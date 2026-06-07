@@ -21,3 +21,10 @@ build/
 *.iml
 .vscode/
 # ยกเว้น settings.json ถ้าอยากแชร์กับทีม แต่แนะนำให้ข้ามไปก่อน
+# --- Logs ---
+logs/
+backend/logs/
+*.log
+
+# --- Uploads ---
+uploads/

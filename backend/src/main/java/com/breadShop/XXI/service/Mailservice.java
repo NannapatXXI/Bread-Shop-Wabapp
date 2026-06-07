@@ -4,6 +4,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+//สำหรับการส่งอีเมล เช่น OTP และอีเมลต้อนรับ  reviewd by peak
 @Service
 public class Mailservice {
 

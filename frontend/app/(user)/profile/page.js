@@ -3,10 +3,11 @@
 // [Claude] หน้า Profile — แสดง/แก้ไขข้อมูลส่วนตัว และจัดการที่อยู่จัดส่ง
 // รองรับการเลือกที่อยู่จากแผนที่ผ่าน MapPicker (Leaflet + OpenStreetMap)
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/AuthContext';
 import api from '@/lib/api';
+import { sendOTPEmail, verifyOTP, resetPassword } from '@/services/auth.service';
 
 // [Claude] dynamic import เพราะ Leaflet ใช้ window ซึ่งไม่มีใน SSR
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { ssr: false });
@@ -18,6 +19,18 @@ export default function ProfilePage() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [username, setUsername]             = useState('');
   const [profileMsg, setProfileMsg]         = useState('');
+
+  // ─── เปลี่ยนรหัสผ่าน ─────────────────────────────────────────
+  // step: 'idle' | 'otp' | 'newpass'
+  const [pwStep,      setPwStep]      = useState('idle');
+  const [otpToken,    setOtpToken]    = useState('');
+  const [otpValue,    setOtpValue]    = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPw,   setConfirmPw]   = useState('');
+  const [pwLoading,   setPwLoading]   = useState(false);
+  const [pwMsg,       setPwMsg]       = useState({ text: '', ok: true });
+  const [countdown,   setCountdown]   = useState(0); // วินาที cooldown ส่งซ้ำ
+  const countdownRef = useRef(null);
 
   // ─── ที่อยู่ ──────────────────────────────────────────────────
   const [addresses, setAddresses]           = useState([]);
@@ -49,6 +62,74 @@ export default function ProfilePage() {
     } catch {
       setAddressMsg('โหลดที่อยู่ไม่สำเร็จ');
     }
+  };
+
+  // ─── เปลี่ยนรหัสผ่าน helpers ─────────────────────────────────
+  const startCountdown = (sec = 60) => {
+    setCountdown(sec);
+    clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown(v => {
+        if (v <= 1) { clearInterval(countdownRef.current); return 0; }
+        return v - 1;
+      });
+    }, 1000);
+  };
+
+  // ขั้น 1: ส่ง OTP ไปที่ email ของ user ที่ login อยู่
+  const handleSendOtp = async () => {
+    setPwLoading(true);
+    setPwMsg({ text: '', ok: true });
+    try {
+      const res = await sendOTPEmail(user.email);
+      setOtpToken(res.data.token);
+      setPwStep('otp');
+      startCountdown(60);
+      setPwMsg({ text: `ส่ง OTP ไปที่ ${user.email} แล้ว`, ok: true });
+    } catch {
+      setPwMsg({ text: 'ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่', ok: false });
+    } finally { setPwLoading(false); }
+  };
+
+  // ขั้น 2: ตรวจ OTP
+  const handleVerifyOtp = async () => {
+    if (!otpValue.trim()) return;
+    setPwLoading(true);
+    setPwMsg({ text: '', ok: true });
+    try {
+      await verifyOTP({ token: otpToken, otp: otpValue });
+      setPwStep('newpass');
+      setPwMsg({ text: 'OTP ถูกต้อง กรุณาตั้งรหัสผ่านใหม่', ok: true });
+    } catch {
+      setPwMsg({ text: 'OTP ไม่ถูกต้องหรือหมดอายุ', ok: false });
+    } finally { setPwLoading(false); }
+  };
+
+  // ขั้น 3: บันทึกรหัสผ่านใหม่
+  const handleResetPassword = async () => {
+    if (newPassword.length < 8) {
+      setPwMsg({ text: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร', ok: false }); return;
+    }
+    if (newPassword !== confirmPw) {
+      setPwMsg({ text: 'รหัสผ่านไม่ตรงกัน', ok: false }); return;
+    }
+    setPwLoading(true);
+    try {
+      await resetPassword({ token: otpToken, newPassword });
+      setPwMsg({ text: 'เปลี่ยนรหัสผ่านสำเร็จ', ok: true });
+      // reset กลับ idle
+      setPwStep('idle');
+      setOtpValue(''); setNewPassword(''); setConfirmPw(''); setOtpToken('');
+    } catch {
+      setPwMsg({ text: 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่', ok: false });
+    } finally { setPwLoading(false); }
+    setTimeout(() => setPwMsg({ text: '', ok: true }), 4000);
+  };
+
+  const cancelPwChange = () => {
+    setPwStep('idle'); setOtpValue(''); setNewPassword('');
+    setConfirmPw(''); setOtpToken(''); setPwMsg({ text: '', ok: true });
+    clearInterval(countdownRef.current);
   };
 
   // ─── แก้ไขข้อมูลส่วนตัว ──────────────────────────────────────
@@ -148,11 +229,11 @@ export default function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
 
-      {/* ─── ส่วนที่ 1: ข้อมูลส่วนตัว ─── */}
+      {/* ─── ส่วนที่ 1: ข้อมูลส่วนตัว + เปลี่ยนรหัสผ่าน ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-7">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-800">ข้อมูลส่วนตัว</h2>
-          {!editingProfile && (
+          {!editingProfile && pwStep === 'idle' && (
             <button
               onClick={() => setEditingProfile(true)}
               className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg transition-colors"
@@ -162,6 +243,7 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* ชื่อผู้ใช้ */}
         <div className="mb-4">
           <p className="text-xs text-gray-500 mb-1 font-medium">ชื่อผู้ใช้</p>
           {editingProfile ? (
@@ -175,13 +257,15 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* อีเมล */}
         <div className="mb-4">
           <p className="text-xs text-gray-500 mb-1 font-medium">อีเมล</p>
           <p className="text-sm text-gray-800">{user?.email}</p>
         </div>
 
+        {/* ปุ่มบันทึก/ยกเลิก สำหรับแก้ไขโปรไฟล์ */}
         {editingProfile && (
-          <div className="flex gap-2 mt-3">
+          <div className="flex gap-2 mt-1 mb-4">
             <button
               onClick={handleSaveProfile}
               className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition-colors"
@@ -197,7 +281,119 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {profileMsg && <p className="text-sm text-indigo-500 mt-3">{profileMsg}</p>}
+        {profileMsg && <p className="text-sm text-indigo-500 mb-4">{profileMsg}</p>}
+
+        {/* ─── เปลี่ยนรหัสผ่าน (inline) ─── */}
+        <div className="border-t border-gray-100 pt-4">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <p className="text-xs text-gray-500 font-medium">รหัสผ่าน</p>
+              {pwStep === 'idle' && (
+                <p className="text-xs text-gray-400 mt-0.5">ระบบจะส่ง OTP ไปยัง {user?.email}</p>
+              )}
+            </div>
+            {pwStep === 'idle' && (
+              <button
+                onClick={handleSendOtp}
+                disabled={pwLoading}
+                className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {pwLoading ? 'กำลังส่ง...' : 'เปลี่ยนรหัสผ่าน'}
+              </button>
+            )}
+          </div>
+
+          {/* ── Step 1: กรอก OTP ── */}
+          {pwStep === 'otp' && (
+            <div className="space-y-3 mt-3">
+              <p className="text-sm text-gray-600">
+                กรอกรหัส OTP 6 หลักที่ส่งไปที่{' '}
+                <span className="font-semibold text-indigo-600">{user?.email}</span>
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text" maxLength={6} value={otpValue}
+                  onChange={e => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-center tracking-widest font-mono text-lg focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={otpValue.length !== 6 || pwLoading}
+                  className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition disabled:opacity-40"
+                >
+                  {pwLoading ? '...' : 'ยืนยัน'}
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSendOtp}
+                  disabled={countdown > 0 || pwLoading}
+                  className="text-xs text-indigo-500 hover:underline disabled:text-gray-400 disabled:no-underline"
+                >
+                  {countdown > 0 ? `ส่งซ้ำได้ใน ${countdown}s` : 'ส่ง OTP ใหม่'}
+                </button>
+                <button onClick={cancelPwChange} className="text-xs text-gray-400 hover:text-gray-600">
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 2: ตั้งรหัสใหม่ ── */}
+          {pwStep === 'newpass' && (
+            <div className="space-y-3 mt-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">
+                  รหัสผ่านใหม่ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password" value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="อย่างน้อย 8 ตัวอักษร"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">
+                  ยืนยันรหัสผ่านใหม่ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password" value={confirmPw}
+                  onChange={e => setConfirmPw(e.target.value)}
+                  placeholder="กรอกรหัสผ่านอีกครั้ง"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none transition
+                    ${confirmPw && confirmPw !== newPassword
+                      ? 'border-red-400 focus:border-red-400'
+                      : 'border-gray-300 focus:border-indigo-400'}`}
+                />
+                {confirmPw && confirmPw !== newPassword && (
+                  <p className="text-xs text-red-500 mt-1">รหัสผ่านไม่ตรงกัน</p>
+                )}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleResetPassword}
+                  disabled={pwLoading || !newPassword || !confirmPw}
+                  className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition disabled:opacity-40"
+                >
+                  {pwLoading ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่านใหม่'}
+                </button>
+                <button onClick={cancelPwChange}
+                  className="border border-gray-300 text-gray-600 text-sm px-5 py-2 rounded-lg hover:bg-gray-50 transition">
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ข้อความแจ้งเตือน OTP/password */}
+          {pwMsg.text && (
+            <p className={`text-sm mt-3 ${pwMsg.ok ? 'text-indigo-500' : 'text-red-500'}`}>
+              {pwMsg.text}
+            </p>
+          )}
+        </div>
       </section>
 
       {/* ─── ส่วนที่ 2: ที่อยู่จัดส่ง ─── */}
@@ -293,24 +489,36 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 gap-3 mb-3">
               {[
                 { label: 'ชื่อที่อยู่ (เช่น บ้าน, ที่ทำงาน)', name: 'name' },
-                { label: 'ชื่อผู้รับ', name: 'recipientName' },
-                { label: 'เบอร์โทรศัพท์', name: 'phone' },
-                { label: 'ที่อยู่', name: 'address' },
-                { label: 'ตำบล / แขวง', name: 'subdistrict' },
-                { label: 'อำเภอ / เขต', name: 'district' },
-                { label: 'จังหวัด', name: 'province' },
-                { label: 'รหัสไปรษณีย์', name: 'postcode' },
-              ].map(({ label, name }) => (
-                <div key={name} className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500 font-medium">{label}</label>
-                  <input
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-                    name={name}
-                    value={form[name]}
-                    onChange={handleFormChange}
-                  />
-                </div>
-              ))}
+                { label: 'ชื่อผู้รับ',      name: 'recipientName', required: true },
+                { label: 'เบอร์โทรศัพท์',  name: 'phone',          required: true },
+                { label: 'ที่อยู่',          name: 'address' },
+                { label: 'ตำบล / แขวง',    name: 'subdistrict' },
+                { label: 'อำเภอ / เขต',    name: 'district' },
+                { label: 'จังหวัด',         name: 'province' },
+                { label: 'รหัสไปรษณีย์',   name: 'postcode' },
+              ].map(({ label, name, required }) => {
+                const isEmpty = required && !form[name].trim();
+                return (
+                  <div key={name} className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500 font-medium">
+                      {label}
+                      {required && <span className="text-red-500 ml-0.5">*</span>}
+                    </label>
+                    <input
+                      className={`border rounded-lg px-3 py-2 text-sm focus:outline-none transition
+                        ${isEmpty
+                          ? 'border-red-400 focus:border-red-500 bg-red-50'
+                          : 'border-gray-300 focus:border-indigo-400'}`}
+                      name={name}
+                      value={form[name]}
+                      onChange={handleFormChange}
+                    />
+                    {isEmpty && (
+                      <p className="text-xs text-red-500">กรุณากรอก{label}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <label className="flex items-center gap-2 text-sm text-gray-700 mb-4 cursor-pointer">
@@ -326,7 +534,9 @@ export default function ProfilePage() {
             <div className="flex gap-2">
               <button
                 onClick={handleSaveAddress}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition-colors"
+                disabled={!form.recipientName.trim() || !form.phone.trim()}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition-colors
+                  disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-500"
               >
                 บันทึก
               </button>

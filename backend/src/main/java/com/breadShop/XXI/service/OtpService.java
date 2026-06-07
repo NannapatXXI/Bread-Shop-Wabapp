@@ -12,7 +12,7 @@ import com.breadShop.XXI.entity.EmailOtp;
 import com.breadShop.XXI.repository.EmailOtpRepository;
 
 import jakarta.transaction.Transactional;
-
+//สำหรับการจัดการ OTP ทั้งการสร้างและตรวจสอบ OTP โดยใช้ Spring Data JPA และ Spring Security  |  reviewd by peak
 @Service
 public class OtpService {
 
@@ -59,7 +59,8 @@ public class OtpService {
      * @param token เอา token ไปค้นหารหัส OTP ที่เก็บไว้
      * @param otpInput รหัส OTP ที่ผู้ใช้กรอกมา
      */
-    @Transactional
+    @Transactional // เราจะใช้ @Transactional ในกรณีที่เราต้องการให้มันทำงานเสร็จพร้อมกันเพราะถ้าเสร็จไม่พร้อมกันอาจจะมีเรื่องข้อมูล
+    //เข่นการอัพเดตสินค้าหลายๆรายการพร้อมกันแล้วเกิดปัญหาเรื่องข้อมูลไม่ตรงกันได้
     public void verifyOtp(String token, String otpInput) {
     
         EmailOtp otp = otpRepository

@@ -11,7 +11,11 @@ module.exports = {
   ],
   // 👆 แก้ไขส่วนนี้ 👆
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ["var(--font-noto-sans-thai)", "var(--font-inter)", "sans-serif"],
+      },
+    },
   },
   plugins: [],
 }

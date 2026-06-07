@@ -38,11 +38,16 @@ public class SecurityConfig {
     public UserDetailsService userDetailsService() {
         return login -> userRepository.findByUsername(login)
                 .or(() -> userRepository.findByEmail(login))
-                .map(user -> org.springframework.security.core.userdetails.User
-                        .withUsername(user.getEmail())
-                        .password(user.getPassword())
-                        .roles(user.getRole().toUpperCase())
-                        .build())
+                .map(user -> {
+                    if (!user.isActive()) {
+                        throw new UsernameNotFoundException("บัญชีนี้ถูกระงับการใช้งาน");
+                    }
+                    return org.springframework.security.core.userdetails.User
+                            .withUsername(user.getEmail())
+                            .password(user.getPassword())
+                            .roles(user.getRole().toUpperCase())
+                            .build();
+                })
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
@@ -72,7 +77,7 @@ public class SecurityConfig {
         return request -> {
             CorsConfiguration config = new CorsConfiguration();
             config.setAllowedOrigins(List.of("http://localhost:3000"));
-            config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+            config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
             config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
             config.setAllowCredentials(true);
             return config;
@@ -119,7 +124,17 @@ public class SecurityConfig {
         
             // ---------- User ----------
             .requestMatchers("/api/v1/users/**").hasRole("USER")
-        
+
+            // ---------- Notifications ----------
+            .requestMatchers("/api/v1/notifications/**").authenticated()
+
+            // ---------- Promotions ----------
+            .requestMatchers(HttpMethod.GET, "/api/promotions/validate").authenticated()
+            .requestMatchers(HttpMethod.GET, "/api/promotions").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/promotions").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.PATCH, "/api/promotions/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.DELETE, "/api/promotions/**").hasRole("ADMIN")
+
             // ---------- Admin ----------
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
         

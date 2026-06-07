@@ -1,48 +1,36 @@
-// app/(app)/layout.js
-'use client'; 
-import { useState } from 'react'; 
-import Sidebar from '../components/Sidebar';
-import Navbar from '../components/Navbar';
+'use client';
+import { useState } from 'react';
+import Sidebar    from '../components/Sidebar';
+import Navbar     from '../components/Navbar';
+import CartDrawer from '../components/CartDrawer';
+import { NotificationProvider } from '../context/NotificationContext';
 
-// V V V 1. Import "สมองตะกร้า" เข้ามา V V V
-import { CartProvider } from '../CartContext';
-import { AuthProvider } from '../context/AuthContext'; 
 export default function AppLayout({ children }) {
-  // (โค้ด State ของ Sidebar ของคุณ - เหมือนเดิม)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    // V V V 2. "หุ้ม" ทุกอย่างด้วย Provider V V V
-    <AuthProvider> 
-      <CartProvider>
-        <div className="flex h-screen bg-[#EEF4FB]">
-          
-          {/* (โค้ด Overlay ของคุณ - เหมือนเดิม) */}
-          {isSidebarOpen && (
-            <div 
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-black opacity-50 z-20 md:hidden"
-            />
-          )}
+    <NotificationProvider>
+    <div className="flex h-screen bg-[#EEF4FB]">
 
-          {/* (โค้ด Sidebar ของคุณ - เหมือนเดิม) */}
-          <Sidebar 
-            isOpen={isSidebarOpen} 
-            setIsOpen={setIsSidebarOpen} 
-          />
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black opacity-50 z-20 md:hidden"
+        />
+      )}
 
-          {/* (โค้ด Navbar และ main ของคุณ - เหมือนเดิม) */}
-          {/* min-w-0 ป้องกัน flex child ดัน sidebar แคบเมื่อ content กว้างเกิน */}
-          <div className="flex-1 min-w-0 flex flex-col">
-            <Navbar
-              setIsOpen={setIsSidebarOpen}
-            />
-            <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
-              {children}
-            </main>
-          </div>
-        </div>
-      </CartProvider>
-    </AuthProvider> 
+      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Navbar setIsOpen={setIsSidebarOpen} />
+        <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
+          {children}
+        </main>
+      </div>
+
+      {/* CartDrawer — ต้องมีทั้ง user และ admin layout ไม่งั้นกดตะกร้าไม่ได้ */}
+      <CartDrawer />
+    </div>
+    </NotificationProvider>
   );
 }

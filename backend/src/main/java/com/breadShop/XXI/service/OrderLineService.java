@@ -11,6 +11,7 @@ import com.breadShop.XXI.dto.orderline.OrderLineResponse;
 import com.breadShop.XXI.entity.OrderLine;
 import com.breadShop.XXI.repository.OrderLineRepository;
 
+//สำหรับการจัดการ order line ของ order  เอาไว้จำกัดข้อมูลที่จะส่งกลับไปหา frontend  | reviewd by peak
 @Service
 public class OrderLineService {
 
@@ -42,6 +43,7 @@ public class OrderLineService {
                 ol.getProduct().getId().intValue(),
                 ol.getProductName(),
                 ol.getProductSku(),
+                ol.getProduct().getImageUrl(),
                 ol.getUnitPrice(),
                 ol.getQuantity(),
                 ol.getDiscountAmount(),

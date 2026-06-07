@@ -8,7 +8,11 @@ import com.breadShop.XXI.entity.Order;
 
 public interface OrderRepository extends JpaRepository<Order, Integer> {
 
-    List<Order> findByUserId(Integer userId);
+    List<Order> findByUserIdOrderByCreatedAtDesc(Integer userId);
+
+    List<Order> findAllByOrderByCreatedAtDesc();
+
+    long countByUserId(Integer userId);
 
     List<Order> findByStatus(Order.OrderStatus status);
 }

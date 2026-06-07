@@ -25,18 +25,20 @@ next-step
 -ทำเรื่อง token กับ cookie ให้เสร็จ แล้วก็เส้น Api และการจัดการ exception ต่างๆ
 -แก้เส้น Api หน้าเว็บให้ไปร่วมกันเพื่อให้รู้ว่า token หมดอายุ
 -เอาข้อมูล order ออกมาโชว์
+-แก้ design mail ที่ส่งเวลาจะส่ง OTP เปลี่ยนเมลด้วยทำเป็นเมลของร้านโดยเฉพาะ
+-ทำการแจ้งเตือนส่งไปทางไลน์ เมื่อมีคนสั่งซื้อสินค้า
+-ทำไลน์ OA แล้วให้ลูกค้าสามารถเชื่อมต่อกับ web ได้เพื่อติดตามหรือเช็ึคสินค้าผ่าน line 
+-ทำใบกำกับภาษีให้ลูกค้า
+-ให้ลูกค้ากำหนดวันที่จะรับสินค้าได้
 
 
 
 Successful
 - accessToken refresh token  cookie เสร็จแล้ว
 
-กลับมา review code  #pass
--order
--orderline
--product
--useraddress 
--promotion
+Code ในส่วนที reviewd ไปแล้ว
+- folder service
+
 
 test api 
 - pass line order in admin
@@ -51,3 +53,31 @@ test api
 
 
 -กลับมาทำหน้า editProduct ตอนนี้ api การดึงข้อมูลจาก id ใช้ได้แล้ว
+
+
+
+✅ รู้แล้ว (จาก project นี้)
+   JWT, Cookie Auth, Refresh Token
+   REST API + ApiResponse standard
+   Layered Architecture (Controller-Service-Repository)
+   ORM (JPA), Dependency Injection
+   Flyway, CORS, DTO, Environment Variables
+
+🎯 ต่อไปที่ควรศึกษา
+   Docker — package app ให้รันที่ไหนก็ได้
+   CI/CD — auto deploy เมื่อ push code
+   Testing — Unit test, Integration test
+   Index ใน Database — ทำให้ query เร็วขึ้น
+   Caching (Redis) — ลด load DB
+   HTTPS/TLS — production ต้องมี
+
+
+
+#Explain for me
+-Flyway = เอาไว้เก็บว่า database มีอะไรเปลี่ยนแปลงไป
+-การแย่ง layout 
+    Controller  →  รับ HTTP request / ส่ง HTTP response
+    Service     →  logic ทางธุรกิจ
+    Repository  →  คุยกับ database
+
+

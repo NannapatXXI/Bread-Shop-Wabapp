@@ -61,6 +61,9 @@ export default function ProductPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 5;
+  const LOW_STOCK_THRESHOLD = 5;
+  // [Claude] 'all' | 'lowstock' (1-5) | 'outofstock' (0)
+  const [stockFilter, setStockFilter] = useState('all');
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
@@ -146,11 +149,15 @@ export default function ProductPage() {
     }
   };
 
-  // [Claude] ใช้ Boyer-Moore search แทน .includes() — case-insensitive อยู่ใน boyerMooreContains แล้ว
+  // [Claude] filter ผสม: category + search + stockFilter (all / lowstock / outofstock)
   const filteredProducts = products.filter(p => {
-    const matchCategory = categoryFilter === "ALL" || p.category === categoryFilter;
-    const matchSearch = boyerMooreContains(p.name ?? '', search);
-    return matchCategory && matchSearch;
+    const matchCategory  = categoryFilter === "ALL" || p.category === categoryFilter;
+    const matchSearch    = boyerMooreContains(p.name ?? '', search);
+    const matchStock =
+      stockFilter === 'lowstock'    ? p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD :
+      stockFilter === 'outofstock'  ? p.stock === 0 :
+      true;
+    return matchCategory && matchSearch && matchStock;
   });
 
   const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
@@ -158,7 +165,8 @@ export default function ProductPage() {
 
   // reset กลับหน้า 1 เมื่อ filter หรือ search เปลี่ยน
   const handleCategoryChange = (cat) => { setCategoryFilter(cat); setCurrentPage(1); };
-  const handleSearchChange = (e) => { setSearch(e.target.value); setCurrentPage(1); };
+  const handleSearchChange   = (e)   => { setSearch(e.target.value); setCurrentPage(1); };
+  const handleStockFilter    = (val) => { setStockFilter(v => v === val ? 'all' : val); setCurrentPage(1); };
 
   
   // (Logic Functions - เหมือนเดิม)
@@ -353,33 +361,57 @@ export default function ProductPage() {
             </div>
             
           </div>
-          <div className="bg-white flex items-center justify-left pl-10 rounded-md">
+          {/* [Claude] คลิก → filter เฉพาะ stock 1-5 */}
+          <button onClick={() => handleStockFilter('lowstock')}
+            className={`flex items-center justify-start pl-10 rounded-md transition border-2
+              ${stockFilter === 'lowstock' ? 'bg-orange-50 border-orange-400' : 'bg-white border-transparent hover:border-orange-200'}`}>
             <div className="h-10 flex items-center justify-center">
                  <div className='bg-[#fff4b4] p-4 rounded-md flex items-center justify-center text-white'>
-                 <FiAlertTriangle  size={30} className="text-yellow-800"/>
+                 <FiAlertTriangle size={30} className="text-yellow-800"/>
                   </div>
-                  <div className = 'flex flex-col items-start justify-center ml-3'>
-                        <h1> {countLowProduct}</h1>
-                        <p >สต็อกใกล้หมด</p>
-                      
+                  <div className='flex flex-col items-start justify-center ml-3'>
+                        <h1 className={stockFilter === 'lowstock' ? 'text-orange-600 font-bold' : ''}>{countLowProduct}</h1>
+                        <p>สต็อกใกล้หมด</p>
                  </div>
             </div>
-            
-          </div>
-          <div className="bg-white flex items-center justify-left pl-10 rounded-md">
+          </button>
+
+          {/* [Claude] คลิก → filter เฉพาะ stock = 0 */}
+          <button onClick={() => handleStockFilter('outofstock')}
+            className={`flex items-center justify-start pl-10 rounded-md transition border-2
+              ${stockFilter === 'outofstock' ? 'bg-red-50 border-red-400' : 'bg-white border-transparent hover:border-red-200'}`}>
             <div className="h-10 flex items-center justify-center">
                   <div className='bg-[#e4c9c9] p-4 rounded-md flex items-center justify-center text-white'>
-                  <TiDeleteOutline  size={30} className="text-red-800"/>
+                  <TiDeleteOutline size={30} className="text-red-800"/>
                   </div>
-                  <div className = 'flex flex-col items-start justify-center ml-3'>
-                        <h1> {countOutofstockProduct} </h1>
-                        <p >หมดสต็อก</p>
-                      
+                  <div className='flex flex-col items-start justify-center ml-3'>
+                        <h1 className={stockFilter === 'outofstock' ? 'text-red-600 font-bold' : ''}>{countOutofstockProduct}</h1>
+                        <p>หมดสต็อก</p>
                  </div>
             </div>
-            
-          </div>
+          </button>
       </div>
+
+      {/* [Claude] Banner — แสดงเมื่อ filter stock เปิดอยู่ */}
+      {stockFilter !== 'all' && (
+        <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 mb-3 border
+          ${stockFilter === 'outofstock'
+            ? 'bg-red-50 border-red-200'
+            : 'bg-orange-50 border-orange-200'}`}>
+          <p className={`text-sm font-semibold flex items-center gap-2
+            ${stockFilter === 'outofstock' ? 'text-red-700' : 'text-orange-700'}`}>
+            <FiAlertTriangle className={stockFilter === 'outofstock' ? 'text-red-500' : 'text-orange-500'} />
+            {stockFilter === 'outofstock'
+              ? `กำลังแสดงเฉพาะสินค้าหมดสต็อก (stock = 0)`
+              : `กำลังแสดงเฉพาะสินค้าใกล้หมด (stock 1–${LOW_STOCK_THRESHOLD} ชิ้น)`}
+          </p>
+          <button onClick={() => handleStockFilter(stockFilter)}
+            className={`text-xs underline font-medium
+              ${stockFilter === 'outofstock' ? 'text-red-600 hover:text-red-800' : 'text-orange-600 hover:text-orange-800'}`}>
+            ล้างตัวกรอง
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center justify-between  gap-4 mb-6  bg-white  shadow-md p-2 rounded-lg">
             
@@ -424,13 +456,13 @@ export default function ProductPage() {
                       </button>
                  
                       <button onClick={() => handleCategoryChange("COOKIE")}
-                      className={`px-4 py-2 rounded-md font-semibold    w-full 
+                      className={`px-4 py-2 rounded-md font-semibold    w-full
                         ${categoryFilter === "COOKIE"
                           ? "bg-[#0F2235] text-white"
                           : "text-gray-400 hover:bg-gray-200"}`}>
                           Cookie
                       </button>
-              </div> 
+              </div>
             </div>
 
     
@@ -439,147 +471,151 @@ export default function ProductPage() {
             
           </div>
 
-    
-      {/* (table ) */}
-      {/* overflow-x-auto ให้ table scroll แนวนอนแทนบีบ column */}
-      <div className="bg-white rounded-xl overflow-x-auto">
-
-        <table className="min-w-[900px] w-full border border-gray-300 rounded-lg overflow-hidden">
-          <thead className="bg-[#0F2235]  text-white">
+      {/* ── Table ── */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
-              <th className="px-4 py-3  text-center text-sm  font-semibold">
-               id
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold ">
-               name
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                price
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                stock
-              </th>
-              <th className="px-4 py-3 text-center text-sm font-semibold w-40 max-w-[160px]">
-                description
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                category
-              </th>
-              <th className="px-6 py-3   text-center text-sm font-semibold">
-                status
-              </th>
-              <th className="px-6 py-3   text-center text-sm font-semibold">
-                expiryDate
-              </th>
-              
-              
-              <th className="py-3 text-center text-sm font-semibold w-24 min-w-[96px]">
-                Image
-              </th>
-              <th className="px-4 py-3 text-center text-sm font-semibold min-w-[160px]">
-                Functions
-              </th>
+              <th className="px-4 py-3 text-left">สินค้า</th>
+              <th className="px-4 py-3 text-center">ราคา / จำนวน</th>
+              <th className="px-4 py-3 text-center">หมวดหมู่</th>
+              <th className="px-4 py-3 text-center">วันหมดอายุ</th>
+              <th className="px-4 py-3 text-center">สถานะสต็อก</th>
+              <th className="px-4 py-3 text-center">จัดการ</th>
             </tr>
           </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pagedProducts.length === 0 ? (
+              <tr>
+                <td colSpan="7" className="py-16 text-center text-gray-400">ไม่มีข้อมูลสินค้า</td>
+              </tr>
+            ) : pagedProducts.map((product) => {
+              // stock status badge
+              const stockBadge =
+                product.stock === 0    ? { label: 'หมดสต็อก',     dot: 'bg-red-400',    bg: 'bg-red-50',    text: 'text-red-600'    } :
+                product.stock <= 5     ? { label: 'ใกล้หมด',      dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-600' } :
+                product.stock <= 9     ? { label: 'เหลือปานกลาง', dot: 'bg-yellow-400', bg: 'bg-yellow-50', text: 'text-yellow-700' } :
+                                         { label: 'พร้อมขาย',     dot: 'bg-green-400',  bg: 'bg-green-50',  text: 'text-green-700'  };
 
-          <tbody className="divide-y divide-gray-200">
+              // category badge
+              const catColor =
+                product.category === 'BREAD'  ? 'bg-blue-100 text-blue-700'   :
+                product.category === 'CAKE'   ? 'bg-pink-100 text-pink-700'   :
+                product.category === 'COOKIE' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-600';
 
-          {pagedProducts.length === 0 ? (
-            <tr>
-              <td colSpan="10" className="py-6 text-gray-400 text-center">
-                ไม่มีข้อมูลสินค้า
-              </td>
-            </tr>
-          ) : pagedProducts.map((product, index) => (
+              return (
+                <tr key={product.id} className="hover:bg-gray-50 transition">
+                  {/* รูป + ชื่อ */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                        {product.imageUrl
+                          ? <img src={`http://localhost:8080/${product.imageUrl}`} alt={product.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">🍞</div>
+                        }
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800">{product.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 max-w-[200px] truncate">{product.description || '—'}</p>
+                      </div>
+                    </div>
+                  </td>
 
-            console.log("สินค้า",product),
+                  {/* ราคา / จำนวน */}
+                  <td className="px-4 py-3 text-center">
+                    <p className="font-semibold text-gray-800">฿{Number(product.price).toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">คงเหลือ {product.stock} ชิ้น</p>
+                  </td>
 
-            <tr key={product.id} className="border-t  text-center  hover:bg-gray-50">
-              <td className="px-4 py-2">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
-              <td className="px-4 py-2">{product.name}</td>
-              <td className="px-4 py-2">{product.price}</td>
-              <td className="px-4 py-2">{product.stock}</td>
-              <td className="px-4 py-2 w-40 max-w-[160px]">
-                <p className="break-words whitespace-normal">{product.description}</p>
-              </td>
-              <td className="px-4 py-2">{boxMap[product.category] || (<div className="p-4 bg-gray-100 border">  ไม่พบค่า</div>)}</td>
-              <td className="px-4 py-2">{renderStockBox(product.stock) || (<div className="p-4 bg-gray-100 border">  ไม่พบค่า</div>)}</td>
-              
-              <td className="px-4 py-2">{product.expiryDate}</td>
-              <td className="px-3 py-2">
-                {product.imageUrl
-                  ? <img src={`http://localhost:8080/${product.imageUrl}`} alt={product.name} className="w-20 h-20 object-cover rounded-md border" />
-                  : <div className="w-20 h-20 bg-gray-100 rounded-md border flex items-center justify-center text-gray-300 text-xs">No img</div>
-                }
-              </td>
-              <td className="px-4 py-2 ">
-                <div className="flex justify-center gap-2">
-                  <button onClick={() => handleDeleteProduct(product.id, product.name)}
-                  className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700">
-                    ลบ
-                  </button>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700" 
-                onClick={() =>{
-                  router.push(`/admin/products/editproduct/${product.id}`)
-                }}>
-                    แก้ไข
-                  </button>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  
-                 
-                  onClick={() =>{
-                    setSelectedProduct(product);
-                    setShowPreview(true);
-                  }}
-                  >
-                    
-                    preview
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+                  {/* หมวดหมู่ */}
+                  <td className="px-4 py-3 text-center">
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${catColor}`}>
+                      {product.category || '—'}
+                    </span>
+                  </td>
+
+                  {/* วันหมดอายุ */}
+                  <td className="px-4 py-3 text-center text-gray-500 text-xs">
+                    {product.expiryDate
+                      ? new Date(product.expiryDate).toLocaleDateString('th-TH', { dateStyle: 'medium' })
+                      : '—'}
+                  </td>
+
+                  {/* สถานะสต็อก */}
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${stockBadge.bg} ${stockBadge.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${stockBadge.dot}`} />
+                      {stockBadge.label}
+                    </span>
+                  </td>
+
+                  {/* จัดการ */}
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center items-center gap-1.5">
+                      {/* ลบ */}
+                      <button onClick={() => handleDeleteProduct(product.id, product.name)}
+                        title="ลบ"
+                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+                        </svg>
+                      </button>
+                      {/* preview */}
+                      <button onClick={() => { setSelectedProduct(product); setShowPreview(true); }}
+                        title="ดูรายละเอียด"
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
+                      {/* แก้ไข */}
+                      <button onClick={() => router.push(`/admin/products/editproduct/${product.id}`)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0B1F33] hover:bg-blue-900 text-[#A8CEFF] text-xs font-semibold rounded-lg transition">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        จัดการ
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-    </div>
+      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-500">
-            แสดง {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} จาก {filteredProducts.length} รายการ
-          </p>
+      {/* ── Pagination ── */}
+      <div className="flex items-center justify-between mt-4 px-1">
+        <p className="text-sm text-gray-500">
+          {filteredProducts.length === 0
+            ? 'ไม่มีสินค้า'
+            : `แสดง ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} จาก ${filteredProducts.length} สินค้า`}
+        </p>
+        {totalPages > 1 && (
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 disabled:opacity-40 hover:bg-gray-100"
-            >
-              ← ก่อนหน้า
+            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition text-sm">
+              ‹
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-1.5 rounded-lg text-sm border ${
-                  currentPage === page
-                    ? 'bg-[#0F2235] text-white border-[#0F2235]'
-                    : 'border-gray-300 hover:bg-gray-100'
-                }`}
-              >
+              <button key={page} onClick={() => setCurrentPage(page)}
+                className={`w-8 h-8 rounded-lg text-sm font-medium transition border
+                  ${currentPage === page
+                    ? 'bg-[#0B1F33] text-white border-[#0B1F33]'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-100'}`}>
                 {page}
               </button>
             ))}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 disabled:opacity-40 hover:bg-gray-100"
-            >
-              ถัดไป →
+            <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition text-sm">
+              ›
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* (Modal แสดง Preview ก่อนเพิ่มสินค้า) */}
       {showPreviewOfAddProduct && (

@@ -50,6 +50,9 @@ public class User {
     @Column(nullable = false)
     private String role = "USER"; // ค่าเริ่มต้น
 
+    @Column(nullable = false)
+    private boolean isActive = true; // false = banned
+
     // (Constructors, Getters, Setters)
    
    public User() {
@@ -88,8 +91,10 @@ public class User {
         return role != null ? role.toUpperCase() : "USER";
     }
     
-    public void setRole(String role) { this.role = role; }  
-    public void setProvider(String provider) { this.provider = provider; }  
+    public void setRole(String role) { this.role = role; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { this.isActive = active; }
 
     // (Getters/Setters ใหม่ 3 อัน)
     public LocalDateTime getCreatedAt() { return createdAt; }

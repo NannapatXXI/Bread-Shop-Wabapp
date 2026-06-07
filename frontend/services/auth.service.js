@@ -15,7 +15,7 @@ export const register = (data) => {
 };
 
 export const sendOTPEmail = (email) => {
-  return api.post("/api/v1/auth/send-OTP-mail",email);
+  return api.post("/api/v1/auth/send-OTP-mail", { email });
 };
 export const verifyOTP = (data) => {
   return api.post("/api/v1/auth/verify-otp", data);
@@ -62,4 +62,44 @@ export const addproduct = (formData) => {
     },
   });
 }
+
+// ── Address ──────────────────────────────────────────────────
+export const getAddresses = (userId) =>
+  api.get(`/api/users/${userId}/addresses`);
+
+// ── Promotion ────────────────────────────────────────────────
+/** ตรวจโค้ดส่วนลด + คำนวณส่วนลดตามยอด
+ *  คืน { code, name, discountAmount } */
+export const validatePromoCode = (code, amount) =>
+  api.get(`/api/promotions/validate`, { params: { code, amount } });
+
+// ── Order ────────────────────────────────────────────────────
+/** สร้าง order ใหม่
+ *  body: { userId, addressId, promotionCode?, shippingFee, note?, items: [{productId, quantity}] } */
+export const createOrder = (data) =>
+  api.post(`/api/orders`, data);
+
+/** ประวัติ order ของ user */
+export const getMyOrders = (userId) =>
+  api.get(`/api/orders`, { params: { userId } });
+
+/** ยกเลิก order — ได้เฉพาะ status PENDING */
+export const cancelOrder = (orderId, userId) =>
+  api.patch(`/api/orders/${orderId}/cancel`, null, { params: { userId } });
+
+// ── Admin ────────────────────────────────────────────────────
+export const adminGetAllOrders    = ()         => api.get('/api/v1/admin/orders');
+export const adminUpdateOrderStatus = (id, status, trackingNo) =>
+  api.patch(`/api/v1/admin/${id}/status`, null, { params: { status, ...(trackingNo ? { trackingNo } : {}) } });
+
+export const adminGetCustomers    = ()         => api.get('/api/v1/admin/customers');
+
+export const adminGetPromotions   = ()         => api.get('/api/promotions');
+export const adminCreatePromotion = (data)     => api.post('/api/promotions', data);
+export const adminTogglePromotion = (id)       => api.patch(`/api/promotions/${id}/toggle`);
+export const adminDeletePromotion = (id)       => api.delete(`/api/promotions/${id}`);
+
+export const adminUpdateUserRole  = (id, role)     => api.patch(`/api/v1/admin/customers/${id}/role`, null, { params: { role } });
+export const adminToggleBan       = (id)            => api.patch(`/api/v1/admin/customers/${id}/ban`);
+export const adminUpdateUsername  = (id, username)  => api.patch(`/api/v1/admin/customers/${id}/username`, null, { params: { username } });
 

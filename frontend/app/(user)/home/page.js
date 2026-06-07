@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
-import { getProducts, getorders } from '@/services/auth.service';
+import { getProducts, getMyOrders } from '@/services/auth.service';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -39,12 +39,16 @@ export default function HomePage() {
       .then(res => setProducts(res.data))
       .catch(() => {})
       .finally(() => setLoadingProducts(false));
+  }, []);
 
-    getorders()
-      .then(res => setOrders(res.data))
+  // โหลด orders เฉพาะตอนที่รู้ user.id แล้ว
+  useEffect(() => {
+    if (!user?.id) return;
+    getMyOrders(user.id)
+      .then(res => setOrders(res.data ?? []))
       .catch(() => {})
       .finally(() => setLoadingOrders(false));
-  }, []);
+  }, [user?.id]);
 
   const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'PROCESSING' || o.status === 'CONFIRMED');
   const latestOrder = [...orders].reverse()[0];
@@ -83,8 +87,19 @@ export default function HomePage() {
       {/* Latest order alert */}
       {latestOrder && (
         <div style={{ background: 'white', borderRadius: '12px', border: '0.5px solid #dce8f0', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '40px', height: '40px', background: '#EEF4FB', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ fontSize: '20px' }}>📦</span>
+          {/* รูปสินค้าแรกในออเดอร์ */}
+          <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#EEF4FB' }}>
+            {latestOrder.orderLines?.[0]?.productImageUrl ? (
+              <img
+                src={`${API_URL}/${latestOrder.orderLines[0].productImageUrl}`}
+                alt={latestOrder.orderLines[0].productName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '20px' }}>🍞</span>
+              </div>
+            )}
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: '13px', fontWeight: 500, color: '#0B1F33', margin: '0 0 2px' }}>
@@ -94,7 +109,7 @@ export default function HomePage() {
               {latestOrder.orderLines?.map(l => l.productName).join(', ')} · ฿{latestOrder.totalAmount}
             </p>
           </div>
-          <Link href="/orders">
+          <Link href="/history">
             <span style={{ fontSize: '12px', color: '#378ADD', cursor: 'pointer', whiteSpace: 'nowrap' }}>ดูรายละเอียด →</span>
           </Link>
         </div>
@@ -151,7 +166,7 @@ export default function HomePage() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#0B1F33', margin: 0 }}>ออเดอร์ล่าสุด</h3>
-          <Link href="/orders">
+          <Link href="/history">
             <span style={{ fontSize: '12px', color: '#378ADD', cursor: 'pointer' }}>ดูทั้งหมด →</span>
           </Link>
         </div>
@@ -168,8 +183,19 @@ export default function HomePage() {
               const s = statusLabel(order.status);
               return (
                 <div key={order.id} style={{ background: 'white', borderRadius: '10px', border: '0.5px solid #dce8f0', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '36px', height: '36px', background: '#EEF4FB', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: '18px' }}>📦</span>
+                  {/* รูปสินค้าแรกในออเดอร์ */}
+                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#EEF4FB' }}>
+                    {order.orderLines?.[0]?.productImageUrl ? (
+                      <img
+                        src={`${API_URL}/${order.orderLines[0].productImageUrl}`}
+                        alt={order.orderLines[0].productName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '18px' }}>🍞</span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '13px', fontWeight: 500, color: '#0B1F33', margin: '0 0 2px' }}>{order.orderNo}</p>

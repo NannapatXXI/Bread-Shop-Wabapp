@@ -27,7 +27,11 @@ public class UserAddressService {
         this.userRepository = userRepository;
     }
 
-    // ดึงที่อยู่ทั้งหมดของ user
+    /**
+     * ดึงที่อยู่ทั้งหมดของ user คนนี้ 
+     * @param userId ID ของ user ที่ต้องการดึงที่อยู่
+     * @return รายการที่อยู่ทั้งหมดของ user คนนี้ในรูปแบบ List<UserAddressResponse> ซึ่งเป็น DTO ที่มีข้อมูลที่จำเป็นสำหรับ client เท่านั้น โดยไม่รวมข้อมูลภายในหรือข้อมูลที่ไม่จำเป็นอื่นๆ
+     */
     public List<UserAddressResponse> getAddressesByUserId(Integer userId) {
         return userAddressRepository.findByUserId(userId)
                 .stream()
@@ -125,6 +129,11 @@ public class UserAddressService {
     }
 
     // helper — แปลง Entity → Response
+    /**
+     * จำกัดข้อมูลที่ส่งกลับให้เฉพาะข้อมูลที่จำเป็นสำหรับ client โดยไม่เปิดเผยข้อมูลภายในหรือข้อมูลที่ไม่จำเป็น 
+     * @param a UserAddress Entity ที่ต้องการแปลงเป็น Response DTO
+     * @return UserAddressResponse DTO ที่มีข้อมูลที่จำเป็นสำหรับ client เท่านั้น โดยไม่รวมข้อมูลภายในหรือข้อมูลที่ไม่จำเป็นอื่นๆ
+     */
     private UserAddressResponse toResponse(UserAddress a) {
         return new UserAddressResponse(
                 a.getId(), a.getName(), a.getRecipientName(),

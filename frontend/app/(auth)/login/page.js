@@ -1,9 +1,11 @@
 "use client";
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from "react";
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { login, profile } from "@/services/auth.service";
+import api from "@/lib/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,10 +17,10 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
-      const res = await fetch(`${API_URL}/api/v1/auth/google`);
-      const data = await res.json();
-      window.location.href = data.url;
+      // [Fix] ใช้ api (axios) แทน fetch เพื่อให้ interceptor unwrap ApiResponse ก่อน
+      // ถ้าใช้ fetch โดยตรง data.url จะเป็น undefined เพราะ URL จริงซ่อนอยู่ใน data.data.url
+      const res = await api.get("/api/v1/auth/google");
+      window.location.href = res.data.url;
     } catch {
       toast.error("ไม่สามารถเชื่อมต่อ Google ได้");
     }
@@ -53,7 +55,12 @@ export default function LoginPage() {
       toast.success('เข้าสู่ระบบสำเร็จ!');
     } catch (err) {
       if (err.response) {
-        setError(err.response.data?.message || "Login ไม่สำเร็จ");
+        const msg = err.response.data?.message || "";
+        if (msg === "GOOGLE_ACCOUNT") {
+          setError("บัญชีนี้ใช้ Google Login กรุณาเข้าสู่ระบบด้วยปุ่ม Google ด้านล่าง");
+        } else {
+          setError(msg || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+        }
       } else {
         setError("ไม่สามารถเชื่อมต่อ Server ได้");
       }
@@ -88,21 +95,15 @@ export default function LoginPage() {
 
         {/* Logo + title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.75rem' }}>
-          <div style={{
-            width: '40px', height: '40px', background: '#0B1F33',
-            borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <span style={{ fontSize: '20px' }}>🍞</span>
-          </div>
-          <div>
-            <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0B1F33' }}>BreadShop</p>
-            <p style={{ margin: 0, fontSize: '12px', color: '#8ba6ca' }}>Admin Dashboard</p>
+          <Image src="/logo.png" alt="Peak Pung Logo" width={56} height={56} style={{ objectFit: 'cover', flexShrink: 0, borderRadius: '50%' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '10px' }}>
+            <p style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0B1F33' }}>Peak Pung</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#8ba6ca' }}>by Mom Hmee</p>
           </div>
         </div>
 
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0B1F33', margin: '0 0 4px' }}>เข้าสู่ระบบ</h1>
-        <p style={{ fontSize: '13px', color: '#5a7a9a', margin: '0 0 1.75rem' }}>จัดการร้านค้าและออเดอร์ของคุณ</p>
+        <p style={{ fontSize: '13px', color: '#5a7a9a', margin: '0 0 1.75rem' }}>สั่งซื้อสินค้าและติดตาม</p>
 
         <form onSubmit={handleSubmit}>
 

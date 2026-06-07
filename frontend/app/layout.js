@@ -1,15 +1,15 @@
 // app/layout.js
-import { Inter } from "next/font/google";
+import { Inter, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
 
 
 // 1. Import AuthProvider (แก้ Path ให้ถูกตามที่คุณวางไฟล์)
-import { AuthProvider } from "./context/AuthContext"; 
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./CartContext";
 
-// import { CartProvider } from "./CartContext"; // (เดาว่าคุณน่าจะมี CartProvider ด้วย)
-
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const notoSansThai = Noto_Sans_Thai({ subsets: ["thai"], variable: "--font-noto-sans-thai", weight: ["300", "400", "500", "600", "700"] });
 
 export const metadata = {
   title: "BreadShop App",
@@ -18,14 +18,18 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="th">
+      <body className={`${inter.variable} ${notoSansThai.variable} font-sans`}>
         {/* 2. เอา AuthProvider มาครอบเนื้อหาทั้งหมดตรงนี้ */}
         <AuthProvider>
-           <Toaster position="top-right"  reverseOrder={false} />
-            {/* <CartProvider>  <-- ถ้ามี CartProvider ก็ซ้อนกันแบบนี้ */}
-              {children}
-            {/* </CartProvider> */}
+          <CartProvider>
+            <Toaster
+              position="top-right"
+              containerStyle={{ top: 72, right: 16 }}
+              toastOptions={{ duration: 3000 }}
+            />
+            {children}
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>

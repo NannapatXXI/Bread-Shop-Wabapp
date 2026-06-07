@@ -8,8 +8,16 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// path ที่ไม่ต้องการ login — ถ้า refresh token ล้มเหลวบน path พวกนี้ ให้ไม่ redirect
+const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/verify-email", "/reset-password"];
+
+function isPublicPage() {
+  if (typeof window === "undefined") return false;
+  return PUBLIC_PATHS.includes(window.location.pathname);
+}
+
 function redirectToLogin() {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !isPublicPage()) {
     window.location.href = "/login";
   }
 }

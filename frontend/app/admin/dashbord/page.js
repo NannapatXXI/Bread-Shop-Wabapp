@@ -11,11 +11,12 @@ import SalesChart from "../../components/SalesChart";
 import CategoryDonutChart from "../../components/CategoryDonutChart";
 import { getorders } from "@/services/auth.service";
 import api from "@/lib/api"; // [Claude] ใช้ดึง summary และ top products
-
+import { useRouter } from "next/navigation";
 
 
 export default function HomePage() {
-  
+
+  const router = useRouter();
   const [active, setActive] = useState("A");
   const { addToCart } = useCart();
   const { user, loading } = useAuth();
@@ -381,7 +382,7 @@ export default function HomePage() {
                         </div>
                         <div className=' w-1/2 flex items-center justify-end pr-4'>
                             
-                            <div className = 'flex gap-2 items-center justify-end pr-4 text-blue-500 hover:underline cursor-pointer'>
+                            <div   onClick={() => router.push("/admin/orders")} className = 'flex gap-2 items-center justify-end pr-4 text-blue-500 hover:underline cursor-pointer'>
                                     <p>ดูทั้งหมด ⭢ </p>
                             </div>
                         </div>

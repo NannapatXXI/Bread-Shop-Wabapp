@@ -7,6 +7,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.breadShop.XXI.Util.CookieUtil;
 import com.breadShop.XXI.dto.AuthenticationResponse;
@@ -22,17 +24,17 @@ import com.breadShop.XXI.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 
-//สำหรับการสมัครผ่านหน้าเว็บ
+//สำหรับการสมัครผ่านหน้าเว็บ   reviewd by peak
 @Service
 public class AuthService {
 
-   
+
     private  final UserRepository userRepository;
 
     private final EmailOtpRepository otpRepository;
     private final PasswordEncoder passwordEncoder;
 
-   
+
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
     private final UserDetailsService userDetailsService;
@@ -41,7 +43,9 @@ public class AuthService {
     private final Mailservice mailService;
 
     private final OtpService otpService;
-    
+
+    private final UserActivityLogService activityLogService;
+
     public AuthService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
@@ -51,7 +55,8 @@ public class AuthService {
             Mailservice mailService,
             OtpService otpService,
             RefreshTokenService refreshTokenService,
-            UserDetailsService userDetailsService
+            UserDetailsService userDetailsService,
+            UserActivityLogService activityLogService
     ) {
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
@@ -62,21 +67,46 @@ public class AuthService {
         this.otpRepository = otpRepository;
         this.refreshTokenService = refreshTokenService;
         this.userDetailsService = userDetailsService;
+        this.activityLogService = activityLogService;
     }
 
-    public  String refreshAccessToken(HttpServletRequest request){
+    private String getClientIp() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        return attrs != null ? attrs.getRequest().getRemoteAddr() : null;
+    }
 
-         String refreshToken = CookieUtil.getCookie(
-            request, "refresh_token"
-        ).orElseThrow(() -> new RuntimeException("NO_REFRESH_TOKEN"));
+    private String getUserAgent() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        return attrs != null ? attrs.getRequest().getHeader("User-Agent") : null;
+    }
 
-        RefreshToken rt = refreshTokenService.validate(refreshToken);
-        User user = rt.getUser();
+    /**
+     * Token Rotation:
+     * 1. validate token เดิม
+     * 2. ลบ token เดิมออกจาก DB
+     * 3. สร้าง access_token ใหม่ + refresh_token ใหม่
+     *    → ถ้า refresh_token เก่าถูกขโมยไป พอ rotate แล้วตัวเก่าใช้ไม่ได้อีก
+     */
+    @Transactional
+    public AuthenticationResponse refreshAccessToken(HttpServletRequest request) {
+        String refreshTokenValue = CookieUtil.getCookie(request, "refresh_token")
+            .orElseThrow(() -> new RuntimeException("NO_REFRESH_TOKEN"));
 
-        UserDetails userDetails =
-        userDetailsService.loadUserByUsername(user.getEmail());
+        // validate ก่อน (throw ถ้า expired/revoked)
+        RefreshToken oldRt = refreshTokenService.validate(refreshTokenValue);
+        User user = oldRt.getUser();
 
-        return  jwtService.generateToken(userDetails) ;
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+
+        // rotate: ลบเก่า สร้างใหม่
+        RefreshToken newRt = refreshTokenService.rotate(oldRt);
+
+        return new AuthenticationResponse(
+            jwtService.generateToken(userDetails),  // access token ใหม่
+            newRt.getToken(),                        // refresh token ใหม่
+            user.getUsername(),
+            user.getEmail()
+        );
     }
 
     //อาจจะต้องมาแก้ ยังไม่ได้ test bug
@@ -85,22 +115,25 @@ public class AuthService {
         if (userRepository.existsByUsername(request.username())) {
             throw new IllegalArgumentException("USERNAME_EXISTS");
         }
-    
+
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("EMAIL_EXISTS");
         }
-    
+
         User user = new User(
                 request.username(),
                 request.email(),
                 passwordEncoder.encode(request.password())
         );
-    
-        user.setRole("USER"); // 👈 สำคัญ
-    
+
+        user.setRole("USER");
+
         userRepository.save(user);
-    
+
         mailService.sendWelcomeEmail(request.email(), request.username());
+
+        activityLogService.logSuccess(user, "REGISTER", getClientIp(), getUserAgent(),
+                "Register with email: " + request.email());
     }
     
 
@@ -111,6 +144,16 @@ public class AuthService {
      * @return ส่ง token ,username , email กลับไป
      */
     public AuthenticationResponse loginUser(LoginRequest request) {
+
+        // เช็คก่อนว่า account นี้ใช้ Google Login หรือเปล่า
+        // ถ้าใช่ → throw ทันที ไม่ต้องไป authenticate (ป้องกัน "Bad credentials" ที่ไม่ชัดเจน)
+        userRepository.findByEmail(request.usernameOrEmail())
+                .or(() -> userRepository.findByUsername(request.usernameOrEmail()))
+                .ifPresent(u -> {
+                    if ("google".equalsIgnoreCase(u.getProvider())) {
+                        throw new IllegalArgumentException("GOOGLE_ACCOUNT");
+                    }
+                });
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -131,6 +174,9 @@ public class AuthService {
         // 2. refresh token (อายุยาว + save DB)
         RefreshToken refreshToken = refreshTokenService.create(user);
     
+        activityLogService.logSuccess(user, "LOGIN", getClientIp(), getUserAgent(),
+                "Login success for: " + user.getEmail());
+
         return new AuthenticationResponse(
                 accessToken,
                 refreshToken.getToken(),

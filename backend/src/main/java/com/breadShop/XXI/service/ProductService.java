@@ -18,13 +18,15 @@ import com.breadShop.XXI.entity.Product;
 import com.breadShop.XXI.entity.ProductCategory;
 import com.breadShop.XXI.repository.ProductRepository;
 
+
+/// บริการสำหรับจัดการข้อมูลสินค้า เช่น สร้าง, อ่าน, อัปเดต, ลบ และนับจำนวนสินค้าตามเงื่อนไขต่างๆ | reviewed by peak
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
 
     private static final String UPLOAD_DIR =
-    System.getProperty("user.dir") + File.separator + "uploads";
+        Paths.get(System.getProperty("user.dir")).getParent().resolve("uploads").toString();
 
 
    
@@ -32,7 +34,12 @@ public class ProductService {
         this.productRepository = productRepository;
     }
 
-   
+   /**
+    * สร้างสินค้าใหม่พร้อมบันทึกรูปภาพที่อัปโหลดไปยังโฟลเดอร์ uploads และเก็บ URL ของรูปในฐานข้อมูล
+    * @param request ข้อมูลสินค้าใหม่ที่รับมาจาก client รวมถึงไฟล์รูปภาพ
+    * @return ข้อมูลสินค้าใหม่ที่ถูกบันทึกในฐานข้อมูลพร้อม URL ของรูปภาพ
+    * @throws IOException หากเกิดข้อผิดพลาดในการบันทึกรูปภาพ
+    */
    public Product createProduct(ProductRequest request) throws IOException {
 
     MultipartFile image = request.getImage();
@@ -53,7 +60,10 @@ public class ProductService {
     return productRepository.save(product);
 }
 
-    
+    /**
+     * ดึงข้อมูลสินค้าทั้งหมดจากฐานข้อมูล
+     * @return รายการสินค้าทั้งหมดในรูปแบบ List<Product>
+     */
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
@@ -72,7 +82,13 @@ public class ProductService {
 
 
 
-    // [Claude] อัปเดตข้อมูลสินค้า — ถ้าส่งรูปใหม่มาด้วยจะลบรูปเก่าแล้วบันทึกรูปใหม่
+    /**
+     * อัปเดตข้อมูลสินค้าโดย ID หากไม่พบจะโยนข้อผิดพลาด 404 Not Found และหากมีรูปใหม่ส่งมา จะลบรูปเก่าแล้วบันทึกรูปใหม่แทน
+     * @param id ID ของสินค้าที่ต้องการอัปเดต
+     * @param request ข้อมูลสินค้าใหม่ที่รับมาจาก client รวมถึงไฟล์รูปภาพ (ถ้ามี)
+     * @return ข้อมูลสินค้าใหม่ที่ถูกอัปเดตในฐานข้อมูลพร้อม URL ของรูปภาพ (ถ้ามี)
+     * @throws IOException หากเกิดข้อผิดพลาดในการบันทึกรูปภาพใหม่หรือการลบรูปภาพเก่า
+     */
     public Product updateProduct(Long id, ProductRequest request) throws IOException {
 
         Product product = productRepository.findById(id)
@@ -103,6 +119,10 @@ public class ProductService {
         return productRepository.save(product);
     }
 
+    /**
+     * ลบสินค้าตาม ID หากไม่พบจะโยนข้อผิดพลาด 404 Not Found และหากสินค้ามีรูปภาพที่เก็บไว้ จะลบรูปภาพนั้นด้วย
+     * @param id ID ของสินค้าที่ต้องการลบ
+     */
     public void deleteProduct(Long id) {
 
         Product product = productRepository.findById(id)
@@ -133,19 +153,32 @@ public class ProductService {
         return  count;
        
     }
-    
+    /**
+     * นับจำนวนสินค้าทั้งหมดในฐานข้อมูล
+     * @return จำนวนสินค้าทั้งหมดในฐานข้อมูล
+     */
     public Long countAllProducts() {
         Long count = productRepository.count();
         System.out.println("Total products: " + count);
         return  count;
        
     }
+
+    /**
+     * นับจำนวนสินค้าที่หมดอายุแล้ว (expiryDate ก่อนวันที่ปัจจุบัน)
+     * @return จำนวนสินค้าที่หมดอายุแล้วในฐานข้อมูล
+     */
     public Long countProductsByExpiryDate() {
         Long count = productRepository.countByExpiryDateBefore(java.time.LocalDate.now());
         System.out.println("Total expired products: " + count);
         return  count;
        
     }
+    /**
+     * นับจำนวนสินค้าที่มีจำนวนในสต็อกมากกว่า stock ที่กำหนด
+     * @param stock จำนวนสินค้าที่ต้องการตรวจสอบ (นับสินค้าที่มี stock มากกว่า จำนวนนี้)
+     * @return จำนวนสินค้าที่มีจำนวนในสต็อกมากกว่า stock ที่กำหนด
+     */
     public Long countProductsByStock(int stock) {
         Long count = productRepository.countByStockGreaterThan(stock);
         System.out.println("Total low stock products: " + count);

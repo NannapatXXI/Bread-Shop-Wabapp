@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { getProducts } from "@/services/auth.service";
@@ -17,18 +18,16 @@ export default function LandingPage() {
 
 
   const fetchProducts = async () => {
-
     try {
-      
       const res = await getProducts();
-      setProducts(res.data);
-      console.log("products:", res.data);
+      // interceptor unwrap แล้ว: res.data คือ array ตรงๆ
+      setProducts(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error("fetch error:", err); 
-      if (err.response?.status !== 403) {
-        console.error(err);
-      }
-    }finally {
+      // ถ้าโหลดสินค้าไม่ได้ (backend ยังไม่ start / network error)
+      // ให้แสดงหน้าปกติโดยไม่มีสินค้า ห้าม redirect ออกจาก landing page
+      console.warn("[LandingPage] ไม่สามารถโหลดสินค้าได้:", err?.message ?? err);
+      setProducts([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -43,13 +42,11 @@ export default function LandingPage() {
         position: 'sticky', top: 0, zIndex: 50,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '34px', height: '34px', background: '#1a3a5c',
-            borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontSize: '18px' }}>🍞</span>
+          <Image src="/logo.png" alt="Peak Pung Logo" width={40} height={40} style={{ objectFit: 'cover', borderRadius: '50%', flexShrink: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '6px' }}>
+            <span style={{ color: 'white', fontSize: '14px', fontWeight: 700, lineHeight: 1.2 }}>Peak Pung</span>
+            <span style={{ color: '#8ba6ca', fontSize: '11px', lineHeight: 1.2 }}>by Mom Hmee</span>
           </div>
-          <span style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>BreadShop</span>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link href="/login">

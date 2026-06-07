@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,5 +59,16 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<ApiResponse<OrderResponse>> create(@RequestBody OrderRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("สร้าง order สำเร็จ", orderService.createOrder(request)));
+    }
+
+    /**
+     * PATCH /api/orders/{id}/cancel?userId=1
+     * ยกเลิก order — ได้เฉพาะ status PENDING และต้องเป็น order ของ user คนนั้นเท่านั้น
+     */
+    @PatchMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<OrderResponse>> cancel(
+            @PathVariable Integer id,
+            @RequestParam Integer userId) {
+        return ResponseEntity.ok(ApiResponse.ok("ยกเลิก order สำเร็จ", orderService.cancelOrder(id, userId)));
     }
 }

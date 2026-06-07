@@ -1,14 +1,12 @@
 // components/Sidebar.js
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from "../context/AuthContext";
 // 1. Import ไอคอน Home, Cog, SignOut, และ "Times" (ปุ่ม X)
-import { FaHome, FaCog, FaSignOutAlt, FaTimes } from 'react-icons/fa';
+import { FaHome, FaSignOutAlt, FaTimes, FaUsers, FaTags, FaShieldAlt } from 'react-icons/fa';
 import { GrHistory } from "react-icons/gr";
-import { MdPerson } from "react-icons/md";
-import { MdDashboard } from "react-icons/md";
-import { MdOutlineManageSearch } from "react-icons/md";
-
+import { MdPerson, MdDashboard, MdOutlineManageSearch, MdReceiptLong } from "react-icons/md";
 import { VscArchive } from "react-icons/vsc";
 
 
@@ -29,10 +27,22 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       `}
     >
       {/* 4. เพิ่ม "ปุ่ม X" สำหรับปิดในจอมือถือ */}
-      <div className="flex justify-between items-center p-5">
-        <span className="text-2xl font-bold">My App</span>
-        <button 
-          onClick={() => setIsOpen(false)} // สั่งปิด
+      <div className="flex justify-between items-center p-4">
+        <div className="flex items-center gap-2">
+          <Image
+            src="/logo.png"
+            alt="Peak Pung Logo"
+            width={50}
+            height={50}
+            className="rounded-full object-cover"
+          />
+          <div className="flex flex-col justify-center mt-3">
+            <p className="text-white font-bold text-sm leading-tight m-0">Peak Pung</p>
+            <p className="text-gray-400 text-xs leading-tight m-0">by Mom Hmee</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsOpen(false)}
           className="md:hidden text-gray-400 hover:text-white"
         >
           <FaTimes size={20} />
@@ -73,12 +83,27 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               </div> 
               <Link href="/admin/dashbord" className="flex items-center p-2 rounded-lg hover:bg-gray-700">
                 <MdDashboard className="mr-3" />
-                Manage dashbord
+                Dashboard
               </Link>
-
               <Link href="/admin/products" className="flex items-center p-2 rounded-lg hover:bg-gray-700">
                 <MdOutlineManageSearch className="mr-3" />
-                Manage Product
+                Products
+              </Link>
+              <Link href="/admin/orders" className="flex items-center p-2 rounded-lg hover:bg-gray-700">
+                <MdReceiptLong className="mr-3" />
+                Orders
+              </Link>
+              <Link href="/admin/promotions" className="flex items-center p-2 rounded-lg hover:bg-gray-700">
+                <FaTags className="mr-3" />
+                Promotions
+              </Link>
+              <Link href="/admin/customers" className="flex items-center p-2 rounded-lg hover:bg-gray-700">
+                <FaUsers className="mr-3" />
+                Customers
+              </Link>
+              <Link href="/admin/logs" className="flex items-center p-2 rounded-lg hover:bg-gray-700">
+                <FaShieldAlt className="mr-3" />
+                Logs
               </Link>
             </>
           )}

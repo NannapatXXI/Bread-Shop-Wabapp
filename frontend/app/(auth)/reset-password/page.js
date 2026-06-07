@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -11,9 +11,9 @@ import { useRouter } from 'next/navigation';
 
 // (ClassNames เหมือนเดิม)
 const containerClasses = "bg-white p-8 rounded-xl shadow-2xl w-full max-w-md";
-const controlsClasses = "flex justify-center items-center min-h-screen p-4"; 
+const controlsClasses = "flex justify-center items-center min-h-screen p-4";
 
-export default function RegisterPage() {
+function ResetPasswordForm() {
 
     // 2. เรียกใช้ useRouter เพื่อสร้างตัวแปร router ที่ขาดไป
     const router = useRouter();
@@ -201,8 +201,16 @@ export default function RegisterPage() {
                     </div>
                 </form>
                 
-               
+
             </div>
         </div>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center items-center min-h-screen">กำลังโหลด...</div>}>
+            <ResetPasswordForm />
+        </Suspense>
     );
 }

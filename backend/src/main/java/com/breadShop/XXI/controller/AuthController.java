@@ -31,6 +31,7 @@ import com.breadShop.XXI.service.AuthService;
 import com.breadShop.XXI.service.GoogleAuthService;
 import com.breadShop.XXI.service.Mailservice;
 import com.breadShop.XXI.service.RefreshTokenService;
+import com.breadShop.XXI.service.UserActivityLogService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -50,20 +51,32 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private final AuthService          authService;
-    private final GoogleAuthService    googleAuthService;
-    private final UserRepository       userRepository;
-    private final Mailservice          mailservice;
-    private final RefreshTokenService  refreshTokenService;
+    private final AuthService             authService;
+    private final GoogleAuthService       googleAuthService;
+    private final UserRepository          userRepository;
+    private final Mailservice             mailservice;
+    private final RefreshTokenService     refreshTokenService;
+    private final UserActivityLogService  activityLogService;
 
     public AuthController(AuthService authService, GoogleAuthService googleAuthService,
                           UserRepository userRepository, Mailservice mailservice,
-                          RefreshTokenService refreshTokenService) {
-        this.authService         = authService;
-        this.googleAuthService   = googleAuthService;
-        this.userRepository      = userRepository;
-        this.mailservice         = mailservice;
+                          RefreshTokenService refreshTokenService,
+                          UserActivityLogService activityLogService) {
+        this.authService        = authService;
+        this.googleAuthService  = googleAuthService;
+        this.userRepository     = userRepository;
+        this.mailservice        = mailservice;
         this.refreshTokenService = refreshTokenService;
+        this.activityLogService = activityLogService;
+    }
+
+    private String clientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        return (xff != null && !xff.isBlank()) ? xff.split(",")[0].trim() : req.getRemoteAddr();
+    }
+    private String userAgent(HttpServletRequest req) {
+        String ua = req.getHeader("User-Agent");
+        return ua != null ? ua : "";
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -99,8 +112,10 @@ public class AuthController {
      * revoke refresh_token ใน DB แล้วลบ cookie ทั้งสอง
      */
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
-                                                     HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         if (request.getCookies() != null) {
             for (var cookie : request.getCookies()) {
                 if ("refresh_token".equals(cookie.getName())) {
@@ -112,6 +127,12 @@ public class AuthController {
                     }
                 }
             }
+        }
+
+        if (userDetails != null) {
+            userRepository.findByEmail(userDetails.getUsername()).ifPresent(user ->
+                activityLogService.logSuccess(user, "LOGOUT", clientIp(request), userAgent(request), "ออกจากระบบ")
+            );
         }
 
         ResponseCookie clearAccess = ResponseCookie.from("access_token", "")
@@ -130,16 +151,25 @@ public class AuthController {
      * อ่าน refresh_token จาก cookie → ออก access_token ใหม่
      * ใช้ตอน axios interceptor ตรวจพบ 401
      */
+    /**
+     * POST /api/v1/auth/refresh
+     * Token Rotation: validate เก่า → ลบเก่า → ออก access_token + refresh_token ใหม่
+     * ทั้งสอง cookie ถูก set ใหม่พร้อมกัน
+     */
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<Void>> refresh(HttpServletRequest request) {
+        var tokens = authService.refreshAccessToken(request);
 
-        String newAccessToken = authService.refreshAccessToken(request);
-
-        ResponseCookie accessCookie = ResponseCookie.from("access_token", newAccessToken)
+        ResponseCookie accessCookie = ResponseCookie.from("access_token", tokens.accessToken())
                 .httpOnly(true).path("/").maxAge(15 * 60).build();
+
+        // refresh token ใหม่ (หลัง rotate) — path จำกัดไว้แค่ /api/v1/auth เพื่อ security
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", tokens.refreshToken())
+                .httpOnly(true).path("/api/v1/auth").maxAge(7 * 24 * 60 * 60).build();
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(ApiResponse.ok("refresh สำเร็จ"));
     }
 
@@ -174,15 +204,21 @@ public class AuthController {
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateMe(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody UpdateProfileRequest request) {
+            @RequestBody UpdateProfileRequest request,
+            HttpServletRequest httpRequest) {
 
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        String oldUsername = user.getUsername();
         if (request.getUsername() != null && !request.getUsername().isBlank()) {
             user.setUsername(request.getUsername());
         }
         userRepository.save(user);
+
+        activityLogService.logSuccess(user, "UPDATE_PROFILE",
+                clientIp(httpRequest), userAgent(httpRequest),
+                "เปลี่ยน username: " + oldUsername + " → " + user.getUsername());
 
         return ResponseEntity.ok(ApiResponse.ok("บันทึกสำเร็จ", Map.of(
                 "id",       user.getId(),
@@ -287,13 +323,19 @@ public class AuthController {
     @GetMapping("/google/callback")
     public ResponseEntity<?> callback(@RequestParam("code") String code) {
         try {
-            String jwt = googleAuthService.handleGoogleCallback(code);
+            var tokens = googleAuthService.handleGoogleCallback(code);
 
-            ResponseCookie accessCookie = ResponseCookie.from("access_token", jwt)
+            // [Fix] set ทั้ง access_token + refresh_token เหมือน login ปกติ
+            ResponseCookie accessCookie = ResponseCookie.from("access_token", tokens.accessToken())
                     .httpOnly(true).secure(false).path("/").maxAge(15 * 60).sameSite("Lax").build();
+
+            ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", tokens.refreshToken())
+                    .httpOnly(true).secure(false).path("/api/v1/auth")
+                    .maxAge(7 * 24 * 60 * 60).sameSite("Lax").build();
 
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.SET_COOKIE, accessCookie.toString());
+            headers.add(HttpHeaders.SET_COOKIE, refreshCookie.toString());
             headers.setLocation(URI.create("http://localhost:3000/home"));
 
             return new ResponseEntity<>(headers, HttpStatus.FOUND);

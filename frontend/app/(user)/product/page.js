@@ -12,7 +12,11 @@ import { boyerMooreContains } from "@/lib/boyerMoore"; // [Claude] Boyer-Moore s
 
 export default function ProductPage() {
 
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
+
+  // หาจำนวนสินค้าที่อยู่ในตะกร้าแล้ว (ใช้เช็คกับ stock)
+  const getCartQty = (productId) =>
+    items.find(i => i.product.id === productId)?.quantity ?? 0;
   const [products, setProducts]         = useState([]);
   const [search, setSearch]             = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL'); // [Claude] filter หมวดหมู่
@@ -150,11 +154,28 @@ export default function ProductPage() {
                   </span>
                 </div>
 
-                <button
-                  onClick={() => handleSelectProduct(product)}
-                  className="w-full px-3 py-2 font-bold bg-[#0B1F33] text-[#A8CEFF] rounded-md hover:bg-blue-700 transition">
-                  เลือกซื้อ
-                </button>
+                {(() => {
+                  const inCart  = getCartQty(product.id);
+                  const maxed   = product.stock === 0 || inCart >= product.stock;
+                  return (
+                    <button
+                      onClick={() => !maxed && handleSelectProduct(product)}
+                      disabled={maxed}
+                      className={`w-full px-3 py-2 font-bold rounded-md transition
+                        ${maxed
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          : 'bg-[#0B1F33] text-[#A8CEFF] hover:bg-blue-700'}`}
+                    >
+                      {product.stock === 0
+                        ? 'หมดสต็อก'
+                        : inCart >= product.stock
+                          ? 'ครบแล้ว'
+                          : inCart > 0
+                            ? '+ เพิ่ม'
+                            : 'เลือกซื้อ'}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           ))

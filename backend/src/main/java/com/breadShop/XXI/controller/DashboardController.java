@@ -16,10 +16,6 @@ import com.breadShop.XXI.dto.dashboard.TopProductResponse;
 import com.breadShop.XXI.service.DashboardService;
 
 /**
- * [Claude] DashboardController — ข้อมูลสำหรับหน้า admin dashboard
- * path: /api/v1/admin/dashboard/**
- * security: ROLE_ADMIN เท่านั้น (ล็อกที่ SecurityConfig)
- *
  * ทุก endpoint ใช้ window 30 วัน (ไม่ใช่เดือนปัจจุบัน)
  * เหตุผล: ถ้าใช้เดือนปัจจุบัน วันต้นเดือนจะเห็นข้อมูลน้อยมาก
  *
