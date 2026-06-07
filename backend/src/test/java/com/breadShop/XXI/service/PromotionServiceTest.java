@@ -109,8 +109,7 @@ class PromotionServiceTest {
                     LocalDateTime.now().plusDays(10));
             promo.setMinOrderAmount(new BigDecimal("100"));
 
-            when(promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(eq("BREAD10"), any()))
-                    .thenReturn(Optional.of(promo));
+            when(promotionRepository.findByCode("BREAD10")).thenReturn(Optional.of(promo));
 
             PromotionValidateResponse res = promotionService.validate("BREAD10", new BigDecimal("300"));
 
@@ -119,14 +118,13 @@ class PromotionServiceTest {
         }
 
         @Test
-        @DisplayName("โค้ดไม่มีหรือหมดอายุ → throw 400")
+        @DisplayName("โค้ดไม่มีในระบบ → throw 400")
         void validate_withInvalidCode_shouldThrow400() {
-            when(promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(eq("BADCODE"), any()))
-                    .thenReturn(Optional.empty());
+            when(promotionRepository.findByCode("BADCODE")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> promotionService.validate("BADCODE", new BigDecimal("500")))
                     .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("invalid or expired");
+                    .hasMessageContaining("ไม่ถูกต้อง");
         }
 
         @Test
@@ -137,8 +135,7 @@ class PromotionServiceTest {
                     LocalDateTime.now().plusDays(10));
             promo.setMinOrderAmount(new BigDecimal("500"));
 
-            when(promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(eq("BIG50"), any()))
-                    .thenReturn(Optional.of(promo));
+            when(promotionRepository.findByCode("BIG50")).thenReturn(Optional.of(promo));
 
             assertThatThrownBy(() -> promotionService.validate("BIG50", new BigDecimal("200")))
                     .isInstanceOf(ResponseStatusException.class)
@@ -154,8 +151,7 @@ class PromotionServiceTest {
             promo.setUsageLimit(5);
             promo.setUsedCount(5);  // เต็มแล้ว
 
-            when(promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(eq("LIMITED"), any()))
-                    .thenReturn(Optional.of(promo));
+            when(promotionRepository.findByCode("LIMITED")).thenReturn(Optional.of(promo));
 
             assertThatThrownBy(() -> promotionService.validate("LIMITED", new BigDecimal("300")))
                     .isInstanceOf(ResponseStatusException.class)

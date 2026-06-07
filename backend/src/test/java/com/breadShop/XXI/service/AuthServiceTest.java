@@ -20,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.breadShop.XXI.service.UserActivityLogService;
 
 import java.util.Optional;
 
@@ -44,6 +45,7 @@ class AuthServiceTest {
     @Mock private JwtService jwtService;
     @Mock private Mailservice mailService;
     @Mock private OtpService otpService;
+    @Mock private UserActivityLogService activityLogService;
 
     @InjectMocks
     private AuthService authService;

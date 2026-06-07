@@ -27,18 +27,18 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven (skip tests for now)
+      - name: Build & Test with Maven
         working-directory: backend
-        run: ./mvnw clean package -DskipTests
+        run: ./mvnw clean package
         env:
-          DB_URL: jdbc:mysql://localhost:3306/dummy
+          DB_URL: jdbc:mysql://localhost:3306/breadProject
           DB_USERNAME: root
-          DB_PASSWORD: dummy
-          JWT_SECRET: dummysecretdummysecretdummysecretdummy==
-          GOOGLE_CLIENT_ID: dummy
-          GOOGLE_CLIENT_SECRET: dummy
-          MAIL_USERNAME: dummy@dummy.com
-          MAIL_PASSWORD: dummy
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4

@@ -4,6 +4,7 @@ import com.breadShop.XXI.dto.order.OrderRequest;
 import com.breadShop.XXI.dto.order.OrderResponse;
 import com.breadShop.XXI.dto.orderline.OrderLineRequest;
 import com.breadShop.XXI.entity.Order;
+import com.breadShop.XXI.entity.OrderLine;
 import com.breadShop.XXI.entity.Product;
 import com.breadShop.XXI.entity.ProductCategory;
 import com.breadShop.XXI.entity.User;
@@ -22,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -34,21 +36,20 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for OrderService
- * ทดสอบ getByUserId, createOrder (scenarios ต่างๆ), updateStatus
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("OrderService Tests")
 class OrderServiceTest {
 
-    @Mock private OrderRepository orderRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private UserAddressRepository userAddressRepository;
-    @Mock private ProductRepository productRepository;
-    @Mock private PromotionRepository promotionRepository;
-    @Mock private PromotionService promotionService;
+    @Mock private OrderRepository         orderRepository;
+    @Mock private UserRepository          userRepository;
+    @Mock private UserAddressRepository   userAddressRepository;
+    @Mock private ProductRepository       productRepository;
+    @Mock private PromotionRepository     promotionRepository;
+    @Mock private PromotionService        promotionService;
+    @Mock private NotificationService     notificationService;
+    @Mock private OrderLogService         orderLogService;
+    @Mock private UserActivityLogService  activityLogService;
 
     @InjectMocks
     private OrderService orderService;
@@ -60,6 +61,7 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         sampleUser = new User("nannapat", "nannapat@breadshop.com", "hashed_pw");
+        ReflectionTestUtils.setField(sampleUser, "id", 1);
 
         sampleAddress = new UserAddress();
         sampleAddress.setRecipientName("นันทพัทธ์");
@@ -75,6 +77,7 @@ class OrderServiceTest {
                 "อร่อย", null, ProductCategory.BREAD,
                 LocalDate.of(2026, 12, 31)
         );
+        ReflectionTestUtils.setField(sampleProduct, "id", 10L);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -129,13 +132,13 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("createOrder — stock ไม่พอ → throw 400 + บอกชื่อสินค้า")
+    @DisplayName("createOrder — stock ไม่พอ → throw 400")
     void createOrder_whenStockInsufficient_shouldThrow400() {
-        sampleProduct.setStock(1); // มีแค่ 1 ชิ้น
+        sampleProduct.setStock(1);
 
         OrderLineRequest item = mock(OrderLineRequest.class);
         when(item.getProductId()).thenReturn(10);
-        when(item.getQuantity()).thenReturn(5); // ขอ 5 ชิ้น
+        when(item.getQuantity()).thenReturn(5);
 
         OrderRequest request = mock(OrderRequest.class);
         when(request.getUserId()).thenReturn(1);
@@ -203,6 +206,62 @@ class OrderServiceTest {
 
         assertThat(mockOrder.getStatus()).isEqualTo(Order.OrderStatus.SHIPPED);
         assertThat(mockOrder.getTrackingNo()).isEqualTo("TH-001");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  cancelOrder
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("cancelOrder — PENDING + user เป็นเจ้าของ → เปลี่ยนเป็น CANCELLED และคืน stock")
+    void cancelOrder_whenPendingAndOwner_shouldCancelAndRestoreStock() {
+        Order order = buildMockOrder();
+        OrderLine line = mock(OrderLine.class);
+        when(line.getProduct()).thenReturn(sampleProduct);
+        when(line.getQuantity()).thenReturn(2);
+        order.getOrderLines().add(line);
+
+        when(orderRepository.findById(1)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenReturn(order);
+
+        int stockBefore = sampleProduct.getStock();
+        orderService.cancelOrder(1, sampleUser.getId());
+
+        assertThat(order.getStatus()).isEqualTo(Order.OrderStatus.CANCELLED);
+        assertThat(sampleProduct.getStock()).isEqualTo(stockBefore + 2);
+    }
+
+    @Test
+    @DisplayName("cancelOrder — user ไม่ใช่เจ้าของ order → throw 403")
+    void cancelOrder_whenNotOwner_shouldThrow403() {
+        Order order = buildMockOrder();
+        when(orderRepository.findById(1)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(1, 999))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
+    @DisplayName("cancelOrder — status ไม่ใช่ PENDING → throw 400 พร้อมบอกสถานะ")
+    void cancelOrder_whenNotPending_shouldThrow400() {
+        Order order = buildMockOrder();
+        order.setStatus(Order.OrderStatus.PROCESSING);
+        when(orderRepository.findById(1)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(1, sampleUser.getId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
+    @DisplayName("cancelOrder — ไม่พบ order → throw 404")
+    void cancelOrder_whenOrderNotFound_shouldThrow404() {
+        when(orderRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.cancelOrder(999, 1))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Order not found");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
