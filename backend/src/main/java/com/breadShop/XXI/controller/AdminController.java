@@ -2,6 +2,8 @@ package com.breadShop.XXI.controller;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -60,7 +62,8 @@ public class AdminController {
 
     private User currentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email).orElse(null);
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Admin user not found in DB"));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -172,6 +175,14 @@ public class AdminController {
      */
     @GetMapping("/customers")
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> getAllCustomers() {
+        // โหลด order count ทุก user ในคำสั่งเดียว แทนการยิง N queries ใน loop (N+1 fix)
+        Map<Integer, Long> orderCountByUser = orderRepository.countOrdersGroupByUser()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (Integer) row[0],
+                        row -> (Long) row[1]
+                ));
+
         List<CustomerResponse> customers = userRepository.findAll().stream()
                 .map(user -> new CustomerResponse(
                         user.getId(),
@@ -180,7 +191,7 @@ public class AdminController {
                         user.getRole(),
                         user.getProvider() != null ? user.getProvider() : "credentials",
                         user.getCreatedAt(),
-                        (int) orderRepository.countByUserId(user.getId()),
+                        orderCountByUser.getOrDefault(user.getId(), 0L).intValue(),
                         user.isActive()
                 ))
                 .toList();

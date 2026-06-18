@@ -4,6 +4,9 @@ package com.breadShop.XXI.dto.dashboard;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * DTO สำหรับ CategoryDonutChart — ยอดขายแบ่งตาม category เดือนนี้
+ */
 public class CategorySalesResponse {
 
     private final List<CategoryData> data;

@@ -1,216 +1,134 @@
 "use client";
 import { useState, Suspense } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import Image from 'next/image';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { resetPassword } from "@/services/auth.service";
-
-
-import { useRouter } from 'next/navigation';
-
-// (ClassNames เหมือนเดิม)
-const containerClasses = "bg-white p-8 rounded-xl shadow-2xl w-full max-w-md";
-const controlsClasses = "flex justify-center items-center min-h-screen p-4";
+import Spinner from '@/app/components/Spinner';
 
 function ResetPasswordForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
 
-    // 2. เรียกใช้ useRouter เพื่อสร้างตัวแปร router ที่ขาดไป
-    const router = useRouter();
+  const [newPassword, setNewPassword]         = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword]       = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
+  const [error, setError]                     = useState("");
+  const [isLoading, setIsLoading]             = useState(false);
 
-    const searchParams = useSearchParams();
-    const token = searchParams.get("token");
+  const handleConfirm = async (e) => {
+    e.preventDefault();
+    setError("");
 
-    console.log("Token from verify page:", token);
-    // (States และ Logic ทั้งหมดเหมือนเดิม)
-    const [focusedField, setFocusedField] = useState(null); 
-    const [error, setError] = useState(""); 
-    const [newPassword, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    if (!newPassword || !confirmPassword) { setError("กรุณากรอกข้อมูลให้ครบทุกช่อง"); return; }
+    if (newPassword.length < 6 || (!/\d/.test(newPassword) && !/[^a-zA-Z0-9]/.test(newPassword))) {
+      setError("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร และต้องมีตัวเลขหรือสัญลักษณ์");
+      return;
+    }
+    if (newPassword !== confirmPassword) { setError("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"); return; }
 
+    setIsLoading(true);
+    try {
+      await resetPassword({ token, newPassword });
+      toast.success('เปลี่ยนรหัสผ่านสำเร็จ! กำลังกลับไปหน้า Login...');
+      setTimeout(() => router.push('/login'), 1500);
+    } catch (err) {
+      setError(err?.response?.data?.message ?? err?.message ?? "เกิดข้อผิดพลาดในระบบ");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const infoMessages = {
-        username: "ชื่อผู้ใช้ต้องมีความยาว 4-20 ตัวอักษร และไม่มีอักขระพิเศษ",
-        email: "กรุณาใช้อีเมลที่ถูกต้อง เช่น yourname@example.com",
-        password: "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร และควรมีตัวเลขหรือสัญลักษณ์",
-        confirmPassword: "ยืนยันรหัสผ่านต้องตรงกับช่องรหัสผ่านด้านบน",
-    };
-    
-    const handleConfirm = async(e) => {
-       
-        e.preventDefault(); 
-        setError(""); 
-        console.log("Submitting registration:", { token, newPassword });
-        // (Validation Logic ทั้งหมดเหมือนเดิม)
-        if ( !newPassword || !confirmPassword) {
-            setError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-            return;
-        }
-        const hasNumberOrSymbol = /\d/.test(newPassword) || /[^a-zA-Z0-9]/.test(newPassword);
-        if (newPassword.length < 6 || !hasNumberOrSymbol) {
-            setError(infoMessages.password);
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            setError(infoMessages.confirmPassword);
-            return;
-        }
+  const inputStyle = { width: '100%', padding: '11px 40px 11px 38px', fontSize: '14px', background: 'white', border: '1.5px solid #c8d8e8', borderRadius: '10px', boxSizing: 'border-box', color: '#0B1F33', outline: 'none' };
 
-        setIsLoading(true);
-        
-        try {
-            
-            const payload = {
-                token :token ,
-                newPassword: newPassword,
-              };
-            await resetPassword(payload);
-           
-              toast.success('เปลี่ยนรหัสผ่านแล้ว!!!  กำลังกลับไปหน้า Login...');
-              setTimeout(() => {
-                router.push('/login');
-              }, 1500);
+  return (
+    <div>
+      {/* decorative circles */}
+      <div style={{ position: 'fixed', top: '-80px', right: '-80px', width: '300px', height: '300px', borderRadius: '50%', background: 'rgba(58,123,213,0.12)', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', bottom: '-60px', left: '-60px', width: '220px', height: '220px', borderRadius: '50%', background: 'rgba(168,206,255,0.07)', pointerEvents: 'none' }} />
 
-        
-          } catch (err) {
-            
-              const message =
-              err?.response?.data?.message ??
-              err?.message ??
-              "เกิดข้อผิดพลาดในระบบ";
-          
-            setError(message);
-           
-          } finally {
-            setIsLoading(false);
-          }
-    };
+      <div style={{ background: '#EEF4FB', borderRadius: '20px', padding: 'clamp(1.5rem, 6vw, 2.5rem)', width: '100%', boxSizing: 'border-box' }}>
 
-    const FocusInfo = ({ fieldName }) => {
-        return focusedField === fieldName && (
-            <p className="text-xs !text-indigo-600 mt-1 font-medium">
-                {infoMessages[fieldName]}
-            </p>
-        );
-    };
-
-    const inputFocusProps = (fieldName) => ({
-        onFocus: () => setFocusedField(fieldName),
-        onBlur: () => setFocusedField(null),
-    });
-
-
-    return (
-        <div className={controlsClasses}>
-            <div className={containerClasses}>
-                <div className="mb-6 text-center">
-                    <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Reset Password</h1>
-                </div>
-                
-                <form onSubmit={handleConfirm} className="space-y-4">
-                    {/* (Password Input) */}
-                    <div>
-                        <p className="text-xs font-medium text-gray-700 mb-1 mt-4">Password</p>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                value={newPassword}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                {...inputFocusProps('password')} 
-                                className="w-full py-2.5 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 pr-10"
-                            />
-                            
-                            <button
-                                type="button" 
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute inset-y-0 right-0 flex items-center justify-center h-full w-10 text-gray-500 hover:text-gray-700"
-                                aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                            >
-                                {showPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
-                        
-                        </div> 
-                        <FocusInfo fieldName="password" />
-                    </div>
-
-
-                    {/* (Confirm Password Input) */}
-                    <div>
-                        <p className="text-xs font-medium text-gray-700 mb-1 mt-4">Confirm password</p>
-                        <div className="relative">
-                            <input
-                                type={showConfirmPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                value={confirmPassword} 
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                                {...inputFocusProps('confirmPassword')} 
-                                className="w-full py-2.5 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 pr-10"
-                            />
-                            
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute inset-y-0 right-0 flex items-center justify-center h-full w-10 text-gray-500 hover:text-gray-700"
-                                aria-label={showConfirmPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                            >
-                                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
-                        
-                        </div>
-                        <FocusInfo fieldName="confirmPassword" />
-                    </div>
-
-
-                    {/* (Error Message) */}
-                    {error && (
-                        <div className="text-red-600 text-sm mt-4 text-center font-medium">
-                            {error}
-                        </div>
-                    )}
-                    
-                    {/* (Buttons) */}
-                    <div className="grid grid-cols-4 gap-0 mt-5 pt-4"> 
-                        <a href="/login" className="col-span-1 mr-2"> 
-                            <button
-                                type="button" 
-                                className="
-                                    bg-[#94a3b8] text-[#475569] py-3 px-4 font-bold rounded-lg 
-                                    hover:bg-[#f0f9ff] transition duration-150 w-full 
-                                    cursor-pointer border-4 border-[#64748b] hover:border-[#60a5fa]
-                                "
-                            >
-                                Back
-                            </button>
-                        </a>
-                        <button
-                            type="submit" 
-                            className="
-                                bg-green-600 text-white py-3 px-4 font-bold rounded-lg 
-                                transition duration-150 w-full cursor-pointer hover:bg-green-700 
-                                col-span-3
-                            "
-                        >
-                            Confirm
-                        </button>
-                    </div>
-                </form>
-                
-
-            </div>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+          <Image src="/logo.png" alt="Peak Pung Logo" width={52} height={52} style={{ objectFit: 'cover', flexShrink: 0, borderRadius: '50%' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '8px' }}>
+            <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0B1F33' }}>Peak Pung</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#8ba6ca', whiteSpace: 'nowrap' }}>by Mom Hmee</p>
+          </div>
         </div>
-    );
+
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0B1F33', margin: '0 0 4px' }}>ตั้งรหัสผ่านใหม่</h1>
+        <p style={{ fontSize: '13px', color: '#5a7a9a', margin: '0 0 1.75rem' }}>กรอกรหัสผ่านใหม่ที่ต้องการใช้</p>
+
+        <form onSubmit={handleConfirm}>
+
+          {/* New Password */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#0B1F33', display: 'block', marginBottom: '6px' }}>รหัสผ่านใหม่</label>
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none" stroke="#8ba6ca" strokeWidth="1.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input type={showPassword ? 'text' : 'password'} placeholder="••••••••"
+                value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                disabled={isLoading} style={inputStyle} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8ba6ca' }}>
+                {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Password */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#0B1F33', display: 'block', marginBottom: '6px' }}>ยืนยันรหัสผ่านใหม่</label>
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none" stroke="#8ba6ca" strokeWidth="1.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input type={showConfirm ? 'text' : 'password'} placeholder="••••••••"
+                value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                disabled={isLoading} style={inputStyle} />
+              <button type="button" onClick={() => setShowConfirm(!showConfirm)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8ba6ca' }}>
+                {showConfirm ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ background: '#fff0f0', border: '1px solid #fcc', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#cc3333', margin: '1rem 0', textAlign: 'center' }}>
+              {error}
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '1.25rem' }}>
+            <button type="button" onClick={() => router.push('/login')} style={{ flex: 1, padding: '12px', background: 'white', color: '#5a7a9a', border: '1.5px solid #c8d8e8', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ย้อนกลับ
+            </button>
+            <button type="submit" disabled={isLoading} style={{ flex: 2, padding: '12px', background: isLoading ? '#3a5a7a' : '#0B1F33', color: '#A8CEFF', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>
+              {isLoading
+              ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Spinner size={16} color="#A8CEFF" /> กำลังบันทึก...</span>
+              : 'ยืนยันรหัสผ่านใหม่'}
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  );
 }
 
 export default function ResetPasswordPage() {
-    return (
-        <Suspense fallback={<div className="flex justify-center items-center min-h-screen">กำลังโหลด...</div>}>
-            <ResetPasswordForm />
-        </Suspense>
-    );
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>กำลังโหลด...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
 }

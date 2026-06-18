@@ -7,8 +7,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder; //เป็น class ของ Spring Framework ทำหน้าที่เป็น "ห้องเก็บของ" ที่เก็บ HTTP request ปัจจุบันไว้ให้เข้าถึงได้จากทุกที่ในโปรแกรม
+import org.springframework.web.context.request.ServletRequestAttributes; 
 
 import com.breadShop.XXI.Util.CookieUtil;
 import com.breadShop.XXI.dto.AuthenticationResponse;
@@ -22,7 +23,6 @@ import com.breadShop.XXI.repository.EmailOtpRepository;
 import com.breadShop.XXI.repository.UserRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transactional;
 
 //สำหรับการสมัครผ่านหน้าเว็บ   reviewd by peak
 @Service
@@ -69,12 +69,20 @@ public class AuthService {
         this.userDetailsService = userDetailsService;
         this.activityLogService = activityLogService;
     }
-
+    
+    /**
+     * เอาไว้ดึง IP ของ client ที่เรียกเข้ามา เพื่อใช้ในการบันทึก log การกระทำของผู้ใช้หรือระบบใน UserActivityLogService โดยจะใช้ RequestContextHolder เพื่อเข้าถึง HTTP request ปัจจุบันและดึงค่า remote address (IP) จาก request นั้น
+     * @return IP ของ client ที่เรียกเข้ามา หรือ null ถ้าไม่สามารถเข้าถึง request ได้
+     */
     private String getClientIp() {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         return attrs != null ? attrs.getRequest().getRemoteAddr() : null;
     }
 
+    /**
+     * เอาไว้ดึง User-Agent ของ client ที่เรียกเข้ามา เพื่อใช้ในการบันทึก log การกระทำของผู้ใช้หรือระบบใน UserActivityLogService โดยจะใช้ RequestContextHolder เพื่อเข้าถึง HTTP request ปัจจุบันและดึงค่า header "User-Agent" จาก request นั้น
+     * @return
+     */
     private String getUserAgent() {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         return attrs != null ? attrs.getRequest().getHeader("User-Agent") : null;
@@ -98,18 +106,22 @@ public class AuthService {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
 
-        // rotate: ลบเก่า สร้างใหม่
-        RefreshToken newRt = refreshTokenService.rotate(oldRt);
+        // rotate: ลบเก่า สร้างใหม่ (คืน plain token สำหรับใส่ cookie)
+        String newRefreshToken = refreshTokenService.rotate(oldRt);
 
         return new AuthenticationResponse(
             jwtService.generateToken(userDetails),  // access token ใหม่
-            newRt.getToken(),                        // refresh token ใหม่
+            newRefreshToken,                         // refresh token ใหม่
             user.getUsername(),
             user.getEmail()
         );
     }
 
-    //อาจจะต้องมาแก้ ยังไม่ได้ test bug
+    /**
+     * เอาไว้รับ register request แล้วสร้าง user ใหม่ในระบบ โดยจะตรวจสอบความซ้ำของ username และ email ก่อน 
+     * @param request รับ username, email และ password
+     * @throws IllegalArgumentException ถ้า username หรือ email ซ้ำกับที่มีอยู่ในระบบแล้ว
+     */
     public void registerUser(RegisterRequest request) {
 
         if (userRepository.existsByUsername(request.username())) {
@@ -142,6 +154,7 @@ public class AuthService {
      * เอาไว้รับ login request แล้วส่ง token กลับไป โดยจะตรวจสอบ username กับ password ผ่าน AuthenticationManager 
      * @param request รับ LoginRequest ที่มี usernameOrEmail กับ password
      * @return ส่ง token ,username , email กลับไป
+     * @throws IllegalArgumentException ถ้า credentials ไม่ถูกต้อง หรือถ้า account นี้ใช้ Google Login อยู่ (ป้องกัน "Bad credentials" ที่ไม่ชัดเจน)
      */
     public AuthenticationResponse loginUser(LoginRequest request) {
 
@@ -171,22 +184,26 @@ public class AuthService {
         // 1. access token (อายุสั้น)
         String accessToken = jwtService.generateToken(userDetails);
     
-        // 2. refresh token (อายุยาว + save DB)
-        RefreshToken refreshToken = refreshTokenService.create(user);
-    
+        // 2. refresh token (อายุยาว + save DB — คืน plain token สำหรับใส่ cookie)
+        String refreshToken = refreshTokenService.create(user);
+
         activityLogService.logSuccess(user, "LOGIN", getClientIp(), getUserAgent(),
                 "Login success for: " + user.getEmail());
 
         return new AuthenticationResponse(
                 accessToken,
-                refreshToken.getToken(),
+                refreshToken,
                 user.getUsername(),
                 user.getEmail()
         );
     }
     
 
-    // ------------------ checkEmail ------------------
+    /**
+     * เอาไว้เช็ค email ว่ามีอยู๋ในระบบไหม
+     * @param request รับ CheckEmailRequest ที่มี email มาให้เช็ค
+     * @throws IllegalArgumentException ถ้า email เป็นค่าว่าง หรือไม่มี email นี้ในระบบ
+     */
     public void checkEmail(CheckEmailRequest request) {
 
         if (request.email() == null || request.email().isEmpty()) {
@@ -209,6 +226,7 @@ public class AuthService {
      * ใช้ตอน reset password เพื่อเอา password ใหม่ไปเก็บใน DB และจะมีการเปลี่ยนสถานะ token เป็นใช้แล้ว
      * @param token เอา token ไปค้นหา email ที่เกี่ยวข้อง
      * @param newPassword รหัสผ่านใหม่ที่ผู้ใช้ต้องการตั้งที่เช็คเงื่อนไขแล้วจาก frontend 
+     * @throws RuntimeException ถ้า token ไม่ถูกต้อง หรือถ้าไม่พบ user ที่เกี่ยวข้องกับ email ที่ได้จาก token
      */
      @Transactional
      public void resetPassword(String token, String newPassword) {

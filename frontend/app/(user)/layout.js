@@ -1,4 +1,3 @@
-// app/(user)/layout.js
 'use client';
 
 import { useState } from 'react';
@@ -12,28 +11,20 @@ export default function AppLayout({ children }) {
 
   return (
     <NotificationProvider>
-    <div className="flex h-screen bg-[#EEF4FB]">
+      <div className="min-h-screen bg-[#EEF4FB] overflow-x-hidden">
 
-      {/* Sidebar overlay (mobile) */}
-      {isSidebarOpen && (
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-black opacity-50 z-20 md:hidden"
-        />
-      )}
+        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+        {/* Content — เลื่อนขวา md:ml-64 บน desktop เพื่อเว้นที่ sidebar fixed */}
+        <div className="flex flex-col min-h-screen md:ml-64">
+          <Navbar setIsOpen={setIsSidebarOpen} />
+          <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+            {children}
+          </main>
+        </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <Navbar setIsOpen={setIsSidebarOpen} />
-        <main className="flex-1 p-6 overflow-y-auto">
-          {children}
-        </main>
+        <CartDrawer />
       </div>
-
-      {/* CartDrawer วางนอก flex ปกติ เพราะเป็น fixed overlay */}
-      <CartDrawer />
-    </div>
     </NotificationProvider>
   );
 }

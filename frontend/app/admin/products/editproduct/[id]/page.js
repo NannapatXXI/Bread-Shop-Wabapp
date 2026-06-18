@@ -101,8 +101,25 @@ export default function EditProductPage() {
   const displayImage = imagePreviewUrl || (currentImageUrl ? `${API_URL}/${currentImageUrl}` : null);
 
   if (loading) return (
-    <div className="min-h-screen bg-[#EEF4FB] flex items-center justify-center">
-      <p className="text-gray-400">กำลังโหลด...</p>
+    <div className="min-h-screen bg-[#EEF4FB] p-6 md:p-8">
+      <div className="animate-pulse">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-9 h-9 bg-gray-200 rounded-xl" />
+          <div className="h-6 bg-gray-200 rounded w-40" />
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-gray-200 h-14" />
+          <div className="p-6 space-y-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i}>
+                <div className="h-3 bg-gray-200 rounded w-1/4 mb-2" />
+                <div className="h-10 bg-gray-100 rounded-xl" />
+              </div>
+            ))}
+            <div className="h-32 bg-gray-100 rounded-xl" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 

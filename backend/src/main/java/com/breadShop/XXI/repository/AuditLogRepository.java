@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.breadShop.XXI.entity.AuditLog;
-
+// Repository สำหรับจัดการข้อมูล AuditLog โดยใช้ Spring Data JPA | reviewed by peak
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
     @Query("""

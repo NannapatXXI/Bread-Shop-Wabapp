@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.breadShop.XXI.entity.OrderLog;
 
+// Repository สำหรับจัดการข้อมูล OrderLog โดยใช้ Spring Data JPA | reviewed by peak
 public interface OrderLogRepository extends JpaRepository<OrderLog, Long> {
 
     @Query("""

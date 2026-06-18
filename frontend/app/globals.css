@@ -4,9 +4,20 @@
 @tailwind utilities;
 
 
-body {
+html, body {
   margin: 0;
   padding: 0;
- 
-  background-color: #ffffff; 
+  background-color: #ffffff;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ลบสีเหลืองที่ browser ใส่ตอน autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
 }

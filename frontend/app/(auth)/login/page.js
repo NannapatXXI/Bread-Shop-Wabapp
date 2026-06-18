@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { login, profile } from "@/services/auth.service";
+import Spinner from '@/app/components/Spinner';
 import api from "@/lib/api";
 
 export default function LoginPage() {
@@ -87,9 +88,8 @@ export default function LoginPage() {
       <div style={{
         background: '#EEF4FB',
         borderRadius: '20px',
-        padding: '3rem',
+        padding: 'clamp(1.5rem, 6vw, 3rem)',
         width: '100%',
-        width: '600px',
         boxSizing: 'border-box',
       }}>
 
@@ -212,7 +212,9 @@ export default function LoginPage() {
               marginBottom: '1rem', letterSpacing: '0.03em', transition: 'background 0.2s',
             }}
           >
-            {isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+            {isLoading
+              ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Spinner size={16} color="#A8CEFF" /> กำลังเข้าสู่ระบบ...</span>
+              : 'เข้าสู่ระบบ'}
           </button>
 
         </form>

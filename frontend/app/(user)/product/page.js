@@ -61,52 +61,29 @@ export default function ProductPage() {
       </div>
 
       {/* Search + Category Filter */}
-      <div className="flex items-center justify-between gap-4 mb-6 bg-white shadow-md p-2 rounded-lg">
+      <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-6 bg-white shadow-md p-2 rounded-lg">
 
-        <div className="inline-flex p-1 rounded-lg">
-          <div className="grid grid-cols-[150px_10px_150px_150px_150px_150px] gap-2">
-
-            <button
-              onClick={() => handleCategoryChange('ALL')}
-              className={`px-4 py-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1
-                ${categoryFilter === 'ALL' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-              <AiFillProduct /> All
+        {/* Category buttons — scroll horizontally on small screens */}
+        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
+          <button
+            onClick={() => handleCategoryChange('ALL')}
+            className={`flex items-center gap-1 px-3 py-2 rounded-md font-semibold whitespace-nowrap text-sm transition-all
+              ${categoryFilter === 'ALL' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
+            <AiFillProduct /> All
+          </button>
+          <span className="text-gray-300 text-lg shrink-0">|</span>
+          {['BREAD', 'CAKE', 'COOKIE', 'DRINK'].map(cat => (
+            <button key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              className={`px-3 py-2 rounded-md font-semibold whitespace-nowrap text-sm transition-all
+                ${categoryFilter === cat ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
+              {cat.charAt(0) + cat.slice(1).toLowerCase()}
             </button>
-
-            <div className="text-2xl text-gray-400 flex items-center justify-center">|</div>
-
-            <button
-              onClick={() => handleCategoryChange('BREAD')}
-              className={`px-4 py-2 rounded-md font-semibold w-full transition-all
-                ${categoryFilter === 'BREAD' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-              Bread
-            </button>
-
-            <button
-              onClick={() => handleCategoryChange('CAKE')}
-              className={`px-4 py-2 rounded-md font-semibold w-full transition-all
-                ${categoryFilter === 'CAKE' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-              Cake
-            </button>
-
-            <button
-              onClick={() => handleCategoryChange('COOKIE')}
-              className={`px-4 py-2 rounded-md font-semibold w-full transition-all
-                ${categoryFilter === 'COOKIE' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-              Cookie
-            </button>
-
-            <button
-              onClick={() => handleCategoryChange('DRINK')}
-              className={`px-4 py-2 rounded-md font-semibold w-full transition-all
-                ${categoryFilter === 'DRINK' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-              Drink
-            </button>
-          </div>
+          ))}
         </div>
 
         {/* Search Box */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"

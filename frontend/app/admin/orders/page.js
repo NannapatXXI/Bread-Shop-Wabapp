@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { adminGetAllOrders, adminUpdateOrderStatus } from '@/services/auth.service';
 import { exportCSV } from '@/lib/exportCSV';
 import TaxInvoiceModal from '@/app/components/TaxInvoiceModal';
+import { SkeletonRows } from '@/app/components/Skeleton';
 
 // ── Config สถานะ ────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -102,7 +103,7 @@ export default function AdminOrdersPage() {
     <div className="bg-[#EEF4FB] min-h-screen p-6">
 
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Order Management</h1>
           <p className="text-gray-500 text-sm mt-0.5">จัดการคำสั่งซื้อและอัปเดตสถานะการจัดส่ง</p>
@@ -121,15 +122,12 @@ export default function AdminOrdersPage() {
             </svg>
             Export
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#0B1F33] text-[#A8CEFF] rounded-xl text-sm font-semibold hover:bg-blue-900 transition">
-            <span className="text-lg leading-none">+</span>
-            สร้างออเดอร์
-          </button>
+
         </div>
       </div>
 
       {/* ── Stats Cards ─────────────────────────────────── */}
-      <div className="grid grid-cols-6 gap-3 mb-5">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-5">
         {statCards.map(card => (
           <button key={card.key}
             onClick={() => { setFilterStatus(card.key); setPage(1); }}
@@ -142,13 +140,13 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* ── Filter Bar ──────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm px-4 py-3 mb-4 flex items-center gap-3 flex-wrap">
-        {/* Status tabs */}
-        <div className="flex gap-1 flex-wrap flex-1">
+      <div className="bg-white rounded-xl shadow-sm px-4 py-3 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {/* Status tabs — scroll on mobile */}
+        <div className="flex gap-1 overflow-x-auto flex-1 min-w-0">
           {[{ key: 'ALL', label: 'ทั้งหมด' }, ...ALL_STATUSES.map(s => ({ key: s, label: STATUS_CONFIG[s].label }))].map(t => (
             <button key={t.key}
               onClick={() => { setFilterStatus(t.key); setPage(1); }}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition whitespace-nowrap shrink-0
                 ${filterStatus === t.key
                   ? 'bg-[#0B1F33] text-white'
                   : 'text-gray-500 hover:bg-gray-100'}`}>
@@ -158,26 +156,27 @@ export default function AdminOrdersPage() {
         </div>
 
         {/* Search */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="ค้นหาออเดอร์หรือลูกค้า..."
-            className="pl-9 pr-4 py-2 border rounded-xl text-sm w-56 focus:outline-none focus:ring-2 focus:ring-[#0B1F33]/30" />
+            className="pl-9 pr-4 py-2 border rounded-xl text-sm w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-[#0B1F33]/30" />
         </div>
-
       </div>
 
       {/* ── Table ───────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
         {loading ? (
-          <div className="text-center py-20 text-gray-400">กำลังโหลด...</div>
+          <table className="w-full text-sm min-w-[600px]">
+            <tbody><SkeletonRows rows={8} cols={7} /></tbody>
+          </table>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-400">ไม่พบ order</div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order No.</th>

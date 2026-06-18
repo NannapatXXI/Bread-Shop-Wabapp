@@ -2,7 +2,7 @@ package com.breadShop.XXI.dto.orderline;
 
 import java.math.BigDecimal;
 
-// ใช้สำหรับส่งข้อมูลแต่ละรายการสินค้าในคำสั่งซื้อกลับไปยังลูกค้า
+// ใช้สำหรับส่งข้อมูลแต่ละรายการสินค้าในคำสั่งซื้อกลับไปยังลูกค้า | reviewed by peak
 public class OrderLineResponse {
 
     private final Integer id;

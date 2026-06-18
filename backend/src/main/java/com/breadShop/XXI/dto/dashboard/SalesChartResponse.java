@@ -4,6 +4,9 @@ package com.breadShop.XXI.dto.dashboard;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * DTO สำหรับ SalesChart — แต่ละ data point มีชื่อ label + ยอดปัจจุบัน + ยอดช่วงก่อนหน้า
+ */
 public class SalesChartResponse {
 
     private final List<DataPoint> data;

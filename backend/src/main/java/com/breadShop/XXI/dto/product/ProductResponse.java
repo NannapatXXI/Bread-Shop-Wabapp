@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import com.breadShop.XXI.entity.ProductCategory;
 
 /**
- * DTO สำหรับส่งข้อมูลสินค้าไปยัง client โดยไม่ต้องผ่าน entity ตรงๆ
+ * DTO สำหรับส่งข้อมูลสินค้าไปยัง client โดยไม่ต้องผ่าน entity ตรงๆ | reviewed by peak
  */
 public class ProductResponse {
 

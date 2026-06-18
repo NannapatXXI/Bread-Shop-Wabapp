@@ -15,6 +15,7 @@ import com.breadShop.XXI.entity.UserAddress;
 import com.breadShop.XXI.repository.UserAddressRepository;
 import com.breadShop.XXI.repository.UserRepository;
 
+/// บริการสำหรับจัดการข้อมูลที่อยู่ของผู้ใช้ เช่น การสร้าง, อ่าน, อัปเดต, ลบ และตั้งค่าที่อยู่เริ่มต้น (default) โดยใช้ DTO สำหรับจำกัดข้อมูลที่จะส่งกลับไปยัง client | reviewed by peak
 @Service
 public class UserAddressService {
 
@@ -39,7 +40,12 @@ public class UserAddressService {
                 .collect(Collectors.toList());
     }
 
-    // เพิ่มที่อยู่ใหม่
+    /**
+     * สร้างที่อยู่ใหม่สำหรับ user คนนี้ โดยรับข้อมูลจาก UserAddressRequest DTO และตรวจสอบความถูกต้องของข้อมูล 
+     * @param userId ID ของ user ที่ต้องการสร้างที่อยู่ใหม่
+     * @param request ข้อมูลที่อยู่ใหม่ที่รับมาจาก client ในรูปแบบ UserAddressRequest DTO ซึ่งประกอบด้วยข้อมูลต่างๆ 
+     * @return ข้อมูลที่อยู่ที่ถูกสร้างขึ้นในรูปแบบ UserAddressResponse DTO ซึ่งประกอบด้วยข้อมูลต่างๆ 
+     */
     @Transactional
     public UserAddressResponse createAddress(Integer userId, UserAddressRequest request) {
 
@@ -73,7 +79,12 @@ public class UserAddressService {
         return toResponse(userAddressRepository.save(address));
     }
 
-    // แก้ไขที่อยู่
+    /**
+     * อัปเดตที่อยู่ที่มีอยู่แล้ว โดยรับข้อมูลจาก UserAddressRequest DTO และตรวจสอบความถูกต้องของข้อมูล
+     * @param addressId ID ของที่อยู่ที่ต้องการอัปเดต
+     * @param request ข้อมูลที่อยู่ใหม่ที่รับมาจาก client ในรูปแบบ UserAddressRequest DTO ซึ่งประกอบด้วยข้อมูลต่างๆ 
+     * @return ข้อมูลที่อยู่ที่ถูกอัปเดตในรูปแบบ UserAddressResponse DTO ซึ่งประกอบด้วยข้อมูลต่างๆ 
+     */
     @Transactional
     public UserAddressResponse updateAddress(Integer addressId, UserAddressRequest request) {
 
@@ -98,7 +109,11 @@ public class UserAddressService {
         return toResponse(userAddressRepository.save(address));
     }
 
-    // ลบที่อยู่
+    /**
+     * ลบที่อยู่ที่มีอยู่แล้ว โดยรับ ID ของที่อยู่ที่ต้องการลบ และตรวจสอบว่าที่อยู่นั้นมีอยู่จริงหรือไม่ หากพบจะทำการลบออกจากฐานข้อมูล
+     * @param addressId ID ของที่อยู่ที่ต้องการลบ
+     */
+    @Transactional
     public void deleteAddress(Integer addressId) {
         UserAddress address = userAddressRepository.findById(addressId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -106,7 +121,12 @@ public class UserAddressService {
         userAddressRepository.delete(address);
     }
 
-    // เซ็ต default
+    /**
+     * ตั้งที่อยู่ที่ระบุเป็น default โดยรับ ID ของ user และ ID ของที่อยู่ที่ต้องการตั้งเป็น default และตรวจสอบว่าที่อยู่นั้นมีอยู่จริงหรือไม่ หากพบจะทำการอัปเดตสถานะของที่อยู่ดังกล่าวเป็น default และ unset default ของที่อยู่เก่าของ user คนนี้
+     * @param userId ID ของ user ที่ต้องการตั้งที่อยู่เป็น default
+     * @param addressId ID ของที่อยู่ที่ต้องการตั้งเป็น default
+     * @return ข้อมูลที่อยู่ที่ถูกตั้งเป็น default ในรูปแบบ UserAddressResponse DTO ซึ่งประกอบด้วยข้อมูลต่างๆ
+     */
     @Transactional
     public UserAddressResponse setDefault(Integer userId, Integer addressId) {
         unsetCurrentDefault(userId);
@@ -119,7 +139,10 @@ public class UserAddressService {
         return toResponse(userAddressRepository.save(address));
     }
 
-    // helper — เอา default เก่าออก
+    /**
+     * Unset ที่อยู่ default ปัจจุบันของ user คนนี้ โดยค้นหาที่อยู่ที่มีสถานะ default ของ user คนนี้ และทำการ unset สถานะ default ของที่อยู่นั้น
+     * @param userId ID ของ user ที่ต้องการ unset default ของที่อยู่
+     */ 
     private void unsetCurrentDefault(Integer userId) {
         userAddressRepository.findByUserIdAndIsDefaultTrue(userId)
                 .ifPresent(a -> {

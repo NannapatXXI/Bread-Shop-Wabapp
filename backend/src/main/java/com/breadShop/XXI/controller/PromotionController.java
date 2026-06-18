@@ -49,7 +49,7 @@ public class PromotionController {
 
     /**
      * POST /api/promotions
-     * สร้างโปรโมชั่นใหม่ — ควร ROLE_ADMIN เท่านั้น (TODO: เพิ่ม security)
+     * สร้างโปรโมชั่นใหม่ — ควร ROLE_ADMIN เท่านั้น
      */
     @PostMapping
     public ResponseEntity<ApiResponse<PromotionResponse>> create(@RequestBody PromotionRequest request) {

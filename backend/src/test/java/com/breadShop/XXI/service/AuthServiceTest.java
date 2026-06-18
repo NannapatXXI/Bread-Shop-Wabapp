@@ -3,7 +3,6 @@ package com.breadShop.XXI.service;
 import com.breadShop.XXI.dto.AuthenticationResponse;
 import com.breadShop.XXI.dto.LoginRequest;
 import com.breadShop.XXI.dto.RegisterRequest;
-import com.breadShop.XXI.entity.RefreshToken;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.EmailOtpRepository;
 import com.breadShop.XXI.repository.UserRepository;
@@ -20,7 +19,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import com.breadShop.XXI.service.UserActivityLogService;
 
 import java.util.Optional;
 
@@ -123,10 +121,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("nannapat@breadshop.com"))
                 .thenReturn(Optional.of(sampleUser));
         when(jwtService.generateToken(userDetails)).thenReturn("access_token_xyz");
-
-        RefreshToken rt = mock(RefreshToken.class);
-        when(rt.getToken()).thenReturn("refresh_token_xyz");
-        when(refreshTokenService.create(sampleUser)).thenReturn(rt);
+        when(refreshTokenService.create(sampleUser)).thenReturn("refresh_token_xyz");
 
         AuthenticationResponse response = authService.loginUser(request);
 

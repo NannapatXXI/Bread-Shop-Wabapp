@@ -6,12 +6,11 @@ import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.breadShop.XXI.dto.OtpResult;
 import com.breadShop.XXI.entity.EmailOtp;
 import com.breadShop.XXI.repository.EmailOtpRepository;
-
-import jakarta.transaction.Transactional;
 //สำหรับการจัดการ OTP ทั้งการสร้างและตรวจสอบ OTP โดยใช้ Spring Data JPA และ Spring Security  |  reviewd by peak
 @Service
 public class OtpService {
@@ -28,6 +27,12 @@ public class OtpService {
     }
 
     // ------------------ generate OTP ------------------
+    /**
+     * ใช้ตอนสมัครสมาชิก หรือ reset password โดยจะสร้าง OTP ใหม่และบันทึกลงฐานข้อมูล พร้อมกับสร้าง token สำหรับระบุ OTP นั้น ๆ
+     * @param email  mail ที่ต้องการส่ง OTP ไป 
+     * @param purpose วัตถุประสงค์ของ OTP เช่น "REGISTER" หรือ "RESET_PASSWORD"
+     * @return OtpResult ที่ประกอบด้วย token และ otp (รหัส OTP ที่สร้างขึ้น)
+     */
    @Transactional
     public OtpResult generateOtp(String email, String purpose) {
 
@@ -59,33 +64,36 @@ public class OtpService {
      * @param token เอา token ไปค้นหารหัส OTP ที่เก็บไว้
      * @param otpInput รหัส OTP ที่ผู้ใช้กรอกมา
      */
-    @Transactional // เราจะใช้ @Transactional ในกรณีที่เราต้องการให้มันทำงานเสร็จพร้อมกันเพราะถ้าเสร็จไม่พร้อมกันอาจจะมีเรื่องข้อมูล
-    //เข่นการอัพเดตสินค้าหลายๆรายการพร้อมกันแล้วเกิดปัญหาเรื่องข้อมูลไม่ตรงกันได้
+    // noRollbackFor: ป้องกัน transaction rollback เมื่อโยน RuntimeException
+    // เพื่อให้ attemptCount++ และ setUsed(true) บันทึกลง DB ได้จริง
+    @Transactional(noRollbackFor = RuntimeException.class)
     public void verifyOtp(String token, String otpInput) {
-    
+
         EmailOtp otp = otpRepository
             .findByTokenAndUsedFalse(token)
             .orElseThrow(() -> new RuntimeException("OTP_NOT_FOUND"));
-    
+
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             otp.setUsed(true);
+            otpRepository.save(otp);
             throw new RuntimeException("OTP_EXPIRED");
         }
-    
+
         if (!passwordEncoder.matches(otpInput, otp.getOtpHash())) {
             otp.setAttemptCount(otp.getAttemptCount() + 1);
-    
+
             if (otp.getAttemptCount() >= 5) {
                 otp.setUsed(true);
+                otpRepository.save(otp);
                 throw new RuntimeException("OTP_LOCKED");
             }
-    
+
+            otpRepository.save(otp);
             throw new RuntimeException("OTP_INVALID");
         }
-        System.out.println("Before verify - used: " + otp.isUsed());
+
         otp.setVerified(true);
-        System.out.println("After verify - used: " + otp.isUsed());
-        
+        otpRepository.save(otp);
     }
     
      // ------------------ invalidate Token ------------------

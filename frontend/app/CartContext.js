@@ -4,14 +4,23 @@
 // เก็บ state ของตะกร้าสินค้าทั้งหมด
 // items: [{ product: {...}, quantity: number }]
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  const [items, setItems]     = useState([]);   // รายการสินค้าในตะกร้า
-  const [isOpen, setIsOpen]   = useState(false); // เปิด/ปิด CartDrawer
+  // โหลด cart จาก localStorage ตอน init (B-6 — cart หาย refresh)
+  const [items, setItems] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem('cart') || '[]'); } catch { return []; }
+  });
+  const [isOpen, setIsOpen] = useState(false);
+
+  // บันทึก cart ลง localStorage ทุกครั้งที่ items เปลี่ยน
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(items));
+  }, [items]);
 
   // ── จำนวนชิ้นรวม (ใช้แสดงบน badge ไอคอน) ──────────────────────
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);

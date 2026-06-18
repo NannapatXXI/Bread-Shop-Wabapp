@@ -4,7 +4,7 @@ package com.breadShop.XXI.dto.promotion;
 import java.math.BigDecimal;
 
 /**
- * DTO สำหรับส่งผลการตรวจสอบโค้ดโปรโมชั่นกลับไปยัง client
+ * DTO สำหรับส่งผลการตรวจสอบโค้ดโปรโมชั่นกลับไปยัง client | reviewed by peak
  */
 public class PromotionValidateResponse {
 

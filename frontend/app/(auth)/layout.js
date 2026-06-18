@@ -6,11 +6,12 @@ export default function AuthLayout({ children }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '2rem',
+      padding: '1.5rem 1rem',
+      overflowX: 'hidden',
     }}>
-     
+      <div style={{ width: '100%', maxWidth: '480px' }}>
         {children}
-     
+      </div>
     </div>
   );
 }

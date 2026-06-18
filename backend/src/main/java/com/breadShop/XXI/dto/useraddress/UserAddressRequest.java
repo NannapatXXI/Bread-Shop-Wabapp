@@ -2,7 +2,7 @@
 package com.breadShop.XXI.dto.useraddress;
 
 /**
- * ใช้สำหรับรับข้อมูลการสร้างหรือแก้ไขที่อยู่ของผู้ใช้จากลูกค้า
+ * ใช้สำหรับรับข้อมูลการสร้างหรือแก้ไขที่อยู่ของผู้ใช้จากลูกค้า | reviewed by peak
  */
 public class UserAddressRequest {
 

@@ -41,14 +41,14 @@ export default function HomePage() {
       .finally(() => setLoadingProducts(false));
   }, []);
 
-  // โหลด orders เฉพาะตอนที่รู้ user.id แล้ว
+  // โหลด orders เมื่อ user พร้อม
   useEffect(() => {
-    if (!user?.id) return;
-    getMyOrders(user.id)
+    if (!user) return;
+    getMyOrders()
       .then(res => setOrders(res.data ?? []))
       .catch(() => {})
       .finally(() => setLoadingOrders(false));
-  }, [user?.id]);
+  }, [user]);
 
   const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'PROCESSING' || o.status === 'CONFIRMED');
   const latestOrder = [...orders].reverse()[0];
@@ -125,9 +125,22 @@ export default function HomePage() {
         </div>
 
         {loadingProducts ? (
-          <p style={{ color: '#8ba6ca', fontSize: '13px' }}>กำลังโหลด...</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '0.5px solid #dce8f0' }}>
+                <div style={{ height: '100px', background: '#e8f0f8' }} className="animate-pulse" />
+                <div style={{ padding: '8px 10px' }}>
+                  <div style={{ height: '12px', background: '#e8f0f8', borderRadius: '4px', marginBottom: '8px', width: '70%' }} className="animate-pulse" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ height: '12px', background: '#e8f0f8', borderRadius: '4px', width: '35%' }} className="animate-pulse" />
+                    <div style={{ height: '22px', width: '44px', background: '#e8f0f8', borderRadius: '5px' }} className="animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
             {products.slice(0, 4).map(product => (
               <div key={product.id} style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '0.5px solid #dce8f0' }}>
                 <div style={{ height: '100px', background: '#f0f4f8', overflow: 'hidden', position: 'relative' }}>
@@ -172,7 +185,18 @@ export default function HomePage() {
         </div>
 
         {loadingOrders ? (
-          <p style={{ color: '#8ba6ca', fontSize: '13px' }}>กำลังโหลด...</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="animate-pulse" style={{ background: 'white', borderRadius: '10px', border: '0.5px solid #dce8f0', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#e8f0f8', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: '12px', background: '#e8f0f8', borderRadius: '4px', width: '40%', marginBottom: '6px' }} />
+                  <div style={{ height: '11px', background: '#e8f0f8', borderRadius: '4px', width: '60%' }} />
+                </div>
+                <div style={{ height: '22px', width: '64px', background: '#e8f0f8', borderRadius: '12px' }} />
+              </div>
+            ))}
+          </div>
         ) : orders.length === 0 ? (
           <div style={{ background: 'white', borderRadius: '10px', border: '0.5px solid #dce8f0', padding: '2rem', textAlign: 'center' }}>
             <p style={{ color: '#8ba6ca', fontSize: '13px', margin: 0 }}>ยังไม่มีออเดอร์</p>

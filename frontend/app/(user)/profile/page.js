@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/AuthContext';
 import api from '@/lib/api';
 import { sendOTPEmail, verifyOTP, resetPassword } from '@/services/auth.service';
+import Spinner from '@/app/components/Spinner';
 
 // [Claude] dynamic import เพราะ Leaflet ใช้ window ซึ่งไม่มีใน SSR
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { ssr: false });
@@ -224,7 +225,25 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) return <div className="text-center py-10 text-gray-400">กำลังโหลด...</div>;
+  if (loading) return (
+    <div className="max-w-2xl mx-auto flex flex-col gap-6 animate-pulse">
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-16 h-16 rounded-full bg-gray-200" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-gray-200 rounded w-1/3" />
+            <div className="h-3 bg-gray-200 rounded w-1/2" />
+          </div>
+        </div>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="mb-4">
+            <div className="h-3 bg-gray-200 rounded w-1/4 mb-2" />
+            <div className="h-10 bg-gray-100 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
@@ -298,7 +317,9 @@ export default function ProfilePage() {
                 disabled={pwLoading}
                 className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
               >
-                {pwLoading ? 'กำลังส่ง...' : 'เปลี่ยนรหัสผ่าน'}
+                {pwLoading
+                  ? <span className="flex items-center justify-center gap-2"><Spinner size={14} color="currentColor" /> กำลังส่ง...</span>
+                  : 'เปลี่ยนรหัสผ่าน'}
               </button>
             )}
           </div>
@@ -322,7 +343,7 @@ export default function ProfilePage() {
                   disabled={otpValue.length !== 6 || pwLoading}
                   className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition disabled:opacity-40"
                 >
-                  {pwLoading ? '...' : 'ยืนยัน'}
+                  {pwLoading ? <Spinner size={14} color="white" /> : 'ยืนยัน'}
                 </button>
               </div>
               <div className="flex items-center gap-3">
@@ -377,7 +398,9 @@ export default function ProfilePage() {
                   disabled={pwLoading || !newPassword || !confirmPw}
                   className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition disabled:opacity-40"
                 >
-                  {pwLoading ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่านใหม่'}
+                  {pwLoading
+                    ? <span className="flex items-center justify-center gap-2"><Spinner size={14} color="white" /> กำลังบันทึก...</span>
+                    : 'บันทึกรหัสผ่านใหม่'}
                 </button>
                 <button onClick={cancelPwChange}
                   className="border border-gray-300 text-gray-600 text-sm px-5 py-2 rounded-lg hover:bg-gray-50 transition">

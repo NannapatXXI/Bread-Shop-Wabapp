@@ -1,6 +1,8 @@
 // dto/useraddress/UserAddressResponse.java
 package com.breadShop.XXI.dto.useraddress;
 
+
+// ใช้สำหรับส่งข้อมูลที่อยู่ของผู้ใช้กลับไปยังลูกค้า | reviewed by peak
 public class UserAddressResponse {
 
     private final Integer id;

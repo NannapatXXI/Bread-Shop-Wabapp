@@ -8,7 +8,7 @@ import java.util.List;
 import com.breadShop.XXI.dto.orderline.OrderLineResponse;
 import com.breadShop.XXI.entity.Order.OrderStatus;
 
-// ใช้สำหรับส่งข้อมูลคำสั่งซื้อกลับไปยัง client หลังจากสร้างหรือเมื่อดึงข้อมูลคำสั่งซื้อ
+// ใช้สำหรับส่งข้อมูลคำสั่งซื้อกลับไปยัง client หลังจากสร้างหรือเมื่อดึงข้อมูลคำสั่งซื้อ | reviewed by peak
 public class OrderResponse {
 
     private final Integer id;

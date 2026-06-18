@@ -142,272 +142,190 @@ export default function HomePage() {
 
   return (
     <div className='w-full min-h-screen bg-[#EEF4FB]'>
-        <div className='w-full h-36 grid grid-cols-2 gap-2  bg-[#0B1F33] bg-[radial-gradient(circle_at_80%_50%,rgba(58,123,213,0.35),transparent_40%)]  rounded-2xl'>   
-            <div className=' text-white w-full h-36 '>
-
-                <div className='text-[#8ba6ca] text-2xl font-bold pt-8 pl-10'>
-                        <p className='text-sm pb-2'>{getGreeting()}</p>
-                        <h1 className='text-white'>ยินดีต้อนรับกลับมา, 
-                        <span className="text-[#A8CEFF] font-semibold pb-2">
-                            {user?.username || "ผู้ใช้"}
-                        </span>
-                        </h1>
-                        <p className='text-sm text-gray-500'>วันนี้มีออเดอร์ใหม่ {summary?.todayOrders ?? '...'} รายการ</p>
-
-
-                </div>
-                    
+        <div className='w-full bg-[#0B1F33] bg-[radial-gradient(circle_at_80%_50%,rgba(58,123,213,0.35),transparent_40%)] rounded-2xl p-6 flex flex-wrap gap-4 justify-between items-center'>
+            {/* Greeting */}
+            <div className='text-white'>
+                <p className='text-sm text-[#8ba6ca] pb-1'>{getGreeting()}</p>
+                <h1 className='text-xl font-bold'>ยินดีต้อนรับกลับมา,{' '}
+                    <span className="text-[#A8CEFF]">{user?.username || "ผู้ใช้"}</span>
+                </h1>
+                <p className='text-sm text-gray-500 mt-1'>วันนี้มีออเดอร์ใหม่ {summary?.todayOrders ?? '...'} รายการ</p>
             </div>
-            <div className=' text-white w-full h-36 '>
 
-                <div className='grid grid-cols-[150px_10px_150px_10px_150px] w-1000 gap-2  items-center  justify-end h-full  '>
-                    <div>
-                        <p className='text-2xl font-bold'>฿{summary ? Number(summary.todayRevenue).toLocaleString('th-TH') : '...'}</p>
-                        <h1 className='text-sm text-gray-400'>ยอดขายวันนี้</h1>
-                    </div>
-
-                    <div className=' text-2xl text-gray-400 flex items-center justify-center'>
-                          |
-                    </div>
-
-                    <div>
-                        <p className='text-2xl font-bold'>{summary?.todayOrders ?? '...'}</p>
-                        <h1 className='text-sm text-gray-400'>คำสั่งซื้อวันนี้</h1>
-                    </div>
-
-                    <div className=' text-2xl text-gray-400 flex items-center justify-center'>
-                          |
-                        </div>
-                    <div>
-                        <p className='text-2xl font-bold'>{summary?.totalCustomers ?? '...'}</p>
-                        <h1 className='text-sm text-gray-400'>ลูกค้าทั้งหมด</h1>
-                    </div>
+            {/* Stats */}
+            <div className='flex items-center gap-4 text-white flex-wrap'>
+                <div>
+                    <p className='text-xl font-bold'>฿{summary ? Number(summary.todayRevenue).toLocaleString('th-TH') : '...'}</p>
+                    <p className='text-xs text-gray-400'>ยอดขายวันนี้</p>
                 </div>
-                    
+                <div className='text-gray-600 text-xl hidden sm:block'>|</div>
+                <div>
+                    <p className='text-xl font-bold'>{summary?.todayOrders ?? '...'}</p>
+                    <p className='text-xs text-gray-400'>คำสั่งซื้อวันนี้</p>
+                </div>
+                <div className='text-gray-600 text-xl hidden sm:block'>|</div>
+                <div>
+                    <p className='text-xl font-bold'>{summary?.totalCustomers ?? '...'}</p>
+                    <p className='text-xs text-gray-400'>ลูกค้าทั้งหมด</p>
+                </div>
             </div>
         </div>
 
 
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mt-6">
+        <div className="w-full grid grid-cols-2 xl:grid-cols-4 gap-3 mt-6">
 
                 {/* CARD 1 */}
                 <div className="bg-white rounded-2xl shadow-md border-b-2 border-blue-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-5">
-
-                    <div>
-                    <p className="text-gray-400 text-sm mb-4">
-                        รายได้รวมเดือนนี้
-                    </p>
-
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+                <div className="flex justify-between items-start p-3 md:p-5">
+                    <div className="min-w-0">
+                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">รายได้รวมเดือนนี้</p>
+                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3 truncate">
                         ฿{summary ? Number(summary.monthRevenue).toLocaleString('th-TH') : '...'}
                     </h1>
-
-                    <div className="flex items-center gap-2">
-                        <span className={`font-semibold ${(summary?.monthRevenueChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <div className="flex flex-wrap items-center gap-1">
+                        <span className={`text-xs font-semibold ${(summary?.monthRevenueChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                           {(summary?.monthRevenueChangePercent ?? 0) >= 0 ? '▲' : '▼'} {Math.abs(summary?.monthRevenueChangePercent ?? 0).toFixed(1)}%
                         </span>
-                        <span className="text-gray-400 text-sm">vs เดือนที่แล้ว</span>
+                        <span className="text-gray-400 text-xs hidden sm:inline">vs เดือนที่แล้ว</span>
                     </div>
                     </div>
-
-                    <div className="bg-blue-100 p-4 rounded-xl">
-                    <MdOutlineAttachMoney size={28} className="text-blue-600" />
+                    <div className="bg-blue-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
+                    <MdOutlineAttachMoney size={20} className="text-blue-600 md:w-7 md:h-7" />
                     </div>
-
                 </div>
                 </div>
 
                 {/* CARD 2 */}
                 <div className="bg-white rounded-2xl shadow-md border-b-2 border-green-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-5">
-
-                    <div>
-                    <p className="text-gray-400 text-sm mb-4">
-                        ออเดอร์ทั้งหมด
-                    </p>
-
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+                <div className="flex justify-between items-start p-3 md:p-5">
+                    <div className="min-w-0">
+                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">ออเดอร์ทั้งหมด</p>
+                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3">
                         {summary?.totalOrders ?? '...'}
                     </h1>
-
-                    <div className="flex items-center gap-2">
-                        <span className={`font-semibold ${(summary?.totalOrdersChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <div className="flex flex-wrap items-center gap-1">
+                        <span className={`text-xs font-semibold ${(summary?.totalOrdersChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                           {(summary?.totalOrdersChangePercent ?? 0) >= 0 ? '▲' : '▼'} {Math.abs(summary?.totalOrdersChangePercent ?? 0).toFixed(1)}%
                         </span>
-                        <span className="text-gray-400 text-sm">vs เดือนที่แล้ว</span>
+                        <span className="text-gray-400 text-xs hidden sm:inline">vs เดือนที่แล้ว</span>
                     </div>
                     </div>
-
-                    <div className="bg-green-100 p-4 rounded-xl">
-                    <BiChevronDownSquare size={28} className="text-green-600" />
+                    <div className="bg-green-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
+                    <BiChevronDownSquare size={20} className="text-green-600" />
                     </div>
-
                 </div>
                 </div>
 
                 {/* CARD 3 */}
                 <div className="bg-white rounded-2xl shadow-md border-b-2 border-orange-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-5">
-
-                    <div>
-                    <p className="text-gray-400 text-sm mb-4">
-                        ลูกค้าทั้งหมด
-                    </p>
-
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+                <div className="flex justify-between items-start p-3 md:p-5">
+                    <div className="min-w-0">
+                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">ลูกค้าทั้งหมด</p>
+                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3">
                         {summary?.totalCustomers ?? '...'}
                     </h1>
-
-                    <div className="flex items-center gap-2">
-                        <span className="text-green-600 font-semibold">—</span>
-                        <span className="text-gray-400 text-sm">ลูกค้าสะสม</span>
+                    <div className="flex items-center gap-1">
+                        <span className="text-gray-400 text-xs">ลูกค้าสะสม</span>
                     </div>
                     </div>
-
-                    <div className="bg-orange-100 p-4 rounded-xl">
-                    <BiGroup size={28} className="text-orange-600" />
+                    <div className="bg-orange-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
+                    <BiGroup size={20} className="text-orange-600" />
                     </div>
-
                 </div>
                 </div>
 
                 {/* CARD 4 */}
                 <div className="bg-white rounded-2xl shadow-md border-b-2 border-red-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-5">
-
-                    <div>
-                    <p className="text-gray-400 text-sm mb-4">
-                        ออเดอร์ยกเลิก
-                    </p>
-
-                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+                <div className="flex justify-between items-start p-3 md:p-5">
+                    <div className="min-w-0">
+                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">ออเดอร์ยกเลิก</p>
+                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3">
                         {summary?.cancelledOrders ?? '...'}
                     </h1>
-
-                    <div className="flex items-center gap-2">
-                        <span className="text-gray-400 text-sm">ออเดอร์ที่ถูกยกเลิก</span>
+                    <div className="flex items-center gap-1">
+                        <span className="text-gray-400 text-xs">ถูกยกเลิก</span>
                     </div>
                     </div>
-
-                    <div className="bg-red-100 p-4 rounded-xl">
-                    <BiMessageSquareX size={28} className="text-red-600" />
+                    <div className="bg-red-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
+                    <BiMessageSquareX size={20} className="text-red-600" />
                     </div>
-
                 </div>
                 </div>
 
         </div>
-        <div className="grid grid-cols-3 gap-4  mt-6">
-            <div className=' col-span-2  h-96 rounded-2xl bg-white  shadow-md ' >
-                    <div className=" m-2 h-full flex flex-col">
-
-                        <div className=' h-16 w-full flex  items-center   text-gray-500 font-semibold'> 
-
-                                <div className=' w-1/2 pl-6'>
-                                        <h1 className='text-black text-2xl'>{getGraph()}</h1>
-                                        <p className='text-sm'>{getInfoGraph()}</p>
-                                </div>
-                                <div className=' w-1/2 flex items-center justify-end pr-4'>
-                                       
-                                       <div className = 'flex gap-2 items-center justify-end pr-4 '>
-                                               <button  onClick={() => {
-                                                            setActive("A");
-                                                            perweek();
-                                                        }}
-                                                        className={`px-4 py-2 rounded-md font-semibold transition-all ${
-                                                            active === "A"
-                                                            ? "bg-[#0F2235] text-[#A8CEFF]"
-                                                            : "hover:bg-gray-200 text-gray-400"
-                                                        }`}
-                                                        >
-                                                        สัปดาห์
-                                                </button>
-                                                <button onClick={() => {
-                                                        setActive("B");
-                                                        permonth();
-                                                    }}
-                                                    className={`px-4 py-2 rounded-md font-semibold transition-all ${
-                                                        active === "B"
-                                                        ? "bg-[#0F2235] text-[#A8CEFF]"
-                                                        : "hover:bg-gray-200 text-gray-400"
-                                                    }`}
-                                                    >
-                                                    เดือน
-                                                </button>
-                                                 <button onClick={() => {
-                                                        setActive("C");
-                                                        peryear();
-                                                    }}
-                                                    className={`px-4 py-2 rounded-md font-semibold transition-all ${
-                                                        active === "C"
-                                                        ? "bg-[#0F2235] text-[#A8CEFF]"
-                                                        : "hover:bg-gray-200 text-gray-400"
-                                                    }`}
-                                                    >
-                                                    ปี
-                                                </button>
-                                       </div>
-                                </div>
-                    
-                         </div>
-                         <div className="flex-1 p-4 ">
-                             <SalesChart period={active} />
-                         </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+            <div className='col-span-1 lg:col-span-2 rounded-2xl bg-white shadow-md flex flex-col' style={{minHeight:'24rem'}}>
+                    {/* Header — flex-wrap so title + buttons stack on mobile */}
+                    <div className='flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-gray-500 font-semibold shrink-0'>
+                        <div>
+                            <h1 className='text-black text-lg sm:text-2xl leading-snug'>{getGraph()}</h1>
+                            <p className='text-xs sm:text-sm'>{getInfoGraph()}</p>
+                        </div>
+                        <div className='flex gap-1.5 shrink-0'>
+                            <button onClick={() => { setActive("A"); perweek(); }}
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${active === "A" ? "bg-[#0F2235] text-[#A8CEFF]" : "hover:bg-gray-200 text-gray-400"}`}>
+                                สัปดาห์
+                            </button>
+                            <button onClick={() => { setActive("B"); permonth(); }}
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${active === "B" ? "bg-[#0F2235] text-[#A8CEFF]" : "hover:bg-gray-200 text-gray-400"}`}>
+                                เดือน
+                            </button>
+                            <button onClick={() => { setActive("C"); peryear(); }}
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${active === "C" ? "bg-[#0F2235] text-[#A8CEFF]" : "hover:bg-gray-200 text-gray-400"}`}>
+                                ปี
+                            </button>
+                        </div>
+                    </div>
+                    {/* Chart fills remaining height */}
+                    <div className="flex-1 p-3 min-h-0" style={{height:'300px'}}>
+                        <SalesChart period={active} />
                     </div>
             </div>
            
            
-                <div className='  h-96 rounded-2xl bg-white  shadow-md font-semibold' >
-                        <div className=" m-2 ">
-                            <div className='pl-6 pt-2 '>
-                                <h1 className='text-black text-2xl'>หมวดหมู่สินค้า</h1>
-                               <p className='text-gray-600 text-sm'>สัดส่วนยอดขาย 30 วันล่าสุด</p>
-                            </div>
-                            <div className="flex-1 p-4 rounded-2xl  pr-5">
-                                <CategoryDonutChart />
-                            </div>
-                        </div>
+                <div className='rounded-2xl bg-white shadow-md font-semibold flex flex-col' style={{minHeight:'24rem'}}>
+                    <div className='px-5 pt-4 shrink-0'>
+                        <h1 className='text-black text-xl sm:text-2xl'>หมวดหมู่สินค้า</h1>
+                        <p className='text-gray-600 text-sm'>สัดส่วนยอดขาย 30 วันล่าสุด</p>
+                    </div>
+                    <div className="flex-1 p-4 min-h-0">
+                        <CategoryDonutChart />
+                    </div>
                 </div>
            
         </div>
-        <div className="grid grid-cols-4 gap-4 h-[500px] w-full mt-6 rounded-2xl   ">
-            <div className="col-span-3 h-full flex flex-col rounded-2xl bg-white shadow-md font-semibold w-full ">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 w-full mt-6 rounded-2xl">
+            <div className="col-span-1 lg:col-span-3 flex flex-col rounded-2xl bg-white shadow-md font-semibold w-full min-h-[400px]">
                     
-                    <div className="h-28 w-full shrink-0 flex items-center pt-2 text-gray-500 font-semibold  ">
-
-                        <div className="w-1/2 pl-6">
-                                <h1 className='text-black text-2xl'>ออเดอร์ล่าสุด</h1>
-                                <p className='text-sm'> 5 ออเดอร์ล่าสุด</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 shrink-0 text-gray-500 font-semibold">
+                        <div>
+                            <h1 className='text-black text-xl sm:text-2xl'>ออเดอร์ล่าสุด</h1>
+                            <p className='text-sm'>5 ออเดอร์ล่าสุด</p>
                         </div>
-                        <div className=' w-1/2 flex items-center justify-end pr-4'>
-                            
-                            <div   onClick={() => router.push("/admin/orders")} className = 'flex gap-2 items-center justify-end pr-4 text-blue-500 hover:underline cursor-pointer'>
-                                    <p>ดูทั้งหมด ⭢ </p>
-                            </div>
+                        <div onClick={() => router.push("/admin/orders")}
+                            className='text-blue-500 hover:underline cursor-pointer text-sm'>
+                            ดูทั้งหมด ⭢
                         </div>
-                            
-                  
                     </div>
-                    <div className="flex-1 min-h-0 overflow-auto px-4 pt-2    pb-4 ">
-                        <div className="overflow-hidden rounded-xl border border-gray-300 bg-white">
-                                        <table className="min-w-full table-fixed border-separate border-spacing-0   ">
+                    <div className="flex-1 min-h-0 px-4 pt-2 pb-4">
+                        <div className="overflow-x-auto rounded-xl border border-gray-300 bg-white">
+                                        <table className="w-full min-w-[560px] border-separate border-spacing-0">
                                             <thead className="text-white">
-                                            <tr className="h-16">
-                                                <th className="rounded-tl-xl bg-[#0F2235] px-4 py-4 text-center text-sm font-semibold align-middle">
-                                                id
+                                            <tr className="h-14">
+                                                <th className="rounded-tl-xl bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
+                                                เลขออเดอร์
                                                 </th>
-                                                <th className="bg-[#0F2235] px-6 py-4 text-center text-sm font-semibold align-middle">
-                                                Customer name
+                                                <th className="bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
+                                                ชื่อลูกค้า
                                                 </th>
-                                                <th className="bg-[#0F2235] px-6 py-4 text-center text-sm font-semibold align-middle">
-                                                Product name
+                                                <th className="bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
+                                                สินค้า
                                                 </th>
-                                                <th className="bg-[#0F2235] px-6 py-4 text-center text-sm font-semibold align-middle">
-                                                Price
+                                                <th className="bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
+                                                ราคา
                                                 </th>
-                                                <th className="rounded-tr-xl bg-[#0F2235] px-6 py-4 text-center text-sm font-semibold align-middle">
-                                                Status
+                                                <th className="rounded-tr-xl bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
+                                                สถานะ
                                                 </th>
                                             </tr>
                                             </thead>

@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminGetCustomers, adminUpdateUserRole, adminToggleBan, adminUpdateUsername, getMyOrders } from '@/services/auth.service';
 import { exportCSV } from '@/lib/exportCSV';
+import Spinner from '@/app/components/Spinner';
+import { SkeletonRows } from '@/app/components/Skeleton';
 
 const PAGE_SIZE = 5;
 
@@ -133,12 +135,12 @@ export default function AdminCustomersPage() {
     <div className="bg-[#EEF4FB] min-h-screen p-6">
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Customers</h1>
           <p className="text-gray-500 text-sm mt-0.5">รายชื่อลูกค้าทั้งหมดในระบบ</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
             onClick={() => exportCSV(
               customers,
@@ -152,7 +154,7 @@ export default function AdminCustomersPage() {
             </svg>
             Export
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#0B1F33] hover:bg-blue-900 text-[#A8CEFF] rounded-xl text-sm font-semibold transition">
+          <button className="flex items-center gap-2 px-4 py-2 bg-[#0B1F33] hover:bg-blue-900 text-[#A8CEFF] rounded-xl text-sm font-semibold transition whitespace-nowrap">
             <span className="text-base leading-none">+</span>
             เพิ่มลูกค้า
           </button>
@@ -160,7 +162,7 @@ export default function AdminCustomersPage() {
       </div>
 
       {/* ── Stats Cards ─────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
 
         {/* ลูกค้าทั้งหมด */}
         <div className="bg-white rounded-2xl p-5 shadow-sm flex items-center gap-4">
@@ -215,19 +217,19 @@ export default function AdminCustomersPage() {
         </div>
       </div>
 
-      {/* ── Filter Bar (แบบเดียวกับ Orders) ─────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm px-4 py-3 mb-4 flex items-center gap-3 flex-wrap">
-        {/* Tabs */}
-        <div className="flex gap-1 flex-wrap flex-1">
+      {/* ── Filter Bar ──────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm px-4 py-3 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {/* Tabs — scroll horizontally on mobile */}
+        <div className="flex gap-1 overflow-x-auto flex-1 min-w-0">
           {PROVIDER_TABS.map(t => (
             <button key={t.key}
               onClick={() => setFilterTab(t.key)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition whitespace-nowrap shrink-0
                 ${filterTab === t.key
                   ? 'bg-[#0B1F33] text-white'
                   : 'text-gray-500 hover:bg-gray-100'}`}>
               {t.label}
-              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold
                 ${filterTab === t.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
                 {t.key === 'ALL'    ? customers.length
                   : t.key === 'google' ? customers.filter(c => c.provider === 'google').length
@@ -241,26 +243,27 @@ export default function AdminCustomersPage() {
         </div>
 
         {/* Search */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
             fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="ค้นหาออเดอร์หรือลูกค้า..."
-            className="pl-9 pr-4 py-2 border rounded-xl text-sm w-56 focus:outline-none focus:ring-2 focus:ring-[#0B1F33]/30" />
+            placeholder="ค้นหาลูกค้า..."
+            className="pl-9 pr-4 py-2 border rounded-xl text-sm w-full sm:w-52 focus:outline-none focus:ring-2 focus:ring-[#0B1F33]/30" />
         </div>
-
       </div>
 
       {/* ── Table ────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
         {loading ? (
-          <div className="text-center py-16 text-gray-400">กำลังโหลด...</div>
+          <table className="w-full text-sm min-w-[600px]">
+            <tbody><SkeletonRows rows={8} cols={7} /></tbody>
+          </table>
         ) : (
           <>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">ลูกค้า</th>
@@ -498,7 +501,9 @@ export default function AdminCustomersPage() {
                     </button>
                     <button onClick={handleSaveInfo} disabled={saving}
                       className="flex-1 py-2.5 bg-[#0B1F33] text-[#A8CEFF] rounded-xl font-semibold text-sm hover:bg-blue-900 disabled:opacity-50 transition">
-                      {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+                      {saving
+                        ? <span className="flex items-center justify-center gap-2"><Spinner size={16} color="#A8CEFF" /> กำลังบันทึก...</span>
+                        : 'บันทึก'}
                     </button>
                   </div>
                 </div>
@@ -508,7 +513,18 @@ export default function AdminCustomersPage() {
               {modalTab === 'orders' && (
                 <div>
                   {ordersLoading ? (
-                    <p className="text-center text-gray-400 py-8">กำลังโหลด...</p>
+                    <div className="py-4 space-y-2">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                          <div className="w-10 h-10 bg-gray-200 rounded-lg flex-shrink-0" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-3 bg-gray-200 rounded w-1/3" />
+                            <div className="h-3 bg-gray-200 rounded w-1/2" />
+                          </div>
+                          <div className="h-5 w-16 bg-gray-200 rounded-full" />
+                        </div>
+                      ))}
+                    </div>
                   ) : userOrders.length === 0 ? (
                     <p className="text-center text-gray-400 py-8">ยังไม่มีออเดอร์</p>
                   ) : (

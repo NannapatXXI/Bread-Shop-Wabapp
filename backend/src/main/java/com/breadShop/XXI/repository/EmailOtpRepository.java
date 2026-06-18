@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.breadShop.XXI.entity.EmailOtp;
 
+// Repository สำหรับจัดการข้อมูล EmailOtp โดยใช้ Spring Data JPA | reviewed by peak
 public interface EmailOtpRepository extends JpaRepository<EmailOtp, Long> {
 
    // ใช้ตอน verify OTP

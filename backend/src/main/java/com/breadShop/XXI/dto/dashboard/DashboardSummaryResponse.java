@@ -3,6 +3,9 @@ package com.breadShop.XXI.dto.dashboard;
 
 import java.math.BigDecimal;
 
+/**
+ * DTO สรุปตัวเลข summary cards บน dashboard
+ */
 public class DashboardSummaryResponse {
 
     private final BigDecimal todayRevenue;

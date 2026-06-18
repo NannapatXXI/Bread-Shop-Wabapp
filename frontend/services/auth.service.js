@@ -79,13 +79,13 @@ export const validatePromoCode = (code, amount) =>
 export const createOrder = (data) =>
   api.post(`/api/orders`, data);
 
-/** ประวัติ order ของ user */
-export const getMyOrders = (userId) =>
-  api.get(`/api/orders`, { params: { userId } });
+/** ประวัติ order ของ user — userId ดึงจาก JWT ฝั่ง backend */
+export const getMyOrders = () =>
+  api.get(`/api/orders`);
 
-/** ยกเลิก order — ได้เฉพาะ status PENDING */
-export const cancelOrder = (orderId, userId) =>
-  api.patch(`/api/orders/${orderId}/cancel`, null, { params: { userId } });
+/** ยกเลิก order — userId ดึงจาก JWT ฝั่ง backend */
+export const cancelOrder = (orderId) =>
+  api.patch(`/api/orders/${orderId}/cancel`, null);
 
 // ── Admin ────────────────────────────────────────────────────
 export const adminGetAllOrders    = ()         => api.get('/api/v1/admin/orders');

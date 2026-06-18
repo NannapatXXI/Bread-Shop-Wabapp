@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import com.breadShop.XXI.entity.Notification;
 
+// Repository สำหรับจัดการข้อมูล Notification โดยใช้ Spring Data JPA | reviewed by peak
 public interface NotificationRepository extends JpaRepository<Notification, Integer> {
 
     List<Notification> findByUserIdOrderByCreatedAtDesc(Integer userId);

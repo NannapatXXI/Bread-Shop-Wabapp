@@ -6,8 +6,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -24,19 +24,21 @@ import jakarta.servlet.http.HttpServletResponse;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    // ยังคง inject ไว้ใช้กับ DaoAuthenticationProvider (login flow)
+    @SuppressWarnings("unused")
     private final UserDetailsService userDetailsService;
 
     @Autowired
     public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
-        
     }
+
     @Override
     protected void doFilterInternal(
-        @NonNull   HttpServletRequest request,
-        @NonNull  HttpServletResponse response,
-        @NonNull  FilterChain filterChain
+        @NonNull HttpServletRequest request,
+        @NonNull HttpServletResponse response,
+        @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
         String jwt = getAccessTokenFromCookie(request);
@@ -49,23 +51,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String email = jwtService.extractEmail(jwt);
 
-            if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(email);
-                      
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null
+                    && jwtService.isTokenSignatureValid(jwt)) {
 
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken auth =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
-
-                    SecurityContextHolder
-                            .getContext()
-                            .setAuthentication(auth);
-                }
+                // อ่าน role จาก JWT claims ตรงๆ — ไม่ยิง DB
+                String role = jwtService.extractRole(jwt);
+                var auth = new UsernamePasswordAuthenticationToken(
+                        email, null, List.of(new SimpleGrantedAuthority(role))
+                );
+                SecurityContextHolder.getContext().setAuthentication(auth);
             }
 
         } catch (ExpiredJwtException e) {

@@ -28,7 +28,6 @@ import com.breadShop.XXI.repository.ProductRepository;
 import com.breadShop.XXI.repository.PromotionRepository;
 import com.breadShop.XXI.repository.UserAddressRepository;
 import com.breadShop.XXI.repository.UserRepository;
-import com.breadShop.XXI.service.NotificationService;
 
 // Service สำหรับจัดการ order ทั้งหมด ตั้งแต่การสร้าง order, ดึง order ของ user, ดึง order เดี่ยว, อัปเดตสถานะ และดึง order ทั้งหมด (สำหรับ admin) | reviewed by peak
 @Service
@@ -64,6 +63,10 @@ public class OrderService {
         this.activityLogService   = activityLogService;
     }
 
+    /**
+     * ดึง IP ของ client จาก request header "X-Forwarded-For" หรือจาก remote address ของ request ถ้าไม่พบจะส่งกลับเป็น empty string
+     * @return IP ของ client หรือ empty string
+     */ 
     private String getClientIp() {
         try {
             var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -73,8 +76,12 @@ public class OrderService {
             return (xff != null && !xff.isBlank()) ? xff.split(",")[0].trim() : req.getRemoteAddr();
         } catch (Exception e) { return ""; }
     }
-
-    // ดึง order ทั้งหมดของ user (ใหม่สุดก่อน)
+    /**
+     * ดึง order ทั้งหมดของ user ที่ระบุ โดยเรียงลำดับจากวันที่สร้างล่าสุดไปยังเก่าสุด และแปลงเป็น OrderResponse (DTO)
+     * @param userId รหัสผู้ใช้ที่ต้องการดึง order
+     * @return List ของ OrderResponse ที่เกี่ยวข้องกับผู้ใช้
+     */
+    @Transactional(readOnly = true)
     public List<OrderResponse> getByUserId(Integer userId) {
         return orderRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
@@ -82,7 +89,13 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    // ดึง order เดี่ยว
+    
+    /**
+     * ดึง order ที่ระบุ โดยถ้า order นั้นมีอยู่ จะทำการแปลงเป็น OrderResponse (DTO) และส่งกลับไป
+     * @param id รหัสของ order ที่ต้องการดึง
+     * @return OrderResponse ที่เกี่ยวข้องกับ order
+     */
+    @Transactional(readOnly = true)
     public OrderResponse getById(Integer id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -118,10 +131,13 @@ public class OrderService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found"));
 
-        // 2. ดึงที่อยู่ที่เลือก
+        // 2. ดึงที่อยู่ที่เลือก + ตรวจว่าเป็นของ user คนนี้ (B-5 address ownership)
         UserAddress address = userAddressRepository.findById(request.getAddressId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Address not found"));
+        if (!address.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ที่อยู่นี้ไม่ใช่ของคุณ");
+        }
 
         // 3. สร้าง order + snapshot ที่อยู่
         Order order = new Order(user, generateOrderNo(), address);
@@ -133,7 +149,8 @@ public class OrderService {
         BigDecimal subtotal = BigDecimal.ZERO;
 
         for (var item : request.getItems()) {
-            Product product = productRepository.findById(item.getProductId().longValue())
+            // Pessimistic write lock — ป้องกัน race condition ตอน 2 คำสั่งซื้อพร้อมกัน (B-4)
+            Product product = productRepository.findByIdWithLock(item.getProductId().longValue())
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND, "Product not found: " + item.getProductId()));
 
@@ -256,7 +273,7 @@ public class OrderService {
 
     /**
      * แปลง Order Entity เป็น OrderResponse DTO โดยดึงข้อมูลที่จำเป็นจาก Order และ OrderLine ที่เกี่ยวข้อง
-     * @param o
+     * @param o         
      * @return ข้อมูล OrderResponse ที่ประกอบด้วย id, orderNo, userId, shippingName, shippingPhone, shippingAddress, shippingProvince, shippingDistrict, shippingSubdistrict, shippingPostcode, subtotal, discountAmount, shippingFee, totalAmount, promotionCode, status, trackingNo, note, list ของ OrderLineResponse และ createdAt
      */
     private OrderResponse toResponse(Order o) {
@@ -312,6 +329,7 @@ public class OrderService {
     }
 
     // ดึง order ทั้งหมด (admin) — ใหม่สุดก่อน
+    @Transactional(readOnly = true)
     public List<OrderResponse> getAll() {
         return orderRepository.findAllByOrderByCreatedAtDesc()
                 .stream()

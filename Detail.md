@@ -81,3 +81,8 @@ test api
     Repository  →  คุยกับ database
 
 
+
+
+
+17/06/2026 | เทส bug แล้วก็ review code ในส่วนของ service แล้ว
+18/06/2026 | review dto

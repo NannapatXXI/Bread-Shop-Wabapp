@@ -3,12 +3,13 @@ package com.breadShop.XXI.controller;
 import java.net.URI;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -50,6 +51,9 @@ import jakarta.servlet.http.HttpServletResponse;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    @Value("${app.secure-cookie:false}")
+    private boolean secureCookie;
 
     private final AuthService             authService;
     private final GoogleAuthService       googleAuthService;
@@ -94,10 +98,10 @@ public class AuthController {
         var tokens = authService.loginUser(loginRequest);
 
         ResponseCookie accessCookie = ResponseCookie.from("access_token", tokens.accessToken())
-                .httpOnly(true).secure(false).path("/").maxAge(15 * 60).sameSite("Lax").build();
+                .httpOnly(true).secure(secureCookie).path("/").maxAge(15 * 60).sameSite("Lax").build();
 
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", tokens.refreshToken())
-                .httpOnly(true).secure(false).path("/api/v1/auth")
+                .httpOnly(true).secure(secureCookie).path("/api/v1/auth")
                 .maxAge(7 * 24 * 60 * 60).sameSite("Lax").build();
 
         // [Claude] ต้องใช้ ResponseEntity เพื่อแนบ Set-Cookie header
@@ -113,7 +117,7 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String email,
             HttpServletRequest request,
             HttpServletResponse response) {
         if (request.getCookies() != null) {
@@ -129,16 +133,16 @@ public class AuthController {
             }
         }
 
-        if (userDetails != null) {
-            userRepository.findByEmail(userDetails.getUsername()).ifPresent(user ->
+        if (email != null) {
+            userRepository.findByEmail(email).ifPresent(user ->
                 activityLogService.logSuccess(user, "LOGOUT", clientIp(request), userAgent(request), "ออกจากระบบ")
             );
         }
 
         ResponseCookie clearAccess = ResponseCookie.from("access_token", "")
-                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
+                .httpOnly(true).secure(secureCookie).path("/").maxAge(0).sameSite("Lax").build();
         ResponseCookie clearRefresh = ResponseCookie.from("refresh_token", "")
-                .httpOnly(true).secure(false).path("/api/v1/auth").maxAge(0).sameSite("Lax").build();
+                .httpOnly(true).secure(secureCookie).path("/api/v1/auth").maxAge(0).sameSite("Lax").build();
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, clearAccess.toString())
@@ -184,16 +188,17 @@ public class AuthController {
      */
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<Map<String, Object>>> me(
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal String email,
+            Authentication authentication) {
 
-        User user = userRepository.findByEmail(userDetails.getUsername())
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "id",       user.getId(),
                 "email",    user.getEmail(),
                 "username", user.getUsername(),
-                "roles",    userDetails.getAuthorities()
+                "roles",    authentication.getAuthorities()
         )));
     }
 
@@ -203,11 +208,11 @@ public class AuthController {
      */
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateMe(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String email,
             @RequestBody UpdateProfileRequest request,
             HttpServletRequest httpRequest) {
 
-        User user = userRepository.findByEmail(userDetails.getUsername())
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         String oldUsername = user.getUsername();
@@ -233,9 +238,9 @@ public class AuthController {
      */
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getProfile(
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal String email) {
 
-        User user = userRepository.findByEmail(userDetails.getUsername())
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
@@ -327,10 +332,10 @@ public class AuthController {
 
             // [Fix] set ทั้ง access_token + refresh_token เหมือน login ปกติ
             ResponseCookie accessCookie = ResponseCookie.from("access_token", tokens.accessToken())
-                    .httpOnly(true).secure(false).path("/").maxAge(15 * 60).sameSite("Lax").build();
+                    .httpOnly(true).secure(secureCookie).path("/").maxAge(15 * 60).sameSite("Lax").build();
 
             ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", tokens.refreshToken())
-                    .httpOnly(true).secure(false).path("/api/v1/auth")
+                    .httpOnly(true).secure(secureCookie).path("/api/v1/auth")
                     .maxAge(7 * 24 * 60 * 60).sameSite("Lax").build();
 
             HttpHeaders headers = new HttpHeaders();

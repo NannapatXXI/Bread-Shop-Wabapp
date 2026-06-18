@@ -3,6 +3,9 @@ package com.breadShop.XXI.dto.dashboard;
 
 import java.math.BigDecimal;
 
+/**
+ * DTO สำหรับ widget สินค้าขายดี
+ */
 public class TopProductResponse {
 
     private final Integer productId;

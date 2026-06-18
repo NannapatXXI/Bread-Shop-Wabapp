@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.breadShop.XXI.dto.orderline.OrderLineResponse;
@@ -21,7 +22,12 @@ public class OrderLineService {
         this.orderLineRepository = orderLineRepository;
     }
 
-    // ดึง order lines ทั้งหมดของ order
+    /**
+     * ดึง order line ทั้งหมดของ order ที่ระบุ โดยเรียงลำดับจาก id ของ order line และแปลงเป็น OrderLineResponse (DTO)
+     * @param orderId รหัสของ order ที่ต้องการดึง order line
+     * @return  List ของ OrderLineResponse ที่เกี่ยวข้องกับ order
+     */
+    @Transactional(readOnly = true)
     public List<OrderLineResponse> getByOrderId(Integer orderId) {
         return orderLineRepository.findByOrderId(orderId)
                 .stream()
@@ -29,7 +35,12 @@ public class OrderLineService {
                 .collect(Collectors.toList());
     }
 
-    // ดึง order line เดี่ยว
+   /**
+    * ดึง order line ที่ระบุ โดยถ้า order line นั้นมีอยู่ จะทำการแปลงเป็น OrderLineResponse (DTO) และส่งกลับไป
+    * @param id รหัสของ order line ที่ต้องการดึง
+    * @return OrderLineResponse ที่เกี่ยวข้องกับ order line
+    */
+    @Transactional(readOnly = true)
     public OrderLineResponse getById(Integer id) {
         OrderLine line = orderLineRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(

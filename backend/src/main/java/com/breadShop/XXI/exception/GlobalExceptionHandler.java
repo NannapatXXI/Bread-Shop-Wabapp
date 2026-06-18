@@ -68,6 +68,28 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("ไฟล์มีขนาดใหญ่เกินกำหนด (สูงสุด 50MB)"));
     }
 
+    /** RuntimeException จาก token/OTP flow — แปลง error code เป็น message ภาษาไทย */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuntime(RuntimeException ex) {
+        String msg = switch (ex.getMessage() != null ? ex.getMessage() : "") {
+            case "INVALID_REFRESH_TOKEN"  -> "Token ไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่";
+            case "REFRESH_TOKEN_EXPIRED"  -> "Token หมดอายุ กรุณาเข้าสู่ระบบใหม่";
+            case "NO_REFRESH_TOKEN"       -> "ไม่พบ token กรุณาเข้าสู่ระบบใหม่";
+            case "OTP_LOCKED"             -> "OTP ถูกล็อก กรุณาขอ OTP ใหม่";
+            case "OTP_NOT_VERIFIED"       -> "กรุณายืนยัน OTP ก่อน";
+            case "TOKEN_INVALID"          -> "Token ไม่ถูกต้อง";
+            case "TOKEN_EXPIRED"          -> "Token หมดอายุ";
+            default                       -> null;
+        };
+        if (msg == null) {
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("เกิดข้อผิดพลาดในระบบ"));
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(msg));
+    }
+
     /** Catch-all — exception ที่ไม่ได้ handle ไว้โดยเฉพาะ */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleOther(Exception ex) {

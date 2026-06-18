@@ -6,7 +6,7 @@ import java.util.List;
 
 import com.breadShop.XXI.dto.orderline.OrderLineRequest;
 
-// ใช้สำหรับรับข้อมูลการสร้างคำสั่งซื้อจากลูกค้า
+// ใช้สำหรับรับข้อมูลการสร้างคำสั่งซื้อจากลูกค้า | reviewed by peak
 public class OrderRequest {
 
     private Integer userId;

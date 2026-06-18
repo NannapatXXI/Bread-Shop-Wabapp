@@ -1,252 +1,220 @@
 "use client";
 import { useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-import toast from 'react-hot-toast';
+import Image from 'next/image';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import { register } from "@/services/auth.service";
+import Spinner from '@/app/components/Spinner';
 import { useRouter } from 'next/navigation';
 
-// (ClassNames เหมือนเดิม)
-const containerClasses = "bg-white p-8 rounded-xl shadow-2xl w-full max-w-md";
-const controlsClasses = "flex justify-center items-center min-h-screen p-4"; 
-
 export default function RegisterPage() {
+  const router = useRouter();
 
-    // 2. เรียกใช้ useRouter เพื่อสร้างตัวแปร router ที่ขาดไป
-    const router = useRouter();
+  const [username, setUsername]                 = useState("");
+  const [email, setEmail]                       = useState("");
+  const [password, setPassword]                 = useState("");
+  const [confirmPassword, setConfirmPassword]   = useState("");
+  const [showPassword, setShowPassword]         = useState(false);
+  const [showConfirm, setShowConfirm]           = useState(false);
+  const [error, setError]                       = useState("");
+  const [isLoading, setIsLoading]               = useState(false);
 
-    // (States และ Logic ทั้งหมดเหมือนเดิม)
-    const [focusedField, setFocusedField] = useState(null); 
-    const [error, setError] = useState(""); 
-    const [username, setUsername] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+  const handleConfirm = async (e) => {
+    e.preventDefault();
+    setError("");
 
+    if (!username || !email || !password || !confirmPassword) {
+      setError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+    if (username.length < 4 || username.length > 20 || !/^[a-zA-Z0-9]+$/.test(username)) {
+      setError("ชื่อผู้ใช้ต้องมีความยาว 4-20 ตัวอักษร และไม่มีอักขระพิเศษ");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("กรุณาใช้อีเมลที่ถูกต้อง เช่น yourname@example.com");
+      return;
+    }
+    if (password.length < 6 || (!/\d/.test(password) && !/[^a-zA-Z0-9]/.test(password))) {
+      setError("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร และต้องมีตัวเลขหรือสัญลักษณ์");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
+      return;
+    }
 
-    const infoMessages = {
-        username: "ชื่อผู้ใช้ต้องมีความยาว 4-20 ตัวอักษร และไม่มีอักขระพิเศษ",
-        email: "กรุณาใช้อีเมลที่ถูกต้อง เช่น yourname@example.com",
-        password: "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร และควรมีตัวเลขหรือสัญลักษณ์",
-        confirmPassword: "ยืนยันรหัสผ่านต้องตรงกับช่องรหัสผ่านด้านบน",
-    };
-    
-    const handleConfirm = async(e) => {
-       
-        e.preventDefault(); 
-        setError(""); 
-        console.log("Submitting registration:", { username, email, password, confirmPassword });
-        
-        // (Validation Logic ทั้งหมดเหมือนเดิม)
-        if (!username || !email || !password || !confirmPassword) {
-            setError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-            return;
-        }
-        const usernameRegex = /^[a-zA-Z0-9]+$/; 
-        if (username.length < 4 || username.length > 20 || !usernameRegex.test(username)) {
-            setError(infoMessages.username);
-            return;
-        }
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            setError(infoMessages.email);
-            return;
-        }
-        const hasNumberOrSymbol = /\d/.test(password) || /[^a-zA-Z0-9]/.test(password);
-        if (password.length < 6 || !hasNumberOrSymbol) {
-            setError(infoMessages.password);
-            return;
-        }
-        if (password !== confirmPassword) {
-            setError(infoMessages.confirmPassword);
-            return;
-        }
-        
-        setIsLoading(true);
-        try {
-            const payload = {
-                username :username ,
-                email: email,
-                password: password
-              };
+    setIsLoading(true);
+    try {
+      await register({ username, email, password });
+      toast.success('ลงทะเบียนสำเร็จ! กำลังกลับไปหน้า Login...');
+      router.push('/login');
+    } catch (err) {
+      setError(err?.response?.data?.message || "ไม่สามารถเชื่อมต่อ Server ได้");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-            await register(payload);
-            toast.success('ลงทะเบียนสำเร็จ! กำลังกลับไปหน้า Login...');
-           
-                router.push('/login');
-      
-        } catch (err) {
-            if (err.response) {
-              // backend ตอบ error (401, 404)
-              setError(err.response.data?.message || "Login ไม่สำเร็จ");
-            } else {
-              // network error
-              setError("ไม่สามารถเชื่อมต่อ Server ได้");
-            }
-          } finally {
-            setIsLoading(false);
-          }
-    };
+  const inputStyle = {
+    width: '100%', padding: '11px 12px 11px 38px',
+    fontSize: '14px', background: 'white',
+    border: '1.5px solid #c8d8e8', borderRadius: '10px',
+    boxSizing: 'border-box', color: '#0B1F33', outline: 'none',
+  };
 
-    const FocusInfo = ({ fieldName }) => {
-        return focusedField === fieldName && (
-            <p className="text-xs !text-indigo-600 mt-1 font-medium">
-                {infoMessages[fieldName]}
-            </p>
-        );
-    };
+  return (
+    <div>
+      {/* decorative circles */}
+      <div style={{
+        position: 'fixed', top: '-80px', right: '-80px',
+        width: '300px', height: '300px', borderRadius: '50%',
+        background: 'rgba(58,123,213,0.12)', pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'fixed', bottom: '-60px', left: '-60px',
+        width: '220px', height: '220px', borderRadius: '50%',
+        background: 'rgba(168,206,255,0.07)', pointerEvents: 'none',
+      }} />
 
-    const inputFocusProps = (fieldName) => ({
-        onFocus: () => setFocusedField(fieldName),
-        onBlur: () => setFocusedField(null),
-    });
+      <div style={{
+        background: '#EEF4FB', borderRadius: '20px', padding: '2.5rem',
+        width: '100%', boxSizing: 'border-box',
+      }}>
 
-
-    return (
-        <div className={controlsClasses}>
-            <div className={containerClasses}>
-                <div className="mb-6 text-center">
-                    <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Sign Up</h1>
-                </div>
-                
-                <form onSubmit={handleConfirm} className="space-y-4">
-                    
-                    {/* (Username Input) */}
-                    <div>
-                        <p className="text-xs font-medium text-gray-700 mb-1">Username</p>
-                        <input
-                            type="text"
-                            placeholder="name"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            required
-                            {...inputFocusProps('username')} 
-                            className="w-full py-2.5 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                        />
-                        <FocusInfo fieldName="username" />
-                    </div>
-
-                    {/* (Email Input) */}
-                    <div>
-                        <p className="text-xs font-medium text-gray-700 mb-1">Email</p>
-                        <input
-                            type="email"
-                            placeholder="your@email.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            {...inputFocusProps('email')} 
-                            className="w-full py-2.5 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                        />
-                        <FocusInfo fieldName="email" />
-                    </div>
-                    
-                    {/* (Password Input) */}
-                    <div>
-                        <p className="text-xs font-medium text-gray-700 mb-1 mt-4">Password</p>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                {...inputFocusProps('password')} 
-                                className="w-full py-2.5 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 pr-10"
-                            />
-                            
-                            <button
-                                type="button" 
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute inset-y-0 right-0 flex items-center justify-center h-full w-10 text-gray-500 hover:text-gray-700"
-                                aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                            >
-                                {showPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
-                        
-                        </div> 
-                        <FocusInfo fieldName="password" />
-                    </div>
-
-
-                    {/* (Confirm Password Input) */}
-                    <div>
-                        <p className="text-xs font-medium text-gray-700 mb-1 mt-4">Confirm password</p>
-                        <div className="relative">
-                            <input
-                                type={showConfirmPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                value={confirmPassword} 
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                                {...inputFocusProps('confirmPassword')} 
-                                className="w-full py-2.5 px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 pr-10"
-                            />
-                            
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute inset-y-0 right-0 flex items-center justify-center h-full w-10 text-gray-500 hover:text-gray-700"
-                                aria-label={showConfirmPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                            >
-                                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
-                        
-                        </div>
-                        <FocusInfo fieldName="confirmPassword" />
-                    </div>
-
-
-                    {/* (Error Message) */}
-                    {error && (
-                        <div className="text-red-600 text-sm mt-4 text-center font-medium">
-                            {error}
-                        </div>
-                    )}
-                    
-                    {/* (Buttons) */}
-                    <div className="grid grid-cols-4 gap-0 mt-5 pt-4"> 
-                        <a href="/login" className="col-span-1 mr-2"> 
-                            <button
-                                type="button" 
-                                className="
-                                    bg-[#94a3b8] text-[#475569] py-3 px-4 font-bold rounded-lg 
-                                    hover:bg-[#f0f9ff] transition duration-150 w-full 
-                                    cursor-pointer border-4 border-[#64748b] hover:border-[#60a5fa]
-                                "
-                            >
-                                Back
-                            </button>
-                        </a>
-                        <button
-                            type="submit" 
-                            className="
-                                bg-green-600 text-white py-3 px-4 font-bold rounded-lg 
-                                transition duration-150 w-full cursor-pointer hover:bg-green-700 
-                                col-span-3
-                            "
-                        >
-                            Confirm
-                        </button>
-                    </div>
-                </form>
-                
-                {/* (Sign In Link) */}
-                <div className="flex justify-center mt-6 text-sm">
-                    <p className="text-xs text-gray-600 mr-1">
-                        มีบัญชีอยู่แล้วใช่ไหม?
-                    </p>
-                    <a href="/login">
-                        <span className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer font-semibold">
-                            เข้าสู่ระบบ
-                        </span>
-                    </a>
-                </div>
-                
-            </div>
+        {/* Logo + title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+          <Image src="/logo.png" alt="Peak Pung Logo" width={52} height={52}
+            style={{ objectFit: 'cover', flexShrink: 0, borderRadius: '50%' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '8px' }}>
+            <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0B1F33' }}>Peak Pung</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#8ba6ca', whiteSpace: 'nowrap' }}>by Mom Hmee</p>
+          </div>
         </div>
-    );
+
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0B1F33', margin: '0 0 4px' }}>สมัครสมาชิก</h1>
+        <p style={{ fontSize: '13px', color: '#5a7a9a', margin: '0 0 1.5rem' }}>สร้างบัญชีเพื่อเริ่มสั่งซื้อสินค้า</p>
+
+        <form onSubmit={handleConfirm}>
+
+          {/* Username */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#0B1F33', display: 'block', marginBottom: '6px' }}>
+              Username
+            </label>
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none" stroke="#8ba6ca" strokeWidth="1.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              </svg>
+              <input type="text" placeholder="ชื่อผู้ใช้" value={username}
+                onChange={e => setUsername(e.target.value)} disabled={isLoading}
+                style={inputStyle} />
+            </div>
+          </div>
+
+          {/* Email */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#0B1F33', display: 'block', marginBottom: '6px' }}>
+              Email
+            </label>
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none" stroke="#8ba6ca" strokeWidth="1.5">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              <input type="email" placeholder="your@email.com" value={email}
+                onChange={e => setEmail(e.target.value)} disabled={isLoading}
+                style={inputStyle} />
+            </div>
+          </div>
+
+          {/* Password */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#0B1F33', display: 'block', marginBottom: '6px' }}>
+              Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none" stroke="#8ba6ca" strokeWidth="1.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password}
+                onChange={e => setPassword(e.target.value)} disabled={isLoading}
+                style={{ ...inputStyle, paddingRight: '40px' }} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8ba6ca' }}>
+                {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Password */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#0B1F33', display: 'block', marginBottom: '6px' }}>
+              ยืนยัน Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none" stroke="#8ba6ca" strokeWidth="1.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input type={showConfirm ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)} disabled={isLoading}
+                style={{ ...inputStyle, paddingRight: '40px' }} />
+              <button type="button" onClick={() => setShowConfirm(!showConfirm)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8ba6ca' }}>
+                {showConfirm ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              background: '#fff0f0', border: '1px solid #fcc', borderRadius: '8px',
+              padding: '10px 14px', fontSize: '13px', color: '#cc3333',
+              margin: '1rem 0', textAlign: 'center',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '1.25rem' }}>
+            <Link href="/login" style={{ flex: 1 }}>
+              <button type="button" style={{
+                width: '100%', padding: '12px',
+                background: 'white', color: '#5a7a9a',
+                border: '1.5px solid #c8d8e8', borderRadius: '10px',
+                fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}>
+                ย้อนกลับ
+              </button>
+            </Link>
+            <button type="submit" disabled={isLoading} style={{
+              flex: 2, padding: '12px',
+              background: isLoading ? '#3a5a7a' : '#0B1F33',
+              color: '#A8CEFF', border: 'none', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 600,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s',
+            }}>
+              {isLoading
+                ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Spinner size={16} color="#A8CEFF" /> กำลังสมัคร...</span>
+                : 'สมัครสมาชิก'}
+            </button>
+          </div>
+
+        </form>
+
+        <p style={{ textAlign: 'center', fontSize: '12px', color: '#8ba6ca', marginTop: '1.25rem', marginBottom: 0 }}>
+          มีบัญชีอยู่แล้วใช่ไหม?{' '}
+          <Link href="/login">
+            <span style={{ color: '#378ADD', cursor: 'pointer', fontWeight: 600 }}>เข้าสู่ระบบ</span>
+          </Link>
+        </p>
+
+      </div>
+    </div>
+  );
 }

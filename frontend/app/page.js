@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
 import { getProducts } from "@/services/auth.service";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -13,201 +12,138 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProducts();
+    getProducts()
+      .then(res => setProducts(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false));
   }, []);
 
-
-  const fetchProducts = async () => {
-    try {
-      const res = await getProducts();
-      // interceptor unwrap แล้ว: res.data คือ array ตรงๆ
-      setProducts(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      // ถ้าโหลดสินค้าไม่ได้ (backend ยังไม่ start / network error)
-      // ให้แสดงหน้าปกติโดยไม่มีสินค้า ห้าม redirect ออกจาก landing page
-      console.warn("[LandingPage] ไม่สามารถโหลดสินค้าได้:", err?.message ?? err);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div style={{ minHeight: '100vh', background: '#EEF4FB', fontFamily: 'sans-serif' }}>
+    <div className="min-h-screen bg-[#EEF4FB] font-sans">
 
-      {/* Navbar */}
-      <nav style={{
-        background: '#0B1F33', padding: '0 2rem', height: '64px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Image src="/logo.png" alt="Peak Pung Logo" width={40} height={40} style={{ objectFit: 'cover', borderRadius: '50%', flexShrink: 0 }} />
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '6px' }}>
-            <span style={{ color: 'white', fontSize: '14px', fontWeight: 700, lineHeight: 1.2 }}>Peak Pung</span>
-            <span style={{ color: '#8ba6ca', fontSize: '11px', lineHeight: 1.2 }}>by Mom Hmee</span>
+      {/* ── Navbar ─────────────────────────────────────────── */}
+      <nav className="bg-[#0B1F33] sticky top-0 z-50 h-16 flex items-center justify-between px-4 md:px-8">
+        <div className="flex items-center gap-2.5">
+          <Image src="/logo.png" alt="Peak Pung Logo" width={38} height={38}
+            className="rounded-full object-cover flex-shrink-0" />
+          <div className="flex flex-col justify-center mt-1">
+            <span className="text-white text-sm font-bold leading-tight">Peak Pung</span>
+            <span className="text-[#8ba6ca] text-[11px] leading-tight">by Mom Hmee</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           <Link href="/login">
-            <button style={{
-              background: 'none', border: '1px solid #2a4a6a', color: '#8ba6ca',
-              padding: '7px 16px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer',
-            }}>
+            <button className="border border-[#2a4a6a] text-[#8ba6ca] px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm cursor-pointer bg-transparent">
               เข้าสู่ระบบ
             </button>
           </Link>
           <Link href="/register">
-            <button style={{
-              background: '#A8CEFF', border: 'none', color: '#0B1F33',
-              padding: '7px 16px', borderRadius: '8px', fontSize: '13px',
-              fontWeight: 600, cursor: 'pointer',
-            }}>
+            <button className="bg-[#A8CEFF] text-[#0B1F33] px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-semibold cursor-pointer border-none">
               สมัครสมาชิก
             </button>
           </Link>
         </div>
       </nav>
 
-      {/* Hero */}
-      <div style={{
-        background: '#0B1F33', padding: '4rem 2rem', textAlign: 'center',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute', top: '-60px', right: '-60px', width: '250px', height: '250px',
-          borderRadius: '50%', background: 'rgba(58,123,213,0.12)', pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-40px', left: '-40px', width: '180px', height: '180px',
-          borderRadius: '50%', background: 'rgba(168,206,255,0.07)', pointerEvents: 'none',
-        }} />
+      {/* ── Hero ───────────────────────────────────────────── */}
+      <div className="bg-[#0B1F33] px-5 py-12 md:py-16 text-center relative overflow-hidden">
+        {/* decorative circles */}
+        <div className="absolute -top-14 -right-14 w-56 h-56 rounded-full bg-[rgba(58,123,213,0.12)] pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-[rgba(168,206,255,0.07)] pointer-events-none" />
 
-        <p style={{ color: '#8ba6ca', fontSize: '12px', letterSpacing: '0.12em', margin: '0 0 10px' }}>
-          PRE-ORDER BAKERY
-        </p>
-        <h1 style={{
-          color: 'white', fontSize: '32px', fontWeight: 600,
-          margin: '0 0 12px', lineHeight: 1.3,
-        }}>
+        <p className="text-[#8ba6ca] text-[11px] tracking-widest mb-2.5">PRE-ORDER BAKERY</p>
+        <h1 className="text-white text-2xl md:text-4xl font-semibold leading-snug mb-3">
           สั่งทำขนมปังสดใหม่<br />
-          <span style={{ color: '#A8CEFF' }}>ตามแบบที่คุณต้องการ</span>
+          <span className="text-[#A8CEFF]">ตามแบบที่คุณต้องการ</span>
         </h1>
-        <p style={{
-          color: '#5a7a9a', fontSize: '14px', margin: '0 auto 2rem',
-          maxWidth: '440px', lineHeight: 1.7,
-        }}>
-          อบสดทุกวัน รับออเดอร์ล่วงหน้า 1-2 วัน เลือกไส้และขนาดได้เอง
-          ส่งตรงถึงมือคุณหรือรับที่ร้าน
+        <p className="text-[#5a7a9a] text-sm max-w-sm mx-auto leading-relaxed mb-7">
+          อบสดทุกวัน รับออเดอร์ล่วงหน้า 1-2 วัน เลือกไส้และขนาดได้เอง ส่งตรงถึงมือคุณหรือรับที่ร้าน
         </p>
 
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div className="flex gap-2.5 justify-center flex-wrap">
           <Link href="/login">
-            <button style={{
-              background: '#A8CEFF', border: 'none', color: '#0B1F33',
-              padding: '12px 28px', borderRadius: '10px', fontSize: '14px',
-              fontWeight: 600, cursor: 'pointer',
-            }}>
+            <button className="bg-[#A8CEFF] text-[#0B1F33] px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer border-none">
               สั่งซื้อเลย →
             </button>
           </Link>
           <a href="#products">
-            <button style={{
-              background: 'none', border: '1px solid #2a4a6a', color: '#8ba6ca',
-              padding: '12px 28px', borderRadius: '10px', fontSize: '14px', cursor: 'pointer',
-            }}>
+            <button className="bg-transparent border border-[#2a4a6a] text-[#8ba6ca] px-6 py-3 rounded-xl text-sm cursor-pointer">
               ดูสินค้า
             </button>
           </a>
         </div>
 
         {/* Stats */}
-        <div style={{
-          display: 'flex', gap: '2rem', justifyContent: 'center',
-          marginTop: '2.5rem', flexWrap: 'wrap',
-        }}>
+        <div className="flex justify-center gap-6 md:gap-8 mt-8 flex-wrap">
           {[
             { value: '50+', label: 'เมนูให้เลือก' },
             { value: 'อบสด', label: 'ทุกวัน' },
             { value: '1-2 วัน', label: 'สั่งล่วงหน้า' },
           ].map((s, i) => (
-            <div key={i} style={{ textAlign: 'center', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-              {i > 0 && <div style={{ width: '1px', height: '30px', background: '#1a3a5c' }} />}
-              <div>
-                <p style={{ color: 'white', fontSize: '20px', fontWeight: 600, margin: 0 }}>{s.value}</p>
-                <p style={{ color: '#5a7a9a', fontSize: '12px', margin: '4px 0 0' }}>{s.label}</p>
+            <div key={i} className="flex items-center gap-6 md:gap-8">
+              {i > 0 && <div className="w-px h-7 bg-[#1a3a5c]" />}
+              <div className="text-center">
+                <p className="text-white text-lg md:text-xl font-semibold m-0">{s.value}</p>
+                <p className="text-[#5a7a9a] text-[11px] mt-1 m-0">{s.label}</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Products */}
-      <div id="products" style={{ padding: '2rem 1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+      {/* ── Products ───────────────────────────────────────── */}
+      <div id="products" className="px-4 md:px-6 py-7">
+        <div className="flex justify-between items-center mb-4">
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#0B1F33', margin: 0 }}>สินค้าแนะนำ</h2>
-            <p style={{ fontSize: '13px', color: '#8ba6ca', margin: '4px 0 0' }}>เลือกและสั่งล่วงหน้าได้เลย</p>
+            <h2 className="text-lg md:text-xl font-semibold text-[#0B1F33] m-0">สินค้าแนะนำ</h2>
+            <p className="text-[#8ba6ca] text-xs mt-1 m-0">เลือกและสั่งล่วงหน้าได้เลย</p>
           </div>
           <Link href="/login">
-            <span style={{ fontSize: '13px', color: '#378ADD', cursor: 'pointer' }}>ดูทั้งหมด →</span>
+            <span className="text-xs text-[#378ADD] cursor-pointer">ดูทั้งหมด →</span>
           </Link>
         </div>
 
         {loading ? (
-          <p style={{ textAlign: 'center', color: '#8ba6ca', padding: '2rem' }}>กำลังโหลด...</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse bg-white rounded-2xl overflow-hidden border border-[#dce8f0]">
+                <div className="h-32 md:h-44 bg-[#e8f0f8]" />
+                <div className="p-3 space-y-2">
+                  <div className="h-3 bg-[#e8f0f8] rounded w-3/4" />
+                  <div className="flex justify-between items-center pt-1">
+                    <div className="h-3 bg-[#e8f0f8] rounded w-1/3" />
+                    <div className="h-6 w-12 bg-[#e8f0f8] rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',  // ← 4 คอลัมน์พอดี
-            gap: '12px',
-          }}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {products.slice(0, 4).map(product => (
-              <div key={product.id} style={{
-                background: 'white', borderRadius: '14px',
-                overflow: 'hidden', border: '0.5px solid #dce8f0',
-              }}>
-                {/* รูปสินค้า */}
-                <div style={{
-                  height: '180px', background: '#f0f4f8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  overflow: 'hidden', position: 'relative',
-                }}>
+              <div key={product.id} className="bg-white rounded-2xl overflow-hidden border border-[#dce8f0]">
+                <div className="h-32 md:h-44 bg-[#f0f4f8] relative overflow-hidden">
                   {product.imageUrl ? (
-                    <img
-                      src={`${API_URL}/${product.imageUrl}`}
-                      alt={product.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <img src={`${API_URL}/${product.imageUrl}`} alt={product.name}
+                      className="w-full h-full object-cover" />
                   ) : (
-                    <span style={{ fontSize: '40px' }}>🍞</span>
+                    <div className="w-full h-full flex items-center justify-center text-4xl">🍞</div>
                   )}
                   {product.stock === 0 && (
-                    <div style={{
-                      position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span style={{ color: 'white', fontSize: '12px', fontWeight: 600 }}>หมดแล้ว</span>
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <span className="text-white text-xs font-semibold">หมดแล้ว</span>
                     </div>
                   )}
                 </div>
-
-                <div style={{ padding: '10px 12px' }}>
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#0B1F33', margin: '0 0 2px' }}>
-                    {product.name}
-                  </p>
-                  <p style={{ fontSize: '11px', color: '#8ba6ca', margin: '0 0 8px' }}>
+                <div className="p-2.5 md:p-3">
+                  <p className="text-xs md:text-sm font-semibold text-[#0B1F33] mb-1 truncate">{product.name}</p>
+                  <p className="text-[10px] md:text-xs text-[#8ba6ca] mb-2 truncate">
                     {product.description || product.category}
                   </p>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 600, color: '#0B1F33' }}>
-                      ฿{product.price}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm md:text-base font-semibold text-[#0B1F33]">฿{product.price}</span>
                     <Link href="/login">
-                      <button style={{
-                        background: '#0B1F33', border: 'none', color: '#A8CEFF',
-                        padding: '5px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer',
-                      }}>
+                      <button className="bg-[#0B1F33] text-[#A8CEFF] px-2 md:px-2.5 py-1 rounded-lg text-[10px] md:text-xs cursor-pointer border-none">
                         + เพิ่ม
                       </button>
                     </Link>
@@ -219,64 +155,38 @@ export default function LandingPage() {
         )}
       </div>
 
-      {/* How to order */}
-      <div style={{ padding: '0 1.5rem 2rem' }}>
-        <div style={{
-          background: '#0B1F33', borderRadius: '16px', padding: '1.75rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexWrap: 'wrap', gap: '1.25rem',
-        }}>
-          <div style={{ minWidth: '280px', flex: 1 }}>
-            <p style={{ color: '#A8CEFF', fontSize: '12px', margin: '0 0 6px', letterSpacing: '0.05em' }}>
-              วิธีสั่งซื้อ Pre-order
-            </p>
-            <h3 style={{ color: 'white', fontSize: '17px', fontWeight: 600, margin: '0 0 1rem' }}>
-              ง่ายแค่ 3 ขั้นตอน
-            </h3>
-            <div style={{
-        display: 'flex',
-        flexDirection: 'row',   // แนวนอนตามปกติ
-        flexWrap: 'wrap',       // ถ้าพื้นที่น้อย ให้ตัดบรรทัด
-        gap: '8px 16px',
-      }}>
+      {/* ── How to order ───────────────────────────────────── */}
+      <div className="px-4 md:px-6 pb-8">
+        <div className="bg-[#0B1F33] rounded-2xl p-5 md:p-7 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <div className="flex-1">
+            <p className="text-[#A8CEFF] text-xs tracking-wider mb-1.5">วิธีสั่งซื้อ Pre-order</p>
+            <h3 className="text-white text-base md:text-lg font-semibold mb-4">ง่ายแค่ 3 ขั้นตอน</h3>
+            <div className="flex flex-col gap-3">
               {[
                 'เลือกสินค้าและกำหนดวันรับ',
                 'ชำระเงินและยืนยันออเดอร์',
                 'รับขนมปังอบสดในวันที่นัด',
               ].map((step, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '22px', height: '22px', background: '#1a3a5c',
-                    borderRadius: '50%', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <span style={{ color: '#A8CEFF', fontSize: '11px', fontWeight: 600 }}>{i + 1}</span>
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-6 h-6 bg-[#1a3a5c] rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-[#A8CEFF] text-[11px] font-semibold">{i + 1}</span>
                   </div>
-                  <span style={{ color: '#8ba6ca', fontSize: '13px' }}>{step}</span>
+                  <span className="text-[#8ba6ca] text-sm">{step}</span>
                 </div>
               ))}
             </div>
           </div>
-          <Link href="/register">
-            <button style={{
-              background: '#A8CEFF', border: 'none', color: '#0B1F33',
-              padding: '12px 24px', borderRadius: '10px', fontSize: '14px',
-              fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-            }}>
+          <Link href="/register" className="flex-shrink-0">
+            <button className="w-full md:w-auto bg-[#A8CEFF] text-[#0B1F33] px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer border-none whitespace-nowrap">
               สมัครและสั่งซื้อเลย →
             </button>
           </Link>
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{
-        background: '#0B1F33', padding: '1.5rem 2rem',
-        textAlign: 'center',
-      }}>
-        <p style={{ color: '#5a7a9a', fontSize: '12px', margin: 0 }}>
-          © 2026 BreadShop · ขนมปังอบสด Pre-order
-        </p>
+      {/* ── Footer ─────────────────────────────────────────── */}
+      <div className="bg-[#0B1F33] py-5 text-center">
+        <p className="text-[#5a7a9a] text-xs m-0">© 2026 BreadShop · ขนมปังอบสด Pre-order</p>
       </div>
 
     </div>

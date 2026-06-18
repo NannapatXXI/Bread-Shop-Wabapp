@@ -1,0 +1,45 @@
+{
+  "properties": [
+    {
+      "name": "app.jwtSecret",
+      "type": "java.lang.String",
+      "description": "Secret key for signing JWT tokens (Base64 encoded, min 256 bit)"
+    },
+    {
+      "name": "app.jwtExpirationMs",
+      "type": "java.lang.Long",
+      "description": "JWT access token expiration time in milliseconds"
+    },
+    {
+      "name": "app.secure-cookie",
+      "type": "java.lang.Boolean",
+      "description": "Set httpOnly cookie Secure flag. false for local HTTP, true for production HTTPS",
+      "defaultValue": false
+    },
+    {
+      "name": "google.redirectUri",
+      "type": "java.lang.String",
+      "description": "Google OAuth2 redirect URI"
+    },
+    {
+      "name": "google.tokenUri",
+      "type": "java.lang.String",
+      "description": "Google OAuth2 token endpoint URI"
+    },
+    {
+      "name": "google.userInfoUri",
+      "type": "java.lang.String",
+      "description": "Google OAuth2 user info endpoint URI"
+    },
+    {
+      "name": "google.clientId",
+      "type": "java.lang.String",
+      "description": "Google OAuth2 client ID"
+    },
+    {
+      "name": "google.clientSecret",
+      "type": "java.lang.String",
+      "description": "Google OAuth2 client secret"
+    }
+  ]
+}

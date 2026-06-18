@@ -313,81 +313,71 @@ export default function ProductPage() {
   return (
     <div className="bg-[#EEF4FB] rounded-lg  p-6 md:p-8">
       
-      {/* (ส่วน Header - เหมือนเดิม) */}
-      <div className="mb-6  flex rounded-lg">
-
-        <div className="w-4/5 p-4  ">
+      {/* (ส่วน Header) */}
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
           <h2 className="text-2xl font-bold text-gray-800">Product list</h2>
           <p className="text-[#4279c1]">ทั้งหมด {countAllProduct} รายการ</p>
         </div>
-
-        <div className="w-1/2 p-4 flex justify-end rounded-lg ">
-            <button  onClick={() => router.push("/admin/products/addproduct")} className="px-4 py-2  h-10 bg-[#0F2235] text-white font-semibold rounded-lg shadow-md hover:bg-blue-500 transition duration-150">
-              + add Product
-              </button>
-         
-        </div>
-
+        <button onClick={() => router.push("/admin/products/addproduct")}
+          className="px-4 py-2 bg-[#0B1F33] text-[#A8CEFF] font-semibold rounded-xl hover:bg-blue-900 transition text-sm whitespace-nowrap shrink-0">
+          + เพิ่มสินค้า
+        </button>
       </div>
 
       {/* (ส่วนแสดงสถิติสินค้า) */}
-      <div  className='grid grid-cols-4 gap-2 mb-2  text-gray-500 font-medium h-32'>
-          <div className="bg-white flex items-center justify-left pl-10 rounded-md">
-            <div className="h-10 flex items-center justify-center">
-               <div className='bg-[#EEF4FB] p-4 rounded-md flex items-center justify-center'>
-                 <TiArchive  size={30} className="text-blue-600" />
+      <div className='grid grid-cols-2 md:grid-cols-4 gap-2 mb-2 text-gray-500 font-medium'>
+          <div className="bg-white flex items-center px-4 md:pl-10 py-4 rounded-md">
+            <div className="flex items-center justify-center">
+               <div className='bg-[#EEF4FB] p-3 rounded-md flex items-center justify-center shrink-0'>
+                 <TiArchive size={24} className="text-blue-600" />
                 </div>
-                <div className = 'flex flex-col items-start justify-center ml-3'>
-                        <h1> {countAllProduct} </h1>
-                        <p >สินค้าทั้งหมด</p>
-                      
-                 </div>
-                 
+                <div className='flex flex-col items-start justify-center ml-3'>
+                  <h1 className="font-semibold text-gray-800">{countAllProduct}</h1>
+                  <p className="text-xs">สินค้าทั้งหมด</p>
+                </div>
             </div>
-            
           </div>
-        
-          <div className="bg-white flex items-center justify-left pl-10 rounded-md">
-            <div className="h-10 flex items-center justify-center">
-              
-                <div className='bg-[#c6e9c6] p-4 rounded-md flex items-center justify-center text-white'>
-                    <MdOutlineSell size={30} className="text-green-600" />
-                  </div>
-                  <div className = 'flex flex-col items-start justify-center ml-3'>
-                        <h1> {countReadyProduct}</h1>
-                        <p >พร้อมขาย</p>
-                      
-                 </div>
+
+          <div className="bg-white flex items-center px-4 md:pl-10 py-4 rounded-md">
+            <div className="flex items-center justify-center">
+              <div className='bg-[#c6e9c6] p-3 rounded-md flex items-center justify-center shrink-0'>
+                  <MdOutlineSell size={24} className="text-green-600" />
+                </div>
+                <div className='flex flex-col items-start justify-center ml-3'>
+                  <h1 className="font-semibold text-gray-800">{countReadyProduct}</h1>
+                  <p className="text-xs">พร้อมขาย</p>
+                </div>
             </div>
-            
           </div>
+
           {/* [Claude] คลิก → filter เฉพาะ stock 1-5 */}
           <button onClick={() => handleStockFilter('lowstock')}
-            className={`flex items-center justify-start pl-10 rounded-md transition border-2
+            className={`flex items-center px-4 md:pl-10 py-4 rounded-md transition border-2
               ${stockFilter === 'lowstock' ? 'bg-orange-50 border-orange-400' : 'bg-white border-transparent hover:border-orange-200'}`}>
-            <div className="h-10 flex items-center justify-center">
-                 <div className='bg-[#fff4b4] p-4 rounded-md flex items-center justify-center text-white'>
-                 <FiAlertTriangle size={30} className="text-yellow-800"/>
-                  </div>
-                  <div className='flex flex-col items-start justify-center ml-3'>
-                        <h1 className={stockFilter === 'lowstock' ? 'text-orange-600 font-bold' : ''}>{countLowProduct}</h1>
-                        <p>สต็อกใกล้หมด</p>
-                 </div>
+            <div className="flex items-center justify-center">
+              <div className='bg-[#fff4b4] p-3 rounded-md flex items-center justify-center shrink-0'>
+                <FiAlertTriangle size={24} className="text-yellow-800"/>
+              </div>
+              <div className='flex flex-col items-start justify-center ml-3'>
+                <h1 className={`font-semibold ${stockFilter === 'lowstock' ? 'text-orange-600' : 'text-gray-800'}`}>{countLowProduct}</h1>
+                <p className="text-xs">สต็อกใกล้หมด</p>
+              </div>
             </div>
           </button>
 
           {/* [Claude] คลิก → filter เฉพาะ stock = 0 */}
           <button onClick={() => handleStockFilter('outofstock')}
-            className={`flex items-center justify-start pl-10 rounded-md transition border-2
+            className={`flex items-center px-4 md:pl-10 py-4 rounded-md transition border-2
               ${stockFilter === 'outofstock' ? 'bg-red-50 border-red-400' : 'bg-white border-transparent hover:border-red-200'}`}>
-            <div className="h-10 flex items-center justify-center">
-                  <div className='bg-[#e4c9c9] p-4 rounded-md flex items-center justify-center text-white'>
-                  <TiDeleteOutline size={30} className="text-red-800"/>
-                  </div>
-                  <div className='flex flex-col items-start justify-center ml-3'>
-                        <h1 className={stockFilter === 'outofstock' ? 'text-red-600 font-bold' : ''}>{countOutofstockProduct}</h1>
-                        <p>หมดสต็อก</p>
-                 </div>
+            <div className="flex items-center justify-center">
+              <div className='bg-[#e4c9c9] p-3 rounded-md flex items-center justify-center shrink-0'>
+                <TiDeleteOutline size={24} className="text-red-800"/>
+              </div>
+              <div className='flex flex-col items-start justify-center ml-3'>
+                <h1 className={`font-semibold ${stockFilter === 'outofstock' ? 'text-red-600' : 'text-gray-800'}`}>{countOutofstockProduct}</h1>
+                <p className="text-xs">หมดสต็อก</p>
+              </div>
             </div>
           </button>
       </div>
@@ -413,67 +403,37 @@ export default function ProductPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between  gap-4 mb-6  bg-white  shadow-md p-2 rounded-lg">
-            
-          <div className="relative flex-1 ">
-                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  
-                  <input
-                    type="text"
-                    placeholder="ค้นหาสินค้า..."
-                    value={search}
-                    onChange={handleSearchChange}
-                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#E0EBF8]  "
-                  />
-              </div>
-            <div className="inline-flex p-1 rounded-lg ">
-              
-              <div className = "grid grid-cols-[10px_150px_150px_150_150px] w-1000 gap-2 "> 
-                    <div className=' text-2xl text-gray-400 flex items-center justify-center'> 
-                          |
-                        </div>
-                      <button  onClick={() => handleCategoryChange("ALL")}
-                      className={`px-4 py-2 rounded-md font-semibold transition-allflex items-center justify-center ${categoryFilter === "ALL"
-                                  ? "bg-[#0F2235] text-white"
-                                  : "text-gray-400 hover:bg-gray-200"}  `}>
-                       ทั้งหมด
-                    </button>
-                 
-                      <button  onClick={() => handleCategoryChange("BREAD")}
-                      className={`px-4 py-2 rounded-md font-semibold  w-full 
-                        ${categoryFilter === "BREAD"
-                          ? "bg-[#0F2235] text-white"
-                          : "text-gray-400 hover:bg-gray-200"}`}>
-                          Bread
-                      </button>
-                 
-                      <button onClick={() => handleCategoryChange("CAKE")}
-                      className={`px-4 py-2 rounded-md font-semibold   w-full 
-                        ${categoryFilter === "CAKE"
-                          ? "bg-[#0F2235] text-white"
-                          : "text-gray-400 hover:bg-gray-200"}`}>
-                          Cake
-                      </button>
-                 
-                      <button onClick={() => handleCategoryChange("COOKIE")}
-                      className={`px-4 py-2 rounded-md font-semibold    w-full
-                        ${categoryFilter === "COOKIE"
-                          ? "bg-[#0F2235] text-white"
-                          : "text-gray-400 hover:bg-gray-200"}`}>
-                          Cookie
-                      </button>
-              </div>
-            </div>
+      <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-6 bg-white shadow-md p-2 rounded-lg">
 
-    
-           
-    
-            
-          </div>
+        {/* Search */}
+        <div className="relative flex-1 min-w-0">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="ค้นหาสินค้า..."
+            value={search}
+            onChange={handleSearchChange}
+            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#E0EBF8]"
+          />
+        </div>
+
+        {/* Category buttons — scroll horizontally on small screens */}
+        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
+          <span className="text-gray-300 text-lg shrink-0">|</span>
+          {['ALL', 'BREAD', 'CAKE', 'COOKIE'].map(cat => (
+            <button key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              className={`px-3 py-2 rounded-md font-semibold whitespace-nowrap text-sm transition-all
+                ${categoryFilter === cat ? 'bg-[#0F2235] text-white' : 'text-gray-400 hover:bg-gray-200'}`}>
+              {cat === 'ALL' ? 'ทั้งหมด' : cat.charAt(0) + cat.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
               <th className="px-4 py-3 text-left">สินค้า</th>

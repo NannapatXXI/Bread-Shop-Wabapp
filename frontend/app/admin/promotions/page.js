@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminGetPromotions, adminCreatePromotion, adminTogglePromotion, adminDeletePromotion } from '@/services/auth.service';
 import { exportCSV } from '@/lib/exportCSV';
+import Spinner from '@/app/components/Spinner';
+import { SkeletonRows } from '@/app/components/Skeleton';
 
 const EMPTY_FORM = {
   code: '', name: '', discountType: 'FIXED',
@@ -81,12 +83,12 @@ export default function AdminPromotionsPage() {
     <div className="bg-[#EEF4FB] min-h-screen p-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Promotion Management</h1>
           <p className="text-gray-500 text-sm">สร้างและจัดการโค้ดส่วนลด</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => exportCSV(
               promos,
@@ -101,14 +103,14 @@ export default function AdminPromotionsPage() {
             Export
           </button>
           <button onClick={() => setShowForm(true)}
-            className="px-5 py-2.5 bg-[#0B1F33] text-[#A8CEFF] font-semibold rounded-xl hover:bg-blue-900 transition text-sm">
+            className="px-4 py-2 bg-[#0B1F33] text-[#A8CEFF] font-semibold rounded-xl hover:bg-blue-900 transition text-sm whitespace-nowrap">
             + สร้างโปรโมชั่น
           </button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         {[
           { label: 'ทั้งหมด',   value: promos.length,                         color: 'text-gray-800' },
           { label: 'ใช้งานอยู่', value: promos.filter(p => p.isActive).length, color: 'text-green-600' },
@@ -122,13 +124,15 @@ export default function AdminPromotionsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
         {loading ? (
-          <div className="text-center py-16 text-gray-400">กำลังโหลด...</div>
+          <table className="w-full text-sm min-w-[600px]">
+            <tbody><SkeletonRows rows={6} cols={7} /></tbody>
+          </table>
         ) : promos.length === 0 ? (
           <div className="text-center py-16 text-gray-400">ยังไม่มีโปรโมชั่น</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">โค้ด</th>
@@ -285,7 +289,9 @@ export default function AdminPromotionsPage() {
                 </button>
                 <button type="submit" disabled={saving}
                   className="flex-1 py-2.5 bg-[#0B1F33] text-[#A8CEFF] rounded-xl font-semibold text-sm hover:bg-blue-900 disabled:opacity-50">
-                  {saving ? 'กำลังสร้าง...' : 'สร้างโปรโมชั่น'}
+                  {saving
+                    ? <span className="flex items-center justify-center gap-2"><Spinner size={16} color="#A8CEFF" /> กำลังสร้าง...</span>
+                    : 'สร้างโปรโมชั่น'}
                 </button>
               </div>
             </form>

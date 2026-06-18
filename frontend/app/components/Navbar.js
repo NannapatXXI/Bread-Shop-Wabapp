@@ -17,7 +17,7 @@ export default function Navbar({ setIsOpen }) {
       {/* ── ซ้าย: Hamburger ─────────────────────────── */}
       <div className="flex items-center">
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => setIsOpen(prev => !prev)}
           className="text-gray-600 md:hidden mr-4"
         >
           <FaBars size={20} />
@@ -31,7 +31,7 @@ export default function Navbar({ setIsOpen }) {
           href="/profile"
           className="text-gray-600 hidden md:block hover:text-indigo-500 transition-colors text-sm"
         >
-          👋 {user?.username}
+          {user?.username}
         </Link>
 
         {/* ── กระดิ่งแจ้งเตือน ────────────────────── */}

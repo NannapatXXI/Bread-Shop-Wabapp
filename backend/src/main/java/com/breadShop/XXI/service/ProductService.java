@@ -25,8 +25,14 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
-    private static final String UPLOAD_DIR =
-        Paths.get(System.getProperty("user.dir")).getParent().resolve("uploads").toString();
+    private static final String UPLOAD_DIR = resolveUploadDir();
+
+    private static String resolveUploadDir() {
+        Path base = Paths.get(System.getProperty("user.dir"));
+        Path candidate = base.resolve("uploads");
+        if (candidate.toFile().exists()) return candidate.toString();
+        return base.getParent().resolve("uploads").toString();
+    }
 
 
    
@@ -105,7 +111,8 @@ public class ProductService {
         if (request.getImage() != null && !request.getImage().isEmpty()) {
             if (product.getImageUrl() != null) {
                 try {
-                    Files.deleteIfExists(Paths.get(System.getProperty("user.dir")).resolve(product.getImageUrl()));
+                    String imgName = Paths.get(product.getImageUrl()).getFileName().toString();
+                    Files.deleteIfExists(Paths.get(UPLOAD_DIR, imgName));
                 } catch (IOException e) {
                     System.out.println("Delete old image failed: " + e.getMessage());
                 }
@@ -130,11 +137,8 @@ public class ProductService {
     
         if (product.getImageUrl() != null) {
             try {
-                Path filePath = Paths.get(System.getProperty("user.dir"))
-                        .resolve(product.getImageUrl());
-    
-                Files.deleteIfExists(filePath);
-    
+                String imgName = Paths.get(product.getImageUrl()).getFileName().toString();
+                Files.deleteIfExists(Paths.get(UPLOAD_DIR, imgName));
             } catch (IOException e) {
                 System.out.println("Image delete failed: " + e.getMessage());
             }

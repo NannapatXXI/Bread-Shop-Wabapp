@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.breadShop.XXI.entity.UserActivityLog;
 
+// Repository สำหรับจัดการข้อมูล UserActivityLog โดยใช้ Spring Data JPA | reviewed by peak
 public interface UserActivityLogRepository extends JpaRepository<UserActivityLog, Long> {
 
     @Query("""

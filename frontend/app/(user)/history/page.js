@@ -44,10 +44,10 @@ export default function HistoryPage() {
     fetchOrders();
   }, [user]);
 
-  // [Claude] ดึง order ทั้งหมดของ user จาก backend
+  // [Claude] ดึง order ทั้งหมดของ user จาก backend — userId มาจาก JWT ฝั่ง server
   const fetchOrders = async () => {
     try {
-      const res = await api.get(`/api/orders?userId=${user.id}`);
+      const res = await api.get(`/api/orders`);
       // เรียงล่าสุดก่อน
       const sorted = res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(sorted);
@@ -65,7 +65,7 @@ export default function HistoryPage() {
 
   const handleCancel = async () => {
     try {
-      await cancelOrder(confirmCancelId, user.id);
+      await cancelOrder(confirmCancelId);
       toast.success('ยกเลิกออเดอร์สำเร็จ');
       setConfirmCancelId(null);
       fetchOrders();
@@ -76,7 +76,27 @@ export default function HistoryPage() {
   };
 
   if (loading || fetchLoading) {
-    return <div className="text-center py-10 text-gray-400">กำลังโหลด...</div>;
+    return (
+      <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        <div className="h-6 bg-gray-200 rounded w-1/3 animate-pulse" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="animate-pulse bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-12 h-12 bg-gray-200 rounded-xl flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-1/3" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
+              </div>
+              <div className="h-6 w-20 bg-gray-200 rounded-full" />
+            </div>
+            <div className="flex justify-between pt-2 border-t border-gray-50">
+              <div className="h-3 bg-gray-200 rounded w-1/4" />
+              <div className="h-3 bg-gray-200 rounded w-1/4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (

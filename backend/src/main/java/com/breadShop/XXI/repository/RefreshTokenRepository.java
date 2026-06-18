@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import com.breadShop.XXI.entity.RefreshToken;
 import com.breadShop.XXI.entity.User;
 
+// Repository สำหรับจัดการข้อมูล RefreshToken โดยใช้ Spring Data JPA | reviewed by peak
 public interface RefreshTokenRepository
         extends JpaRepository<RefreshToken, Long> {
 

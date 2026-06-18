@@ -1,5 +1,6 @@
 package com.breadShop.XXI.dto;
 
+// เอาไว้เป็น wrapper สำหรับทุก API response — เพื่อให้ frontend เข้าถึงข้อมูลได้ง่ายและ uniform | reviewed by peak
 /**
  * [Claude] ApiResponse<T> — wrapper มาตรฐานสำหรับทุก API response
  *

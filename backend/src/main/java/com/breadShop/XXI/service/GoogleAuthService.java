@@ -16,7 +16,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import com.breadShop.XXI.dto.AuthenticationResponse;
-import com.breadShop.XXI.entity.RefreshToken;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.UserRepository;
 
@@ -53,6 +52,10 @@ public class GoogleAuthService {
         this.refreshTokenService = refreshTokenService;
     }
 
+    /**
+     * สร้าง URL สำหรับให้ผู้ใช้คลิกเพื่อเข้าสู่ระบบด้วย Google
+     * @return URL ที่มีพารามิเตอร์ client_id, redirect_uri, response_type, scope และ prompt
+     */ 
     public String getGoogleLoginUrl() {
         return "https://accounts.google.com/o/oauth2/auth?client_id="
                 + clientId
@@ -62,6 +65,17 @@ public class GoogleAuthService {
                 
     }
 
+    /**
+     * ขั้นตอนการทำงาน: 
+     * 1. รับ code จาก Google callback
+     * 2. ขอ access token จาก Google
+     * 3. ดึงข้อมูล user profile จาก Google
+     * 4. สมัคร user ใหม่ในระบบถ้ายังไม่มี หรือดึง user เดิมมา
+     * 5. สร้าง JWT access token + refresh token ให้กับ user
+     * หมายเหตุ: ในขั้นตอนที่ 4 เราจะเก็บ BCrypt hash ของ random UUID เป็น password เพื่อป้องกัน warning และ leak
+     * @param code - authorization code ที่ได้จาก Google callback
+     * @return AuthenticationResponse ที่มี access token, refresh token, username และ email ของ user
+     */
     public AuthenticationResponse handleGoogleCallback(String code) {
         // 1. ขอ access token
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
@@ -115,11 +129,11 @@ public class GoogleAuthService {
 
         // 5. สร้าง access token + refresh token (เหมือน login ปกติ)
         String accessToken = jwtService.generateToken(userDetails);
-        RefreshToken refreshToken = refreshTokenService.create(user);
+        String refreshToken = refreshTokenService.create(user);
 
         return new AuthenticationResponse(
                 accessToken,
-                refreshToken.getToken(),
+                refreshToken,
                 user.getUsername(),
                 user.getEmail()
         );

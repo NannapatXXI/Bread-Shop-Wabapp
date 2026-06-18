@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 import com.breadShop.XXI.entity.Promotion.DiscountType;
 /**
- * DTO สำหรับรับข้อมูลโปรโมชั่นใหม่จาก client เมื่อสร้างหรือแก้ไขโปรโมชั่น
+ * DTO สำหรับรับข้อมูลโปรโมชั่นใหม่จาก client เมื่อสร้างหรือแก้ไขโปรโมชั่น | reviewed by peak
  */
 public class PromotionRequest {
 

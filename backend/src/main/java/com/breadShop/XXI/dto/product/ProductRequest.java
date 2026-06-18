@@ -7,9 +7,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.breadShop.XXI.entity.ProductCategory;
 
-/**
- * DTO สำหรับรับข้อมูลสินค้าใหม่จาก client เมื่อสร้างหรือแก้ไขสินค้า
- */
+
+//  DTO สำหรับรับข้อมูลสินค้าใหม่จาก client เมื่อสร้างหรือแก้ไขสินค้า | reviewed by peak
+  
 public class ProductRequest {
 
     private String name;
