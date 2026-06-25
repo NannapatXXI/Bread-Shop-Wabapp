@@ -2,7 +2,6 @@ package com.breadShop.XXI.scheduler;
 
 import java.time.LocalDateTime;
 
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +19,6 @@ import com.breadShop.XXI.repository.RefreshTokenRepository;
  * รันทุกวัน ตี 3 (เวลา server ต่ำสุด)
  */
 @Component
-@EnableScheduling
 public class RefreshTokenCleanupJob {
 
     private final RefreshTokenRepository repo;

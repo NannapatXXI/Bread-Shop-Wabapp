@@ -64,6 +64,7 @@ class OrderServiceTest {
         ReflectionTestUtils.setField(sampleUser, "id", 1);
 
         sampleAddress = new UserAddress();
+        sampleAddress.setUser(sampleUser);   // ownership check ใน createOrder ต้องการ user
         sampleAddress.setRecipientName("นันทพัทธ์");
         sampleAddress.setPhone("0812345678");
         sampleAddress.setAddress("123 ถ.สุขุมวิท");
@@ -150,7 +151,7 @@ class OrderServiceTest {
 
         when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
         when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
-        when(productRepository.findById(10L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
 
         assertThatThrownBy(() -> orderService.createOrder(request))
                 .isInstanceOf(ResponseStatusException.class)
@@ -173,7 +174,7 @@ class OrderServiceTest {
 
         when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
         when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
-        when(productRepository.findById(999L)).thenReturn(Optional.empty());
+        when(productRepository.findByIdWithLock(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.createOrder(request))
                 .isInstanceOf(ResponseStatusException.class)

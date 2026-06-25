@@ -3,10 +3,16 @@ package com.breadShop.XXI.dto.orderline;
 
 import java.math.BigDecimal;
 
-// ใช้สำหรับรับข้อมูลแต่ละรายการสินค้าในคำสั่งซื้อจากลูกค้า  | reviewed by peak
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
 public class OrderLineRequest {
 
+    @NotNull(message = "กรุณาระบุสินค้า")
     private Integer productId;
+
+    @NotNull(message = "กรุณาระบุจำนวน")
+    @Min(value = 1, message = "จำนวนสินค้าต้องมากกว่า 0")
     private Integer quantity;
     private BigDecimal discountAmount;
 

@@ -1,8 +1,11 @@
 package com.breadShop.XXI.exception;
 
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -21,6 +24,15 @@ import com.breadShop.XXI.dto.ApiResponse;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /** @Valid validation ล้มเหลว — รวม error ทุก field เป็น message เดียว */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
+        String msg = ex.getBindingResult().getFieldErrors().stream()
+                .map(e -> e.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(msg));
+    }
 
     /** ชื่อ/รหัสผ่านผิด */
     @ExceptionHandler(BadCredentialsException.class)

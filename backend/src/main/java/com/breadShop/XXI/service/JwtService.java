@@ -86,13 +86,9 @@ public class JwtService {
         return email.equals(user.getUsername()) && !isTokenExpired(token);
     }
 
-    // ตรวจ signature + expiry โดยไม่ต้องโหลด UserDetails จาก DB
-    /**
-     * ตรวจสอบว่า JWT token มี signature ที่ถูกต้องและยังไม่หมดอายุ โดยไม่ต้องโหลดข้อมูลผู้ใช้จากฐานข้อมูล โดยจะตรวจสอบว่า token ยังไม่หมดอายุและ signature ถูกต้องตาม secret key ที่กำหนดไว้
-     * @param token JWT token ที่ต้องการตรวจสอบ
-     * @return true ถ้า token มี signature ที่ถูกต้องและยังไม่หมดอายุ, false ถ้า signature ไม่ถูกต้องหรือหมดอายุ
-     */
-    public boolean isTokenSignatureValid(String token) {
+    // ตรวจว่า token ยังไม่หมดอายุ โดยไม่ต้องโหลด UserDetails
+    // หมายเหตุ: signature ถูกตรวจโดย JJWT อัตโนมัติตอน parse ก่อนหน้านี้แล้ว
+    public boolean isTokenNotExpired(String token) {
         return !isTokenExpired(token);
     }
 

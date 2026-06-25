@@ -2,6 +2,7 @@ package com.breadShop.XXI.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -71,7 +72,7 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<ApiResponse<OrderResponse>> create(
             @AuthenticationPrincipal String email,
-            @RequestBody OrderRequest request) {
+            @Valid @RequestBody OrderRequest request) {
         User user = resolveUser(email);
         request.setUserId(user.getId()); // override userId จาก JWT เสมอ
         return ResponseEntity.ok(ApiResponse.ok("สร้าง order สำเร็จ", orderService.createOrder(request)));

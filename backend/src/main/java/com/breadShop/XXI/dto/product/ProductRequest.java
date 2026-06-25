@@ -6,15 +6,27 @@ import java.time.LocalDate;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.breadShop.XXI.entity.ProductCategory;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 
 //  DTO สำหรับรับข้อมูลสินค้าใหม่จาก client เมื่อสร้างหรือแก้ไขสินค้า | reviewed by peak
   
 public class ProductRequest {
 
+    @NotBlank(message = "กรุณากรอกชื่อสินค้า")
     private String name;
+
+    @NotNull(message = "กรุณากรอกราคา")
+    @DecimalMin(value = "0.01", message = "ราคาต้องมากกว่า 0")
     private BigDecimal price;
+
+    @NotNull(message = "กรุณากรอกจำนวนสต็อก")
+    @Min(value = 0, message = "จำนวนสต็อกต้องไม่ติดลบ")
     private Integer stock;
+
     private String description;
     private ProductCategory category;
     private LocalDate expiryDate;

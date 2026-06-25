@@ -93,15 +93,22 @@ public class DashboardService {
      */
     @Transactional(readOnly = true)
     public SalesChartResponse getSalesChart(String period) {
-        List<Order> allOrders = orderRepository.findAll()
-                .stream()
-                .filter(o -> !isExcluded(o.getStatus()))
-                .collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
+
+        // กำหนด date range ให้พอดีกับแต่ละ period + prior period สำหรับ comparison
+        LocalDateTime start = switch (period) {
+            case "month" -> today.withDayOfMonth(1).minusMonths(1).atStartOfDay();
+            case "year"  -> LocalDate.of(today.getYear() - 1, 1, 1).atStartOfDay();
+            default      -> today.minusDays(13).atStartOfDay(); // week: 14 วัน + prior 7 วัน
+        };
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+
+        List<Order> orders = orderRepository.findByDateRangeAndStatusNotIn(start, end, EXCLUDED);
 
         List<DataPoint> points = switch (period) {
-            case "month" -> buildMonthlyChart(allOrders);
-            case "year"  -> buildYearlyChart(allOrders);
-            default      -> buildWeeklyChart(allOrders);
+            case "month" -> buildMonthlyChart(orders);
+            case "year"  -> buildYearlyChart(orders);
+            default      -> buildWeeklyChart(orders);
         };
 
         return new SalesChartResponse(points);

@@ -111,6 +111,12 @@
 		<artifactId>flyway-mysql</artifactId>
 	</dependency>
 
+	<!-- Bean Validation (@Valid, @NotBlank, @Email, etc.) -->
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-validation</artifactId>
+	</dependency>
+
 	<!-- Cache: Spring Cache abstraction + Caffeine in-memory implementation -->
 	<dependency>
 		<groupId>org.springframework.boot</groupId>

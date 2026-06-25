@@ -5,16 +5,24 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.breadShop.XXI.dto.orderline.OrderLineRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 // ใช้สำหรับรับข้อมูลการสร้างคำสั่งซื้อจากลูกค้า | reviewed by peak
 public class OrderRequest {
 
     private Integer userId;
-    private Integer addressId;       // ลูกค้าเลือกที่อยู่ไหน
-    private String promotionCode;    // โค้ดส่วนลด (ถ้ามี)
+
+    @NotNull(message = "กรุณาเลือกที่อยู่จัดส่ง")
+    private Integer addressId;
+    private String promotionCode;
     private BigDecimal shippingFee;
     private String note;
-    private List<OrderLineRequest> items;  // สินค้าที่สั่ง
+
+    @NotEmpty(message = "กรุณาเพิ่มสินค้าในตะกร้า")
+    @Valid
+    private List<OrderLineRequest> items;
 
     public Integer getUserId() { return userId; }
     public void setUserId(Integer userId) { this.userId = userId; }

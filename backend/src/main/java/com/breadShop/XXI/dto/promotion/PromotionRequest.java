@@ -5,19 +5,35 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.breadShop.XXI.entity.Promotion.DiscountType;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 /**
  * DTO สำหรับรับข้อมูลโปรโมชั่นใหม่จาก client เมื่อสร้างหรือแก้ไขโปรโมชั่น | reviewed by peak
  */
 public class PromotionRequest {
 
+    @NotBlank(message = "กรุณากรอกโค้ดโปรโมชั่น")
     private String code;
+
+    @NotBlank(message = "กรุณากรอกชื่อโปรโมชั่น")
     private String name;
+
+    @NotNull(message = "กรุณาเลือกประเภทส่วนลด")
     private DiscountType discountType;
+
+    @NotNull(message = "กรุณากรอกมูลค่าส่วนลด")
+    @DecimalMin(value = "0.01", message = "มูลค่าส่วนลดต้องมากกว่า 0")
     private BigDecimal discountValue;
+
     private BigDecimal minOrderAmount;
     private BigDecimal maxDiscount;
     private Integer usageLimit;
+
+    @NotNull(message = "กรุณาระบุวันเริ่มต้น")
     private LocalDateTime startedAt;
+
+    @NotNull(message = "กรุณาระบุวันหมดอายุ")
     private LocalDateTime expiredAt;
 
     public String getCode() { return code; }

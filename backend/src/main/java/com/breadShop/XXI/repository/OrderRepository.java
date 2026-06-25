@@ -38,4 +38,10 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     // คืน [userId, orderCount] per user — ใช้แทน countByUserId() ใน loop (N+1)
     @Query("SELECT o.user.id, COUNT(o) FROM Order o GROUP BY o.user.id")
     List<Object[]> countOrdersGroupByUser();
+
+    // ดึงเฉพาะ order ในช่วงเวลา + กรอง status — ใช้ใน getSalesChart() แทน findAll()
+    @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :start AND :end AND o.status NOT IN :excluded")
+    List<Order> findByDateRangeAndStatusNotIn(@Param("start") LocalDateTime start,
+                                              @Param("end") LocalDateTime end,
+                                              @Param("excluded") List<Order.OrderStatus> excluded);
 }

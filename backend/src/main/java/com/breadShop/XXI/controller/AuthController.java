@@ -3,6 +3,7 @@ package com.breadShop.XXI.controller;
 import java.net.URI;
 import java.util.Map;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -93,7 +94,7 @@ public class AuthController {
      * ไม่ return token ใน body เพราะ httpOnly cookie ปลอดภัยกว่า localStorage
      */
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Void>> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<ApiResponse<Void>> login(@Valid @RequestBody LoginRequest loginRequest) {
 
         var tokens = authService.loginUser(loginRequest);
 
@@ -259,7 +260,7 @@ public class AuthController {
      * สมัครสมาชิก — hash password ด้วย BCrypt ใน AuthService
      */
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<Void>> register(@RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest registerRequest) {
         authService.registerUser(registerRequest);
         return ResponseEntity.ok(ApiResponse.ok("สมัครสมาชิกสำเร็จ"));
     }
@@ -275,7 +276,7 @@ public class AuthController {
      */
     @PostMapping("/send-OTP-mail")
     public ResponseEntity<ApiResponse<Map<String, String>>> sendOtp(
-            @RequestBody CheckEmailRequest request) {
+            @Valid @RequestBody CheckEmailRequest request) {
 
         String token = authService.sendResetPasswordOtp(request.email());
         return ResponseEntity.ok(ApiResponse.ok("ส่ง OTP เรียบร้อย",
@@ -288,7 +289,7 @@ public class AuthController {
      */
     @PostMapping("/verify-otp")
     public ResponseEntity<ApiResponse<Map<String, String>>> verifyOtp(
-            @RequestBody VerifyOtpRequest request) {
+            @Valid @RequestBody VerifyOtpRequest request) {
 
         String token = authService.verifyOtp(request.token(), request.otp());
         return ResponseEntity.ok(ApiResponse.ok("OTP ถูกต้อง",
@@ -301,7 +302,7 @@ public class AuthController {
      */
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
-            @RequestBody ResetPasswordRequest request) {
+            @Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request.token(), request.newPassword());
         return ResponseEntity.ok(ApiResponse.ok("เปลี่ยนรหัสผ่านสำเร็จ"));
     }

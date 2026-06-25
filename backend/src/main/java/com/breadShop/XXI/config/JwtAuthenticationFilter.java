@@ -52,7 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String email = jwtService.extractEmail(jwt);
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null
-                    && jwtService.isTokenSignatureValid(jwt)) {
+                    && jwtService.isTokenNotExpired(jwt)) {
 
                 // อ่าน role จาก JWT claims ตรงๆ — ไม่ยิง DB
                 String role = jwtService.extractRole(jwt);
