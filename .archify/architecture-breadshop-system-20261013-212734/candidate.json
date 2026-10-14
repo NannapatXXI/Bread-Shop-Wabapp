@@ -1,0 +1,379 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "BreadShop XXI — ภาพรวมทั้งระบบ",
+    "output": ".archify/architecture-breadshop-system-20261013-212734/breadshop-system.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "ลูกค้า / Admin",
+      "sublabel": "เบราว์เซอร์",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        130,
+        64
+      ]
+    },
+    {
+      "id": "next",
+      "type": "frontend",
+      "label": "Next.js :3000",
+      "sublabel": "(auth) (user) admin",
+      "tag": "axios auto-refresh",
+      "pos": [
+        250,
+        290
+      ],
+      "size": [
+        170,
+        84
+      ]
+    },
+    {
+      "id": "security",
+      "type": "security",
+      "label": "Spring Security",
+      "sublabel": "JWT cookie + role",
+      "tag": "BCrypt, CORS",
+      "pos": [
+        500,
+        290
+      ],
+      "size": [
+        170,
+        84
+      ]
+    },
+    {
+      "id": "mvc",
+      "type": "backend",
+      "label": "Interceptors",
+      "sublabel": "rate limit + API log",
+      "pos": [
+        750,
+        270
+      ],
+      "size": [
+        170,
+        124
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "backend",
+      "label": "Auth",
+      "sublabel": "login / OTP / Google / refresh",
+      "pos": [
+        1000,
+        70
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "สินค้า",
+      "sublabel": "ProductService",
+      "pos": [
+        1000,
+        180
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "order",
+      "type": "backend",
+      "label": "Order + โปรโมชั่น",
+      "sublabel": "ที่อยู่, cancel",
+      "pos": [
+        1000,
+        300
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "admin",
+      "type": "backend",
+      "label": "Admin",
+      "sublabel": "สินค้า, order, ลูกค้า, log",
+      "tag": "Caffeine cache",
+      "pos": [
+        1000,
+        520
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "notify",
+      "type": "messagebus",
+      "label": "Notification",
+      "sublabel": "SSE ต่อ user",
+      "pos": [
+        1000,
+        410
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "google",
+      "type": "external",
+      "label": "Google OAuth",
+      "sublabel": "token + userinfo",
+      "pos": [
+        1300,
+        20
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "Gmail SMTP",
+      "sublabel": "ส่ง OTP",
+      "pos": [
+        1300,
+        110
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL 8",
+      "sublabel": "Flyway V1–V5",
+      "pos": [
+        1300,
+        220
+      ],
+      "size": [
+        170,
+        260
+      ]
+    },
+    {
+      "id": "files",
+      "type": "database",
+      "label": "ไฟล์บนเครื่อง",
+      "sublabel": "uploads / logs / backup",
+      "pos": [
+        1300,
+        520
+      ],
+      "size": [
+        170,
+        64
+      ]
+    },
+    {
+      "id": "jobs",
+      "type": "backend",
+      "label": "Schedulers",
+      "sublabel": "backup 02:00, cleanup",
+      "pos": [
+        1540,
+        310
+      ],
+      "size": [
+        170,
+        84
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Spring Boot :8080",
+      "wraps": [
+        "security",
+        "mvc",
+        "auth",
+        "catalog",
+        "order",
+        "admin",
+        "notify",
+        "jobs"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "users-next",
+      "from": "users",
+      "to": "next",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "next-security",
+      "from": "next",
+      "to": "security",
+      "label": "REST + cookie",
+      "variant": "emphasis"
+    },
+    {
+      "id": "security-mvc",
+      "from": "security",
+      "to": "mvc",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mvc-auth",
+      "from": "mvc",
+      "to": "auth"
+    },
+    {
+      "id": "mvc-catalog",
+      "from": "mvc",
+      "to": "catalog"
+    },
+    {
+      "id": "mvc-order",
+      "from": "mvc",
+      "to": "order",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mvc-admin",
+      "from": "mvc",
+      "to": "admin"
+    },
+    {
+      "id": "mvc-notify",
+      "from": "mvc",
+      "to": "notify"
+    },
+    {
+      "id": "auth-google",
+      "from": "auth",
+      "to": "google",
+      "label": "OAuth code"
+    },
+    {
+      "id": "auth-smtp",
+      "from": "auth",
+      "to": "smtp",
+      "label": "OTP"
+    },
+    {
+      "id": "catalog-db",
+      "from": "catalog",
+      "to": "mysql",
+      "label": "JPA"
+    },
+    {
+      "id": "order-db",
+      "from": "order",
+      "to": "mysql",
+      "label": "JPA"
+    },
+    {
+      "id": "admin-db",
+      "from": "admin",
+      "to": "mysql",
+      "label": "JPA"
+    },
+    {
+      "id": "auth-db",
+      "from": "auth",
+      "to": "mysql",
+      "variant": "dashed"
+    },
+    {
+      "id": "notify-db",
+      "from": "notify",
+      "to": "mysql",
+      "variant": "dashed"
+    },
+    {
+      "id": "admin-notify",
+      "from": "admin",
+      "to": "notify",
+      "label": "เปลี่ยนสถานะ",
+      "variant": "dashed"
+    },
+    {
+      "id": "notify-next",
+      "from": "notify",
+      "to": "next",
+      "label": "SSE push",
+      "variant": "dashed"
+    },
+    {
+      "id": "jobs-db",
+      "from": "jobs",
+      "to": "mysql",
+      "label": "mysqldump"
+    },
+    {
+      "id": "admin-files",
+      "from": "admin",
+      "to": "files",
+      "label": "รูป + log",
+      "variant": "dashed"
+    },
+    {
+      "id": "jobs-files",
+      "from": "jobs",
+      "to": "files",
+      "label": "backup",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Request หนึ่งรอบ",
+      "items": [
+        "Next.js เรียกผ่าน axios ส่ง cookie มาด้วย (withCredentials)",
+        "JwtAuthenticationFilter อ่าน access_token จาก cookie ก่อน แล้วค่อยดู header",
+        "ได้ 401 → frontend เรียก /auth/refresh รอบเดียว (refresh token rotate)",
+        "Controller → Service → Repository → ส่งกลับเป็น ApiResponse<T>"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Security",
+      "items": [
+        "URL rules ใน SecurityConfig: public / authenticated / USER / ADMIN",
+        "Rate limit เฉพาะ login และ send-OTP-mail (in-memory ต่อ IP)",
+        "Google login ตรวจ state กับ cookie กัน CSRF ตอน callback"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "งานเบื้องหลัง",
+      "items": [
+        "Backup DB ตี 2 เก็บ 7 ไฟล์ล่าสุด",
+        "ลบ OTP หมดอายุทุก 10 นาที, ลบ refresh token ตี 3"
+      ]
+    }
+  ]
+}

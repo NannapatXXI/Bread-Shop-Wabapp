@@ -4,23 +4,59 @@
 // เก็บ state ของตะกร้าสินค้าทั้งหมด
 // items: [{ product: {...}, quantity: number }]
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useSyncExternalStore } from 'react';
 import toast from 'react-hot-toast';
 
 const CartContext = createContext();
 
+// ── cart store: localStorage เป็นแหล่งข้อมูลจริง ─────────────────
+// ใช้ useSyncExternalStore แทน useEffect + setState:
+//   - ตอน server render / hydration ใช้ EMPTY → ไม่เกิด hydration mismatch
+//   - หลัง hydrate React อ่าน localStorage เองแล้ว render ใหม่
+//   - เปิดหลายแท็บ ตะกร้าตรงกันผ่าน event 'storage'
+const STORAGE_KEY = 'cart';
+const EMPTY = [];
+const listeners = new Set();
+let cachedRaw = null;
+let cachedItems = EMPTY;
+
+function readCart() {
+  let raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch { /* storage ถูกปิด */ }
+  if (raw !== cachedRaw) {
+    cachedRaw = raw;
+    try {
+      const parsed = JSON.parse(raw || '[]');
+      cachedItems = Array.isArray(parsed) ? parsed : EMPTY;
+    } catch {
+      cachedItems = EMPTY; // ข้อมูลเสีย → เริ่มตะกร้าว่าง ไม่ crash
+    }
+  }
+  return cachedItems;
+}
+
+function writeCart(items) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch { /* storage ถูกปิด */ }
+  listeners.forEach(l => l());
+}
+
+function subscribe(listener) {
+  listeners.add(listener);
+  window.addEventListener('storage', listener);
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener('storage', listener);
+  };
+}
+
+const getServerSnapshot = () => EMPTY;
+
 export function CartProvider({ children }) {
-  // โหลด cart จาก localStorage ตอน init (B-6 — cart หาย refresh)
-  const [items, setItems] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try { return JSON.parse(localStorage.getItem('cart') || '[]'); } catch { return []; }
-  });
+  const items = useSyncExternalStore(subscribe, readCart, getServerSnapshot);
   const [isOpen, setIsOpen] = useState(false);
 
-  // บันทึก cart ลง localStorage ทุกครั้งที่ items เปลี่ยน
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(items));
-  }, [items]);
+  // API เดียวกับ setState เดิม — รับค่าใหม่หรือ function(prev)
+  const setItems = (next) => writeCart(typeof next === 'function' ? next(readCart()) : next);
 
   // ── จำนวนชิ้นรวม (ใช้แสดงบน badge ไอคอน) ──────────────────────
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);

@@ -92,6 +92,15 @@ public class RefreshTokenService {
     }
 
     /**
+     * ยกเลิก refresh token ทุกตัวของ user — ใช้ตอนเปลี่ยน/รีเซ็ตรหัสผ่าน
+     * ทุกอุปกรณ์ต้อง login ใหม่ (access token ที่ออกไปแล้วหมดเองใน 15 นาที)
+     */
+    @Transactional
+    public void revokeAll(User user) {
+        repo.deleteAllByUser(user);
+    }
+
+    /**
      * Revoke token (ตอน logout)
      */
     @Transactional

@@ -1,0 +1,118 @@
+package com.breadShop.XXI.controller;
+
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import com.breadShop.XXI.dto.notification.NotificationResponse;
+import com.breadShop.XXI.service.NotificationService;
+import com.breadShop.XXI.service.SseService;
+
+@WebMvcTest(NotificationController.class)
+class NotificationControllerTest extends ControllerTestSupport {
+
+    private static final String ALICE = "alice@example.com";
+
+    @MockitoBean
+    private NotificationService notificationService;
+
+    @MockitoBean
+    private SseService sseService;
+
+    @Test
+    void getAll_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/notifications"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void getAll_returnsNotificationsOfTokenUser() throws Exception {
+        stubUser(7, ALICE, "USER");
+        when(notificationService.getByUserId(7)).thenReturn(List.of(
+                new NotificationResponse(1, 100, "ORD-100", "ออเดอร์จัดส่งแล้ว", "SHIPPED", false,
+                        LocalDateTime.of(2026, 10, 1, 10, 0))));
+
+        mockMvc.perform(get("/api/v1/notifications").cookie(userToken(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].orderNo").value("ORD-100"))
+                .andExpect(jsonPath("$.data[0].newStatus").value("SHIPPED"))
+                .andExpect(jsonPath("$.data[0].isRead").value(false));
+
+        verify(notificationService).getByUserId(7);
+    }
+
+    @Test
+    void getAll_tokenUserMissingFromDb_returns404() throws Exception {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/notifications").cookie(userToken("ghost@example.com")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User not found"));
+    }
+
+    @Test
+    void markAsRead_passesNotificationId() throws Exception {
+        stubUser(7, ALICE, "USER");
+
+        mockMvc.perform(patch("/api/v1/notifications/42/read").cookie(userToken(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("อ่านแล้ว"));
+
+        verify(notificationService).markAsRead(42, 7);
+    }
+
+    @Test
+    void markAsRead_withoutToken_returns401() throws Exception {
+        mockMvc.perform(patch("/api/v1/notifications/42/read"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void markAllAsRead_usesTokenUserId() throws Exception {
+        stubUser(7, ALICE, "USER");
+
+        mockMvc.perform(patch("/api/v1/notifications/read-all").cookie(userToken(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("อ่านทั้งหมดแล้ว"));
+
+        verify(notificationService).markAllAsRead(7);
+    }
+
+    @Test
+    void stream_subscribesTokenUser_andStartsAsyncResponse() throws Exception {
+        stubUser(7, ALICE, "USER");
+        when(sseService.subscribe(7)).thenReturn(new SseEmitter(0L));
+
+        mockMvc.perform(get("/api/v1/notifications/stream").cookie(userToken(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+
+        verify(sseService).subscribe(7);
+    }
+
+    @Test
+    void stream_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/notifications/stream"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(sseService);
+    }
+}

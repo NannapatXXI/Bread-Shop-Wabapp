@@ -15,6 +15,10 @@ import com.breadShop.XXI.repository.PromotionRepository;
 import com.breadShop.XXI.repository.UserAddressRepository;
 import com.breadShop.XXI.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +32,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -144,7 +147,6 @@ class OrderServiceTest {
         OrderRequest request = mock(OrderRequest.class);
         when(request.getUserId()).thenReturn(1);
         when(request.getAddressId()).thenReturn(1);
-        when(request.getShippingFee()).thenReturn(BigDecimal.ZERO);
         when(request.getNote()).thenReturn(null);
         when(request.getPromotionCode()).thenReturn(null);
         when(request.getItems()).thenReturn(List.of(item));
@@ -167,7 +169,6 @@ class OrderServiceTest {
         OrderRequest request = mock(OrderRequest.class);
         when(request.getUserId()).thenReturn(1);
         when(request.getAddressId()).thenReturn(1);
-        when(request.getShippingFee()).thenReturn(BigDecimal.ZERO);
         when(request.getNote()).thenReturn(null);
         when(request.getPromotionCode()).thenReturn(null);
         when(request.getItems()).thenReturn(List.of(item));
@@ -284,5 +285,241 @@ class OrderServiceTest {
         when(request.getUserId()).thenReturn(userId);
         when(request.getAddressId()).thenReturn(addressId);
         return request;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  createOrder — happy path
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("createOrder — สำเร็จโดยไม่มีโปรโมชั่น → คำนวณ subtotal/total ถูกต้อง")
+    void createOrder_withoutPromotion_shouldCreateOrderSuccessfully() {
+        OrderLineRequest item = new OrderLineRequest();
+        item.setProductId(10);
+        item.setQuantity(2);
+
+        OrderRequest request = new OrderRequest();
+        request.setUserId(1);
+        request.setAddressId(1);
+        request.setItems(List.of(item));
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = orderService.createOrder(request);
+
+        // 45.00 * 2 = 90.00 subtotal, ส่งฟรี (ค่าส่งกำหนดโดย server)
+        assertThat(response.getSubtotal()).isEqualByComparingTo("90.00");
+        assertThat(response.getShippingFee()).isEqualByComparingTo(OrderService.SHIPPING_FEE);
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("90.00");
+        assertThat(sampleProduct.getStock()).isEqualTo(18);
+        verify(activityLogService).logSuccess(eq(sampleUser), eq("CHECKOUT"), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("createOrder — ที่อยู่ไม่ใช่ของ user คนนี้ → throw 403")
+    void createOrder_whenAddressNotOwned_shouldThrow403() {
+        User otherUser = new User("other", "other@breadshop.com", "pw");
+        ReflectionTestUtils.setField(otherUser, "id", 999);
+        sampleAddress.setUser(otherUser);
+
+        OrderRequest request = buildOrderRequest(1, 1);
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+    }
+
+    @Test
+    @DisplayName("createOrder — โค้ดโปรโมชั่นไม่ถูกต้อง → throw 400")
+    void createOrder_withInvalidPromotionCode_shouldThrow400() {
+        OrderLineRequest item = new OrderLineRequest();
+        item.setProductId(10);
+        item.setQuantity(1);
+
+        OrderRequest request = new OrderRequest();
+        request.setUserId(1);
+        request.setAddressId(1);
+        request.setItems(List.of(item));
+        request.setPromotionCode("BADCODE");
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(eq("BADCODE"), any()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Invalid promotion code");
+    }
+
+    @Test
+    @DisplayName("createOrder — โปรโมชั่นถูกต้อง → คำนวณส่วนลดและเพิ่ม usedCount")
+    void createOrder_withValidPromotion_shouldApplyDiscount() {
+        OrderLineRequest item = new OrderLineRequest();
+        item.setProductId(10);
+        item.setQuantity(1);
+
+        OrderRequest request = new OrderRequest();
+        request.setUserId(1);
+        request.setAddressId(1);
+        request.setItems(List.of(item));
+        request.setPromotionCode("SAVE10");
+
+        com.breadShop.XXI.entity.Promotion promotion = new com.breadShop.XXI.entity.Promotion(
+                "SAVE10", "ลด 10 บาท", com.breadShop.XXI.entity.Promotion.DiscountType.FIXED,
+                new BigDecimal("10"), java.time.LocalDateTime.now().minusDays(1), java.time.LocalDateTime.now().plusDays(10));
+        ReflectionTestUtils.setField(promotion, "id", 5);
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(eq("SAVE10"), any()))
+                .thenReturn(Optional.of(promotion));
+        when(promotionService.calculateDiscount(eq(promotion), any(BigDecimal.class)))
+                .thenReturn(new BigDecimal("10"));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = orderService.createOrder(request);
+
+        assertThat(response.getDiscountAmount()).isEqualByComparingTo("10");
+        assertThat(response.getPromotionCode()).isEqualTo("SAVE10");
+        verify(promotionService).incrementUsedCount(5);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  getById / getAll
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getById — พบ order → คืน OrderResponse")
+    void getById_whenFound_shouldReturnOrderResponse() {
+        Order order = buildMockOrder();
+        when(orderRepository.findById(1)).thenReturn(Optional.of(order));
+
+        OrderResponse response = orderService.getById(1);
+
+        assertThat(response.getOrderNo()).isEqualTo(order.getOrderNo());
+    }
+
+    @Test
+    @DisplayName("getById — ไม่พบ order → throw 404")
+    void getById_whenNotFound_shouldThrow404() {
+        when(orderRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getById(999))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Order not found");
+    }
+
+    @Test
+    @DisplayName("getByIdForUser — เจ้าของ order → คืน OrderResponse")
+    void getByIdForUser_owner_shouldReturnOrder() {
+        Order order = buildMockOrder();
+        when(orderRepository.findById(1)).thenReturn(Optional.of(order));
+
+        OrderResponse response = orderService.getByIdForUser(1, sampleUser.getId());
+
+        assertThat(response.getOrderNo()).isEqualTo(order.getOrderNo());
+    }
+
+    @Test
+    @DisplayName("getByIdForUser — order ของคนอื่น → 404 เหมือนไม่มี order นี้")
+    void getByIdForUser_otherUser_shouldThrow404() {
+        when(orderRepository.findById(1)).thenReturn(Optional.of(buildMockOrder()));
+
+        assertThatThrownBy(() -> orderService.getByIdForUser(1, 2))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+    }
+
+    @Test
+    @DisplayName("getAll — คืน order ทั้งหมดเรียงจากใหม่ไปเก่า")
+    void getAll_shouldReturnAllOrders() {
+        Order order = buildMockOrder();
+        when(orderRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(order));
+
+        List<OrderResponse> result = orderService.getAll();
+
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("getAll — ไม่มี order เลย → คืน list ว่าง")
+    void getAll_whenEmpty_shouldReturnEmptyList() {
+        when(orderRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+
+        assertThat(orderService.getAll()).isEmpty();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  getClientIp (ทดสอบผ่าน createOrder / cancelOrder) — ครอบคลุม branch ต่างๆ
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @AfterEach
+    void clearRequestContext() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    @Test
+    @DisplayName("createOrder — มี X-Forwarded-For header → ใช้ IP จาก header นั้น")
+    void createOrder_withForwardedForHeader_shouldLogClientIpFromHeader() {
+        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+        mockRequest.addHeader("X-Forwarded-For", "203.0.113.5, 70.41.3.18");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(mockRequest));
+
+        OrderLineRequest item = new OrderLineRequest();
+        item.setProductId(10);
+        item.setQuantity(1);
+
+        OrderRequest request = new OrderRequest();
+        request.setUserId(1);
+        request.setAddressId(1);
+        request.setItems(List.of(item));
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderService.createOrder(request);
+
+        verify(activityLogService).logSuccess(eq(sampleUser), eq("CHECKOUT"), eq("203.0.113.5"), any(), any());
+    }
+
+    @Test
+    @DisplayName("createOrder — ไม่มี X-Forwarded-For header → ใช้ remoteAddr แทน")
+    void createOrder_withoutForwardedForHeader_shouldLogRemoteAddr() {
+        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+        mockRequest.setRemoteAddr("192.168.1.100");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(mockRequest));
+
+        OrderLineRequest item = new OrderLineRequest();
+        item.setProductId(10);
+        item.setQuantity(1);
+
+        OrderRequest request = new OrderRequest();
+        request.setUserId(1);
+        request.setAddressId(1);
+        request.setItems(List.of(item));
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderService.createOrder(request);
+
+        verify(activityLogService).logSuccess(eq(sampleUser), eq("CHECKOUT"), eq("192.168.1.100"), any(), any());
     }
 }

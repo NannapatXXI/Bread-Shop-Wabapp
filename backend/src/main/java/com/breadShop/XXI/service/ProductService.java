@@ -1,18 +1,18 @@
 package com.breadShop.XXI.service;
 
-import java.io.File;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.breadShop.XXI.config.UploadPaths;
 import com.breadShop.XXI.dto.product.ProductRequest;
 import com.breadShop.XXI.entity.Product;
 import com.breadShop.XXI.entity.ProductCategory;
@@ -23,16 +23,11 @@ import com.breadShop.XXI.repository.ProductRepository;
 @Service
 public class ProductService {
 
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
+
     private final ProductRepository productRepository;
 
-    private static final String UPLOAD_DIR = resolveUploadDir();
-
-    private static String resolveUploadDir() {
-        Path base = Paths.get(System.getProperty("user.dir"));
-        Path candidate = base.resolve("uploads");
-        if (candidate.toFile().exists()) return candidate.toString();
-        return base.getParent().resolve("uploads").toString();
-    }
+    private static final Path UPLOAD_DIR = UploadPaths.dir();
 
 
    
@@ -49,10 +44,7 @@ public class ProductService {
    public Product createProduct(ProductRequest request) throws IOException {
 
     MultipartFile image = request.getImage();
-
-    String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
-    File destinationFile = new File(UPLOAD_DIR, fileName);
-    image.transferTo(destinationFile);
+    String imageUrl = (image != null && !image.isEmpty()) ? saveImage(image) : null;
 
     Product product = new Product();
     product.setName(request.getName());
@@ -61,10 +53,26 @@ public class ProductService {
     product.setDescription(request.getDescription());
     product.setCategory(request.getCategory());
     product.setExpiryDate(request.getExpiryDate());
-    product.setImageUrl("uploads/" + fileName);
+    product.setImageUrl(imageUrl);
 
     return productRepository.save(product);
 }
+
+    /** บันทึกรูปด้วยชื่อที่ server สร้างเอง (ไม่ใช้ชื่อไฟล์จาก client) แล้วคืน imageUrl */
+    private String saveImage(MultipartFile image) throws IOException {
+        String fileName = UploadPaths.newFileName(image.getOriginalFilename());
+        image.transferTo(UploadPaths.resolveInside(UPLOAD_DIR, fileName).toFile());
+        return "uploads/" + fileName;
+    }
+
+    /** ลบรูปเดิม — path ต้องอยู่ในโฟลเดอร์ uploads เท่านั้น */
+    private void deleteImage(String imageUrl) {
+        try {
+            Files.deleteIfExists(UploadPaths.resolveInside(UPLOAD_DIR, imageUrl));
+        } catch (IOException | IllegalArgumentException e) {
+            log.warn("Delete image failed: {}", e.getMessage());
+        }
+    }
 
     /**
      * ดึงข้อมูลสินค้าทั้งหมดจากฐานข้อมูล
@@ -109,18 +117,11 @@ public class ProductService {
 
         // ถ้ามีรูปใหม่ส่งมา → ลบรูปเก่า แล้ว save รูปใหม่
         if (request.getImage() != null && !request.getImage().isEmpty()) {
+            String newImageUrl = saveImage(request.getImage()); // เช็คชนิดไฟล์ก่อนลบรูปเดิม
             if (product.getImageUrl() != null) {
-                try {
-                    String imgName = Paths.get(product.getImageUrl()).getFileName().toString();
-                    Files.deleteIfExists(Paths.get(UPLOAD_DIR, imgName));
-                } catch (IOException e) {
-                    System.out.println("Delete old image failed: " + e.getMessage());
-                }
+                deleteImage(product.getImageUrl());
             }
-            String fileName = UUID.randomUUID() + "_" + request.getImage().getOriginalFilename();
-            File dest = new File(UPLOAD_DIR, fileName);
-            request.getImage().transferTo(dest);
-            product.setImageUrl("uploads/" + fileName);
+            product.setImageUrl(newImageUrl);
         }
 
         return productRepository.save(product);
@@ -136,12 +137,7 @@ public class ProductService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     
         if (product.getImageUrl() != null) {
-            try {
-                String imgName = Paths.get(product.getImageUrl()).getFileName().toString();
-                Files.deleteIfExists(Paths.get(UPLOAD_DIR, imgName));
-            } catch (IOException e) {
-                System.out.println("Image delete failed: " + e.getMessage());
-            }
+            deleteImage(product.getImageUrl());
         }
     
         productRepository.delete(product);
@@ -153,7 +149,6 @@ public class ProductService {
     */
     public Long countProductCategory(ProductCategory  category) {
         Long count = productRepository.countByCategory(category);
-        System.out.println("Total products: " + count);
         return  count;
        
     }
@@ -163,7 +158,6 @@ public class ProductService {
      */
     public Long countAllProducts() {
         Long count = productRepository.count();
-        System.out.println("Total products: " + count);
         return  count;
        
     }
@@ -174,7 +168,6 @@ public class ProductService {
      */
     public Long countProductsByExpiryDate() {
         Long count = productRepository.countByExpiryDateBefore(java.time.LocalDate.now());
-        System.out.println("Total expired products: " + count);
         return  count;
        
     }
@@ -185,7 +178,6 @@ public class ProductService {
      */
     public Long countProductsByStock(int stock) {
         Long count = productRepository.countByStockGreaterThan(stock);
-        System.out.println("Total low stock products: " + count);
         return  count;
        
     }

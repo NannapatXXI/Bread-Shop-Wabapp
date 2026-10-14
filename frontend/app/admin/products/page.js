@@ -3,20 +3,18 @@
 
 // 1. Import เครื่องมือที่จำเป็น
 import { useState,useRef } from 'react';
-import { useCart } from '../../CartContext'; 
 import { useEffect } from 'react';
 import toast from 'react-hot-toast'; // (เราจะใช้ toast แจ้งเตือน)
-import { FaSearch,FaPlus, FaTrash, FaEdit } from 'react-icons/fa';
-import { TiArchive } from "react-icons/ti";
-import { FiAlertTriangle } from "react-icons/fi";
-import { MdOutlineSell } from "react-icons/md";
-import { TiDeleteOutline } from "react-icons/ti";
+import Icon from '../../components/Icon';
+import { CATEGORY_LABEL } from '../../components/ProductCard';
 
 import { getproduct,addproduct } from "@/services/auth.service";
 import api from "@/lib/api"; // [Claude] ใช้เรียก delete API
 import { boyerMooreContains } from "@/lib/boyerMoore"; // [Claude] Boyer-Moore search
 import Cropper from "react-easy-crop";
 import { useRouter } from "next/navigation";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 
 
@@ -42,8 +40,6 @@ export default function ProductPage() {
   
   const [showEditProduct, setshowEditProduct] = useState(false); 
 
-  const [error, setError] = useState("");
-  const { addToCart } = useCart();
   const [products, setProducts] = useState([]);
 
   // [Claude] state สำหรับ confirm modal ลบสินค้า
@@ -53,7 +49,7 @@ export default function ProductPage() {
 
   const [countAllProduct , setCountAllProduct] = useState(0);
   const [countReadyProduct , setCounReadyProduct] = useState(0);
-  const [countMediumProduct , setCountMediumProduct] = useState(0);
+  const [, setCountMediumProduct] = useState(0); // นับไว้ แต่หน้านี้ยังไม่แสดง
   const [countLowProduct , setCountLowProduct] = useState(0);
   const [countOutofstockProduct , setCountOutofstockProduct] = useState(0);
 
@@ -67,8 +63,8 @@ export default function ProductPage() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [category, setCategory] = useState("BREAD");
-  const [expiryDate, setExpiryDate] = useState("");
+  const [category] = useState("BREAD");
+  const [expiryDate] = useState("");
 
 
   const [description, setDescription] = useState('');
@@ -90,23 +86,17 @@ export default function ProductPage() {
 
 
       const res = await getproduct();
-      console.log(res.data);
       res.data.forEach(p => {
-        console.log(" จำนวน Stock "+ p.name+" :"+p.stock);
        
         countAProduct++;
 
         if(p.stock >= 10){
-          console.log("พร้อมขาย "+p.name);
           countReadyProduct++;
         } else if(p.stock >= 5){
-          console.log("เหลือปานกลาง "+p.name);
           countMediumProduct++;
         } else if(p.stock > 0){
-          console.log("ใกล้หมด "+p.name);
           countLowProduct++;
         } else {
-          console.log("หมด "+p.name);
           countOutofstockProduct++;
         }
       });
@@ -116,7 +106,6 @@ export default function ProductPage() {
       setCountLowProduct(countLowProduct);
       setCountOutofstockProduct(countOutofstockProduct);
       setCountAllProduct(countAProduct);
-      console.log("จำนวนสินค้าทั้งหมด: ", countAProduct);
       setProducts(res.data);
   
     } catch (err) {
@@ -124,30 +113,6 @@ export default function ProductPage() {
     }
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-  
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageSrc(reader.result);
-      setShowCrop(true);   // เปิด modal crop ทันที
-    };
-    reader.readAsDataURL(file);
-  };
-  
-
-  const handlegetproduct = async () => {
-  
-    try {
-      
-      const res = await getproduct();
-      console.log(res.data);
-  
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   // [Claude] filter ผสม: category + search + stockFilter (all / lowstock / outofstock)
   const filteredProducts = products.filter(p => {
@@ -190,7 +155,6 @@ export default function ProductPage() {
     formData.append("category", category); 
     formData.append("expiryDate", expiryDate); // ใส่ที่เลิกรับ order
   
-   console.log("FormData:", formData.get("name"), formData.get("price"), formData.get("stock"), formData.get("description"), formData.get("image"));
    try {
     const res = await addproduct(formData);
   
@@ -213,39 +177,6 @@ export default function ProductPage() {
   }
   };
   
-  const boxMap = {
-    "CAKE": (
-      <div className="p-4 bg-blue-200 border rounded-lg shadow-md transition duration-150">
-        CAKE 
-      </div>
-    ),
-    "BREAD": (
-      <div className="p-4 bg-green-100 border rounded-lg shadow-md transition duration-150">
-        BREAD 
-      </div>
-    ),
-    "COOKIE": (
-      <div className="p-4 bg-yellow-100 border rounded-lg shadow-md transition duration-150">
-        COOKIE 
-      </div>
-    )
-  };
-
-  const renderStockBox = (stock) => {
-    if (stock >= 10) {
-      return <div className="px-3 py-1 bg-green-100 text-green-700 rounded-md">พร้อมขาย</div>;
-    } 
-    else if (stock >= 5) {
-      return <div className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-md">เหลือปานกลาง</div>;
-    } 
-    else if (stock > 0) {
-      return <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded-md">ใกล้หมด</div>;
-    } 
-    else {
-      return <div className="px-3 py-1 bg-red-100 text-red-700 rounded-md">หมด</div>;
-    }
-  };
-  
 
   // [Claude] เปิด modal confirm ก่อนลบ
   const handleDeleteProduct = (id, name) => {
@@ -265,10 +196,6 @@ export default function ProductPage() {
     }
   };
 
-  const handleSelectProduct = (product) => {
-    console.log("Selected product:", product);
-     //addToCart(); 
-  };
 
   
   const getCroppedImg = (imageSrc, crop) => {
@@ -309,450 +236,215 @@ export default function ProductPage() {
 
 
 
+  const stockBadge = (stock) =>
+    stock === 0 ? ['b-red', 'หมดสต็อก'] :
+    stock <= 5  ? ['b-amber', 'ใกล้หมด'] :
+    stock <= 9  ? ['b-blue', 'เหลือปานกลาง'] :
+                  ['b-green', 'พร้อมขาย'];
+
+  const productPreviewCard = (p) => (
+    <div className="pcard">
+      <div className="ph">
+        {p.imageUrl
+          ? <img src={`${API_URL}/${p.imageUrl}`} alt={p.name} />
+          : <span className="ph-empty">ไม่มีรูปสินค้า</span>}
+      </div>
+      <div className="pmeta">
+        <div style={{ minWidth: 0 }}>
+          <h3>{p.name}</h3>
+          <p className="desc">{p.description}</p>
+          <div className="price">฿{p.price.toLocaleString()}<span className="stock">คงเหลือ {p.stock}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+
   // (JSX - ส่วนแสดงผล)
   return (
-    <div className="bg-[#EEF4FB] rounded-lg  p-6 md:p-8">
-      
-      {/* (ส่วน Header) */}
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Product list</h2>
-          <p className="text-[#4279c1]">ทั้งหมด {countAllProduct} รายการ</p>
+    <>
+      <div className="page-head">
+        <div><h1>สินค้า</h1><p>ทั้งหมด {countAllProduct} รายการ</p></div>
+        <div className="actions">
+          <button className="btn btn-primary" onClick={() => router.push("/admin/products/addproduct")}>
+            <Icon name="plus" size="sm" />เพิ่มสินค้า
+          </button>
         </div>
-        <button onClick={() => router.push("/admin/products/addproduct")}
-          className="px-4 py-2 bg-[#0B1F33] text-[#A8CEFF] font-semibold rounded-xl hover:bg-blue-900 transition text-sm whitespace-nowrap shrink-0">
-          + เพิ่มสินค้า
+      </div>
+
+      <div className="stats">
+        <button className={`stat button${stockFilter === 'all' ? ' on' : ''}`} onClick={() => handleStockFilter('all')}>
+          <div className="k">ทั้งหมด</div><div className="v">{countAllProduct}</div>
+        </button>
+        <div className="stat">
+          <div className="k">พร้อมขาย <span className="badge b-green plain">●</span></div><div className="v">{countReadyProduct}</div>
+        </div>
+        <button className={`stat button${stockFilter === 'lowstock' ? ' on' : ''}`} onClick={() => handleStockFilter('lowstock')}>
+          <div className="k">สต็อกใกล้หมด <span className="badge b-amber plain">●</span></div><div className="v">{countLowProduct}</div>
+        </button>
+        <button className={`stat button${stockFilter === 'outofstock' ? ' on' : ''}`} onClick={() => handleStockFilter('outofstock')}>
+          <div className="k">หมดสต็อก <span className="badge b-red plain">●</span></div><div className="v">{countOutofstockProduct}</div>
         </button>
       </div>
 
-      {/* (ส่วนแสดงสถิติสินค้า) */}
-      <div className='grid grid-cols-2 md:grid-cols-4 gap-2 mb-2 text-gray-500 font-medium'>
-          <div className="bg-white flex items-center px-4 md:pl-10 py-4 rounded-md">
-            <div className="flex items-center justify-center">
-               <div className='bg-[#EEF4FB] p-3 rounded-md flex items-center justify-center shrink-0'>
-                 <TiArchive size={24} className="text-blue-600" />
-                </div>
-                <div className='flex flex-col items-start justify-center ml-3'>
-                  <h1 className="font-semibold text-gray-800">{countAllProduct}</h1>
-                  <p className="text-xs">สินค้าทั้งหมด</p>
-                </div>
-            </div>
-          </div>
-
-          <div className="bg-white flex items-center px-4 md:pl-10 py-4 rounded-md">
-            <div className="flex items-center justify-center">
-              <div className='bg-[#c6e9c6] p-3 rounded-md flex items-center justify-center shrink-0'>
-                  <MdOutlineSell size={24} className="text-green-600" />
-                </div>
-                <div className='flex flex-col items-start justify-center ml-3'>
-                  <h1 className="font-semibold text-gray-800">{countReadyProduct}</h1>
-                  <p className="text-xs">พร้อมขาย</p>
-                </div>
-            </div>
-          </div>
-
-          {/* [Claude] คลิก → filter เฉพาะ stock 1-5 */}
-          <button onClick={() => handleStockFilter('lowstock')}
-            className={`flex items-center px-4 md:pl-10 py-4 rounded-md transition border-2
-              ${stockFilter === 'lowstock' ? 'bg-orange-50 border-orange-400' : 'bg-white border-transparent hover:border-orange-200'}`}>
-            <div className="flex items-center justify-center">
-              <div className='bg-[#fff4b4] p-3 rounded-md flex items-center justify-center shrink-0'>
-                <FiAlertTriangle size={24} className="text-yellow-800"/>
-              </div>
-              <div className='flex flex-col items-start justify-center ml-3'>
-                <h1 className={`font-semibold ${stockFilter === 'lowstock' ? 'text-orange-600' : 'text-gray-800'}`}>{countLowProduct}</h1>
-                <p className="text-xs">สต็อกใกล้หมด</p>
-              </div>
-            </div>
-          </button>
-
-          {/* [Claude] คลิก → filter เฉพาะ stock = 0 */}
-          <button onClick={() => handleStockFilter('outofstock')}
-            className={`flex items-center px-4 md:pl-10 py-4 rounded-md transition border-2
-              ${stockFilter === 'outofstock' ? 'bg-red-50 border-red-400' : 'bg-white border-transparent hover:border-red-200'}`}>
-            <div className="flex items-center justify-center">
-              <div className='bg-[#e4c9c9] p-3 rounded-md flex items-center justify-center shrink-0'>
-                <TiDeleteOutline size={24} className="text-red-800"/>
-              </div>
-              <div className='flex flex-col items-start justify-center ml-3'>
-                <h1 className={`font-semibold ${stockFilter === 'outofstock' ? 'text-red-600' : 'text-gray-800'}`}>{countOutofstockProduct}</h1>
-                <p className="text-xs">หมดสต็อก</p>
-              </div>
-            </div>
-          </button>
-      </div>
-
-      {/* [Claude] Banner — แสดงเมื่อ filter stock เปิดอยู่ */}
       {stockFilter !== 'all' && (
-        <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 mb-3 border
-          ${stockFilter === 'outofstock'
-            ? 'bg-red-50 border-red-200'
-            : 'bg-orange-50 border-orange-200'}`}>
-          <p className={`text-sm font-semibold flex items-center gap-2
-            ${stockFilter === 'outofstock' ? 'text-red-700' : 'text-orange-700'}`}>
-            <FiAlertTriangle className={stockFilter === 'outofstock' ? 'text-red-500' : 'text-orange-500'} />
+        <div className="alert-error" role="status"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16,
+            ...(stockFilter === 'lowstock' ? { background: 'var(--amber-soft)', color: 'var(--amber)' } : {}) }}>
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}>
+            <Icon name="alert" size="sm" />
             {stockFilter === 'outofstock'
               ? `กำลังแสดงเฉพาะสินค้าหมดสต็อก (stock = 0)`
               : `กำลังแสดงเฉพาะสินค้าใกล้หมด (stock 1–${LOW_STOCK_THRESHOLD} ชิ้น)`}
-          </p>
-          <button onClick={() => handleStockFilter(stockFilter)}
-            className={`text-xs underline font-medium
-              ${stockFilter === 'outofstock' ? 'text-red-600 hover:text-red-800' : 'text-orange-600 hover:text-orange-800'}`}>
-            ล้างตัวกรอง
-          </button>
+          </span>
+          <button className="btn btn-ghost sm" style={{ color: 'inherit' }} onClick={() => handleStockFilter(stockFilter)}>ล้างตัวกรอง</button>
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-6 bg-white shadow-md p-2 rounded-lg">
-
-        {/* Search */}
-        <div className="relative flex-1 min-w-0">
-          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="ค้นหาสินค้า..."
-            value={search}
-            onChange={handleSearchChange}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#E0EBF8]"
-          />
-        </div>
-
-        {/* Category buttons — scroll horizontally on small screens */}
-        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
-          <span className="text-gray-300 text-lg shrink-0">|</span>
-          {['ALL', 'BREAD', 'CAKE', 'COOKIE'].map(cat => (
-            <button key={cat}
-              onClick={() => handleCategoryChange(cat)}
-              className={`px-3 py-2 rounded-md font-semibold whitespace-nowrap text-sm transition-all
-                ${categoryFilter === cat ? 'bg-[#0F2235] text-white' : 'text-gray-400 hover:bg-gray-200'}`}>
-              {cat === 'ALL' ? 'ทั้งหมด' : cat.charAt(0) + cat.slice(1).toLowerCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Table ── */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">สินค้า</th>
-              <th className="px-4 py-3 text-center">ราคา / จำนวน</th>
-              <th className="px-4 py-3 text-center">หมวดหมู่</th>
-              <th className="px-4 py-3 text-center">วันหมดอายุ</th>
-              <th className="px-4 py-3 text-center">สถานะสต็อก</th>
-              <th className="px-4 py-3 text-center">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {pagedProducts.length === 0 ? (
-              <tr>
-                <td colSpan="7" className="py-16 text-center text-gray-400">ไม่มีข้อมูลสินค้า</td>
-              </tr>
-            ) : pagedProducts.map((product) => {
-              // stock status badge
-              const stockBadge =
-                product.stock === 0    ? { label: 'หมดสต็อก',     dot: 'bg-red-400',    bg: 'bg-red-50',    text: 'text-red-600'    } :
-                product.stock <= 5     ? { label: 'ใกล้หมด',      dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-600' } :
-                product.stock <= 9     ? { label: 'เหลือปานกลาง', dot: 'bg-yellow-400', bg: 'bg-yellow-50', text: 'text-yellow-700' } :
-                                         { label: 'พร้อมขาย',     dot: 'bg-green-400',  bg: 'bg-green-50',  text: 'text-green-700'  };
-
-              // category badge
-              const catColor =
-                product.category === 'BREAD'  ? 'bg-blue-100 text-blue-700'   :
-                product.category === 'CAKE'   ? 'bg-pink-100 text-pink-700'   :
-                product.category === 'COOKIE' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-100 text-gray-600';
-
-              return (
-                <tr key={product.id} className="hover:bg-gray-50 transition">
-                  {/* รูป + ชื่อ */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                        {product.imageUrl
-                          ? <img src={`http://localhost:8080/${product.imageUrl}`} alt={product.name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">🍞</div>
-                        }
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800">{product.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5 max-w-[200px] truncate">{product.description || '—'}</p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* ราคา / จำนวน */}
-                  <td className="px-4 py-3 text-center">
-                    <p className="font-semibold text-gray-800">฿{Number(product.price).toLocaleString()}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">คงเหลือ {product.stock} ชิ้น</p>
-                  </td>
-
-                  {/* หมวดหมู่ */}
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${catColor}`}>
-                      {product.category || '—'}
-                    </span>
-                  </td>
-
-                  {/* วันหมดอายุ */}
-                  <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                    {product.expiryDate
-                      ? new Date(product.expiryDate).toLocaleDateString('th-TH', { dateStyle: 'medium' })
-                      : '—'}
-                  </td>
-
-                  {/* สถานะสต็อก */}
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${stockBadge.bg} ${stockBadge.text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${stockBadge.dot}`} />
-                      {stockBadge.label}
-                    </span>
-                  </td>
-
-                  {/* จัดการ */}
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center items-center gap-1.5">
-                      {/* ลบ */}
-                      <button onClick={() => handleDeleteProduct(product.id, product.name)}
-                        title="ลบ"
-                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
-                        </svg>
-                      </button>
-                      {/* preview */}
-                      <button onClick={() => { setSelectedProduct(product); setShowPreview(true); }}
-                        title="ดูรายละเอียด"
-                        className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                      {/* แก้ไข */}
-                      <button onClick={() => router.push(`/admin/products/editproduct/${product.id}`)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0B1F33] hover:bg-blue-900 text-[#A8CEFF] text-xs font-semibold rounded-lg transition">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        จัดการ
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── Pagination ── */}
-      <div className="flex items-center justify-between mt-4 px-1">
-        <p className="text-sm text-gray-500">
-          {filteredProducts.length === 0
-            ? 'ไม่มีสินค้า'
-            : `แสดง ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} จาก ${filteredProducts.length} สินค้า`}
-        </p>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition text-sm">
-              ‹
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button key={page} onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-lg text-sm font-medium transition border
-                  ${currentPage === page
-                    ? 'bg-[#0B1F33] text-white border-[#0B1F33]'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-100'}`}>
-                {page}
+      <section className="card">
+        <div className="toolbar">
+          <div className="chips">
+            {['ALL', 'BREAD', 'CAKE', 'COOKIE'].map(cat => (
+              <button key={cat} className={`chip${categoryFilter === cat ? ' on' : ''}`} onClick={() => handleCategoryChange(cat)}>
+                {cat === 'ALL' ? 'ทั้งหมด' : CATEGORY_LABEL[cat]}
               </button>
             ))}
-            <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition text-sm">
-              ›
-            </button>
           </div>
-        )}
-      </div>
+          <label className="search">
+            <Icon name="search" size="sm" />
+            <input placeholder="ค้นหาสินค้า" aria-label="ค้นหาสินค้า" value={search} onChange={handleSearchChange} />
+          </label>
+        </div>
+
+        <div className="table-wrap">
+          <table className="t">
+            <thead>
+              <tr>
+                <th>สินค้า</th><th className="hide-m">หมวด</th><th className="right">ราคา</th>
+                <th className="right hide-m">คงเหลือ</th><th className="hide-m">ปิดรับออเดอร์</th><th>สถานะ</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedProducts.length === 0 ? (
+                <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 48 }}>ไม่มีข้อมูลสินค้า</td></tr>
+              ) : pagedProducts.map((product) => {
+                const [badgeClass, badgeLabel] = stockBadge(product.stock);
+                return (
+                  <tr key={product.id}>
+                    <td>
+                      <div className="prod-cell">
+                        {product.imageUrl
+                          ? <img className="thumb" src={`${API_URL}/${product.imageUrl}`} alt={product.name} />
+                          : <span className="thumb" />}
+                        <div style={{ minWidth: 0 }}>
+                          <b style={{ fontWeight: 600 }}>{product.name}</b>
+                          <span className="sub" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.description || '—'}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hide-m"><span className="badge plain">{CATEGORY_LABEL[product.category] ?? product.category ?? '—'}</span></td>
+                    <td className="num right">฿{Number(product.price).toLocaleString()}</td>
+                    <td className="num right hide-m">{product.stock}</td>
+                    <td className="num hide-m">
+                      {product.expiryDate ? new Date(product.expiryDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '—'}
+                    </td>
+                    <td><span className={`badge ${badgeClass}`}>{badgeLabel}</span></td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="icon-btn sm hide-m" aria-label={`ดูรายละเอียด ${product.name}`} title="ดูรายละเอียด"
+                          onClick={() => { setSelectedProduct(product); setShowPreview(true); }}><Icon name="eye" size="sm" /></button>
+                        <button className="icon-btn sm" aria-label={`แก้ไข ${product.name}`} title="แก้ไข"
+                          onClick={() => router.push(`/admin/products/editproduct/${product.id}`)}><Icon name="edit" size="sm" /></button>
+                        <button className="icon-btn sm hide-m" aria-label={`ลบ ${product.name}`} title="ลบ" style={{ color: 'var(--red)' }}
+                          onClick={() => handleDeleteProduct(product.id, product.name)}><Icon name="trash" size="sm" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="pager">
+          <span>
+            {filteredProducts.length === 0
+              ? 'ไม่มีสินค้า'
+              : `แสดง ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} จาก ${filteredProducts.length} สินค้า`}
+          </span>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button className="btn btn-outline sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>ก่อนหน้า</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button key={page} className={`btn sm ${currentPage === page ? 'btn-dark' : 'btn-outline'}`} onClick={() => setCurrentPage(page)}
+                  aria-current={currentPage === page ? 'page' : undefined}>{page}</button>
+              ))}
+              <button className="btn btn-outline sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>ถัดไป</button>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* (Modal แสดง Preview ก่อนเพิ่มสินค้า) */}
       {showPreviewOfAddProduct && (
-       <div
-       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-       onClick={() => setShowPreviewOfAddProduct(false)}
-     >
-       <div
-         className="bg-white p-6 rounded-xl w-96 shadow-xl"
-         onClick={(e) => e.stopPropagation()}
-       >
-            
-            <h2 className="text-lg font-bold mb-4">Preview สินค้า</h2>
-
-            <p><b>ชื่อ:</b> {name}</p>
-            <p><b>ราคา:</b> {price}</p>
-            <p><b>จำนวน:</b> {stock}</p>
-            <p><b>รายละเอียด</b> {description}</p>
-            <p><b>วันปิดรับ order:</b> {expiryDate}</p>
-
-            {imageFile && (
-              <img
-                src={URL.createObjectURL(imageFile)}
-                alt="preview"
-                className="mt-3 h-40 w-full object-cover rounded"
-              />
-            )}
-
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowPreviewOfAddProduct(false)}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                ยกเลิก
-              </button>
-
-              <button
-                onClick={handleAddProduct}
-                className="px-4 py-2 bg-green-600 text-white rounded"
-              >
-                ยืนยัน
-              </button>
+        <div className="modal-scrim" onClick={() => setShowPreviewOfAddProduct(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head"><h2>Preview สินค้า</h2></div>
+            <div className="modal-body rows">
+              <div className="r"><span className="muted">ชื่อ</span><span>{name}</span></div>
+              <div className="r"><span className="muted">ราคา</span><span>{price}</span></div>
+              <div className="r"><span className="muted">จำนวน</span><span>{stock}</span></div>
+              <div className="r"><span className="muted">รายละเอียด</span><span>{description}</span></div>
+              <div className="r"><span className="muted">วันปิดรับ order</span><span>{expiryDate}</span></div>
+              {imageFile && <img src={URL.createObjectURL(imageFile)} alt="preview" style={{ marginTop: 8, height: 160, width: '100%', objectFit: 'cover', borderRadius: 'var(--r-md)' }} />}
             </div>
-
+            <div className="modal-foot">
+              <button className="btn btn-outline" onClick={() => setShowPreviewOfAddProduct(false)}>ยกเลิก</button>
+              <button className="btn btn-primary" onClick={handleAddProduct}>ยืนยัน</button>
+            </div>
           </div>
         </div>
       )}
-
-
 
       {/* (Modal แสดง การแก้ไขข้อมูลสินค้า */}
       {showEditProduct && selectedProduct && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-          onClick={() => setShowPreview(false)}
-        >
-          <div
-            className="bg-white p-6 rounded-xl w-96 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-          <div className="bg-white rounded-lg shadow border overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-
-              <div className="h-48 flex items-center justify-center bg-gray-100">
-                {selectedProduct.imageUrl
-                  ? <img src={`http://localhost:8080/${selectedProduct.imageUrl}`} alt={selectedProduct.name} className="h-full w-full object-cover" />
-                  : <div className="text-gray-300 text-sm">No image</div>
-                }
-              </div>
-
-
-              <div className="p-4">
-                  <h3 className="text-lg font-bold text-gray-800 truncate">{selectedProduct.name}</h3>
-                  <p className="text-sm text-gray-500 h-10 overflow-hidden">{selectedProduct.description}</p>
-
-                  <div className="flex justify-between items-center my-3">
-                    <span className="text-2xl font-bold text-blue-600">฿{selectedProduct.price.toLocaleString()}</span>
-                    <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                      คงเหลือ {selectedProduct.stock}
-                    </span>
-                  </div>
-
-              </div>
-
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setshowEditProduct(false)}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                ปิด
-              </button>
-            
-            </div>
+        <div className="modal-scrim" onClick={() => setShowPreview(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-body">{productPreviewCard(selectedProduct)}</div>
+            <div className="modal-foot"><button className="btn btn-outline" onClick={() => setshowEditProduct(false)}>ปิด</button></div>
           </div>
         </div>
       )}
-
 
       {/* (Modal แสดง Preview ข้อมูลสินค้าในตาราง) */}
       {showPreview && selectedProduct && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-          onClick={() => setShowPreview(false)}
-        >
-          <div
-            className="bg-white p-6 rounded-xl w-96 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-          <div className="bg-white rounded-lg shadow border overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-
-              <div className="h-48 flex items-center justify-center bg-gray-100">
-                {selectedProduct.imageUrl
-                  ? <img src={`http://localhost:8080/${selectedProduct.imageUrl}`} alt={selectedProduct.name} className="h-full w-full object-cover" />
-                  : <div className="text-gray-300 text-sm">No image</div>
-                }
-              </div>
-
-
-              <div className="p-4">
-                  <h3 className="text-lg font-bold text-gray-800 truncate">{selectedProduct.name}</h3>
-                  <p className="text-sm text-gray-500 h-10 overflow-hidden">{selectedProduct.description}</p>
-
-                  <div className="flex justify-between items-center my-3">
-                    <span className="text-2xl font-bold text-blue-600">฿{selectedProduct.price.toLocaleString()}</span>
-                    <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                      คงเหลือ {selectedProduct.stock}
-                    </span>
-                  </div>
-
-              </div>
-
+        <div className="modal-scrim" onClick={() => setShowPreview(false)}>
+          <div className="modal" role="dialog" aria-label={selectedProduct.name} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>รายละเอียดสินค้า</h2>
+              <button className="icon-btn" aria-label="ปิด" onClick={() => setShowPreview(false)}><Icon name="x" /></button>
             </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                ปิด
-              </button>
-            
-            </div>
+            <div className="modal-body">{productPreviewCard(selectedProduct)}</div>
+            <div className="modal-foot"><button className="btn btn-outline" onClick={() => setShowPreview(false)}>ปิด</button></div>
           </div>
         </div>
       )}
+
       {/* [Claude] Modal ยืนยันการลบสินค้า */}
       {deleteModal.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setDeleteModal({ open: false, productId: null, productName: '' })}>
-          <div className="bg-white rounded-2xl shadow-xl w-80 p-6" onClick={e => e.stopPropagation()}>
-
-            {/* ไอคอน */}
-            <div className="flex justify-center mb-4">
-              <div className="bg-red-100 p-4 rounded-full">
-                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
-                </svg>
+        <div className="modal-scrim" onClick={() => setDeleteModal({ open: false, productId: null, productName: '' })}>
+          <div className="modal" role="alertdialog" aria-label="ลบสินค้า" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-body" style={{ textAlign: 'center', paddingTop: 28 }}>
+              <div className="empty" style={{ border: 0, padding: 0, background: 'none' }}>
+                <div className="ic" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}><Icon name="trash" /></div>
               </div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>ลบสินค้า</h2>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
+                คุณต้องการลบ <b style={{ color: 'var(--ink)' }}>{deleteModal.productName}</b> ใช่หรือไม่?
+              </p>
             </div>
-
-            <h3 className="text-lg font-bold text-gray-800 text-center mb-1">ลบสินค้า</h3>
-            <p className="text-sm text-gray-500 text-center mb-6">
-              คุณต้องการลบ <span className="font-semibold text-gray-800">{deleteModal.productName}</span> ใช่หรือไม่?
-              <br />
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteModal({ open: false, productId: null, productName: '' })}
-                className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition font-medium text-sm">
-                ยกเลิก
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition font-medium text-sm">
-                ลบ
-              </button>
+            <div className="modal-foot">
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setDeleteModal({ open: false, productId: null, productName: '' })}>ยกเลิก</button>
+              <button className="btn btn-danger" style={{ flex: 1 }} onClick={confirmDelete}>ลบ</button>
             </div>
           </div>
         </div>
@@ -760,68 +452,36 @@ export default function ProductPage() {
 
       {/* (Modal สำหรับ Crop รูปภาพ) */}
       {showCrop && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div
-            className="bg-white p-6 rounded-xl w-[400px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-bold mb-4">ปรับรูปภาพ</h2>
-
-            <div className="relative w-full h-64 bg-gray-200">
-              <Cropper
-                image={imageSrc}
-                crop={crop}
-                zoom={zoom}
-                aspect={1}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(croppedArea, croppedPixels) =>
-                  setCroppedAreaPixels(croppedPixels)
-                }
-              />
+        <div className="modal-scrim">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head"><h2>ปรับรูปภาพ</h2></div>
+            <div className="modal-body">
+              <div style={{ position: 'relative', width: '100%', height: 256, background: 'var(--line)', borderRadius: 'var(--r-md)', overflow: 'hidden' }}>
+                <Cropper
+                  image={imageSrc}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={(croppedArea, croppedPixels) => setCroppedAreaPixels(croppedPixels)}
+                />
+              </div>
+              <input type="range" min={1} max={3} step={0.1} value={zoom} aria-label="ซูม"
+                onChange={(e) => setZoom(e.target.value)} style={{ width: '100%', marginTop: 16, accentColor: 'var(--blue)' }} />
             </div>
-
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.1}
-              value={zoom}
-              onChange={(e) => setZoom(e.target.value)}
-              className="w-full mt-4"
-            />
-
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => {setShowCrop(false); setImageSrc(null);}}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                ยกเลิก
-              </button>
-
-              <button
-                onClick={async () => {
-                  const cropped = await getCroppedImg(
-                    imageSrc,
-                    croppedAreaPixels
-                  );
-                  setImageFile(cropped);
-                  setShowCrop(false);
-                  setImageSrc(null);
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded"
-              >
-                ตกลง
-              </button>
+            <div className="modal-foot">
+              <button className="btn btn-outline" onClick={() => { setShowCrop(false); setImageSrc(null); }}>ยกเลิก</button>
+              <button className="btn btn-primary" onClick={async () => {
+                const cropped = await getCroppedImg(imageSrc, croppedAreaPixels);
+                setImageFile(cropped);
+                setShowCrop(false);
+                setImageSrc(null);
+              }}>ตกลง</button>
             </div>
           </div>
         </div>
       )}
-      
-
-
-
-    </div>
-    
+    </>
   );
 }

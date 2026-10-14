@@ -5,26 +5,27 @@ import api from '@/lib/api';
 import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
+const NO_NOTIFICATIONS = [];
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  // รายการข้างบนเป็นของ user คนไหน — ไม่ตรงกับคนที่ login อยู่ = ไม่แสดง (logout/สลับบัญชีไม่เห็นของคนก่อน)
+  const [ownerId, setOwnerId] = useState(null);
   const eventSourceRef = useRef(null);
 
   // โหลด notifications จาก DB เมื่อ login
   useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
-    }
+    if (!userId) return;
 
     api.get('/api/v1/notifications')
       .then(res => {
         const data = res.data ?? [];
         setNotifications(data);
         setUnreadCount(data.filter(n => !n.isRead).length);
+        setOwnerId(userId);
       })
       .catch(() => {});
 
@@ -37,7 +38,7 @@ export function NotificationProvider({ children }) {
         const newNoti = JSON.parse(e.data);
         setNotifications(prev => [newNoti, ...prev]);
         setUnreadCount(prev => prev + 1);
-      } catch (_) {}
+      } catch { /* ข้อมูลเสีย — ข้าม */ }
     });
 
     // ไม่ต้อง es.close() ใน onerror — browser จะ reconnect อัตโนมัติ
@@ -48,7 +49,7 @@ export function NotificationProvider({ children }) {
     return () => {
       es.close();
     };
-  }, [user?.id]);
+  }, [userId]);
 
   const markAsRead = async (id) => {
     await api.patch(`/api/v1/notifications/${id}/read`);
@@ -64,8 +65,15 @@ export function NotificationProvider({ children }) {
     setUnreadCount(0);
   };
 
+  const visible = Boolean(userId) && ownerId === userId;
+
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead }}>
+    <NotificationContext.Provider value={{
+      notifications: visible ? notifications : NO_NOTIFICATIONS,
+      unreadCount:   visible ? unreadCount : 0,
+      markAsRead,
+      markAllAsRead,
+    }}>
       {children}
     </NotificationContext.Provider>
   );

@@ -1,5 +1,6 @@
 package com.breadShop.XXI.controller;
 
+import java.util.Locale;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -51,7 +52,12 @@ public class ProductController {
      */
     @GetMapping("/get-count-Category")
     public ResponseEntity<ApiResponse<Long>> countByCategory(@RequestParam String categoryString) {
-        ProductCategory category = ProductCategory.valueOf(categoryString.toUpperCase());
+        ProductCategory category;
+        try {
+            category = ProductCategory.valueOf(categoryString.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("ไม่พบหมวดหมู่สินค้า: " + categoryString));
+        }
         Long count = productService.countProductCategory(category);
         return ResponseEntity.ok(ApiResponse.ok(
                 "จำนวนสินค้าประเภท " + categoryString, count));

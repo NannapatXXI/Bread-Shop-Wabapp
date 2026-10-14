@@ -1,9 +1,11 @@
 package com.breadShop.XXI.service;
 
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -32,6 +34,9 @@ import com.breadShop.XXI.repository.UserRepository;
 // Service สำหรับจัดการ order ทั้งหมด ตั้งแต่การสร้าง order, ดึง order ของ user, ดึง order เดี่ยว, อัปเดตสถานะ และดึง order ทั้งหมด (สำหรับ admin) | reviewed by peak
 @Service
 public class OrderService {
+
+    /** ค่าส่ง — ตอนนี้ส่งฟรี ถ้าจะคิดค่าส่งให้คิดที่ server ตรงนี้ ห้ามรับจาก client */
+    static final BigDecimal SHIPPING_FEE = BigDecimal.ZERO;
 
     private final OrderRepository         orderRepository;
     private final UserRepository          userRepository;
@@ -103,6 +108,18 @@ public class OrderService {
         return toResponse(order);
     }
 
+    /**
+     * ดึง order ของ user คนนี้เท่านั้น — order ของคนอื่นตอบ 404 เหมือนไม่มีอยู่
+     */
+    @Transactional(readOnly = true)
+    public OrderResponse getByIdForUser(Integer id, Integer userId) {
+        Order order = orderRepository.findById(id)
+                .filter(o -> o.getUser().getId().equals(userId))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Order not found"));
+        return toResponse(order);
+    }
+
     // สร้าง order
     /**
      * ขั้นตอนการสร้าง order: ที่ละขั้นตอนจะมีการตรวจสอบข้อมูลและคำนวณราคาต่างๆ ดังนี้
@@ -141,8 +158,7 @@ public class OrderService {
 
         // 3. สร้าง order + snapshot ที่อยู่
         Order order = new Order(user, generateOrderNo(), address);
-        order.setShippingFee(request.getShippingFee() != null
-                ? request.getShippingFee() : BigDecimal.ZERO);
+        order.setShippingFee(SHIPPING_FEE);
         order.setNote(request.getNote());
 
         // 4. สร้าง order lines + คำนวณ subtotal
@@ -160,12 +176,9 @@ public class OrderService {
                         "Insufficient stock for: " + product.getName());
             }
 
-            BigDecimal discount = item.getDiscountAmount() != null
-                    ? item.getDiscountAmount() : BigDecimal.ZERO;
-
+            // ราคาจากฐานข้อมูลเท่านั้น — ส่วนลดมีทางเดียวคือโค้ดโปรโมชั่น (ข้อ 5 ด้านล่าง)
             BigDecimal lineTotal = product.getPrice()
-                    .multiply(BigDecimal.valueOf(item.getQuantity()))
-                    .subtract(discount);
+                    .multiply(BigDecimal.valueOf(item.getQuantity()));
 
             OrderLine line = new OrderLine(
                     order,
@@ -175,7 +188,7 @@ public class OrderService {
                     item.getQuantity(),
                     lineTotal
             );
-            line.setDiscountAmount(discount);
+            line.setDiscountAmount(BigDecimal.ZERO);
             order.getOrderLines().add(line);
 
             subtotal = subtotal.add(lineTotal);
@@ -248,7 +261,9 @@ public class OrderService {
     private String generateOrderNo() {
         String timestamp = LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        return "ORD-" + timestamp;
+        // ต่อท้ายด้วยสุ่ม 6 ตัว — ลูกค้าหลายคนสั่งในวินาทีเดียวกันได้โดยไม่ชน UNIQUE
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
+        return "ORD-" + timestamp + "-" + suffix;
     }
 
 

@@ -21,8 +21,7 @@ import io.jsonwebtoken.security.Keys;
 public class JwtService {
 
     // Secret key ต้องเข้ารหัส Base64 และมีความยาว >= 256 bit (32 bytes)
-    // ตัวอย่างใน application.properties:
-    // app.jwtSecret=VGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIEpXVA==
+   
     @Value("${app.jwtSecret}")
     private String secretKey;
 
@@ -98,7 +97,6 @@ public class JwtService {
      * @param token JWT token ที่ต้องการดึงข้อมูล role โดยจะดึงข้อมูลจาก claim "roles" ซึ่งเป็น list ของ authorities ที่ถูกเก็บใน token และคืนค่า role แรกที่พบ ถ้าไม่มี role จะคืนค่า "ROLE_USER" เป็น default
      * @return role ของผู้ใช้ที่ดึงมาจาก token ถ้ามี, หรือ "ROLE_USER" ถ้าไม่มี role ใน token
      */
-    @SuppressWarnings("unchecked")
     public String extractRole(String token) {
         Claims claims = extractAllClaims(token);
         var roles = (java.util.List<?>) claims.get("roles");

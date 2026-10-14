@@ -50,8 +50,9 @@ public class NotificationController {
     }
 
     @PatchMapping("/{id}/read")
-    public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable Integer id) {
-        notificationService.markAsRead(id);
+    public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable Integer id, Authentication authentication) {
+        User user = resolveUser(authentication);
+        notificationService.markAsRead(id, user.getId());
         return ResponseEntity.ok(ApiResponse.ok("อ่านแล้ว", null));
     }
 

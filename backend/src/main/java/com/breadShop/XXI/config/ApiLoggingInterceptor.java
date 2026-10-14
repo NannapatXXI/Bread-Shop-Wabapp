@@ -2,6 +2,8 @@ package com.breadShop.XXI.config;
 
 import java.util.regex.Pattern;
 
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -38,14 +40,14 @@ public class ApiLoggingInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object handler) {
+    public boolean preHandle(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res, @NonNull Object handler) {
         START_TIME.set(System.currentTimeMillis());
         return true;
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest req, HttpServletResponse res,
-                                Object handler, Exception ex) {
+    public void afterCompletion(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res,
+                                @NonNull Object handler, @Nullable Exception ex) {
         Long start = START_TIME.get();
         START_TIME.remove();  // ป้องกัน memory leak — ต้อง remove ทุกครั้ง
 

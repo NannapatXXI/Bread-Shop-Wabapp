@@ -1,5 +1,7 @@
 package com.breadShop.XXI.scheduler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
 
 import org.springframework.scheduling.annotation.Scheduled;
@@ -9,6 +11,8 @@ import com.breadShop.XXI.repository.EmailOtpRepository;
 
 @Component
 public class OtpCleanupJob {
+
+    private static final Logger log = LoggerFactory.getLogger(OtpCleanupJob.class);
 
     private final EmailOtpRepository repo;
 
@@ -21,7 +25,7 @@ public class OtpCleanupJob {
     public void cleanExpiredOtp() {
         int deleted = repo.deleteExpired(LocalDateTime.now());
         if (deleted > 0) {
-            System.out.println("🧹 Deleted expired OTP: " + deleted);
+            log.info("Deleted expired OTP: {}", deleted);
         }
     }
 }

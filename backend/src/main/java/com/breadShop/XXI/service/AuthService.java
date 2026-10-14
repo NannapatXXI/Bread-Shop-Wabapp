@@ -1,5 +1,6 @@
 package com.breadShop.XXI.service;
 
+import java.util.Set;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -27,6 +28,9 @@ import jakarta.servlet.http.HttpServletRequest;
 //สำหรับการสมัครผ่านหน้าเว็บ   reviewd by peak
 @Service
 public class AuthService {
+
+    /** code ที่ OtpService โยน — แปลเป็นข้อความภาษาไทยใน GlobalExceptionHandler */
+    private static final Set<String> OTP_ERROR_CODES = Set.of("OTP_EXPIRED", "OTP_INVALID", "OTP_LOCKED", "OTP_NOT_FOUND");
 
 
     private  final UserRepository userRepository;
@@ -103,6 +107,12 @@ public class AuthService {
         // validate ก่อน (throw ถ้า expired/revoked)
         RefreshToken oldRt = refreshTokenService.validate(refreshTokenValue);
         User user = oldRt.getUser();
+
+        // ถูกแบนหลัง login → ห้ามต่ออายุ session และทิ้ง refresh token ที่เหลือ
+        if (!user.isActive()) {
+            refreshTokenService.revokeAll(user);
+            throw new RuntimeException("ACCOUNT_DISABLED");
+        }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
 
@@ -207,13 +217,11 @@ public class AuthService {
     public void checkEmail(CheckEmailRequest request) {
 
         if (request.email() == null || request.email().isEmpty()) {
-            throw new IllegalArgumentException("Email ไม่ควรเป็นค่าว่าง");
+            throw new IllegalArgumentException("EMAIL_REQUIRED");
         }
 
-        System.out.println("Email ที่รับมา = " + request.email());
-
         if (userRepository.findByEmail(request.email()).isEmpty()) {
-            throw new IllegalArgumentException("ไม่มี Email นี้ ในระบบ");
+            throw new IllegalArgumentException("EMAIL_NOT_FOUND");
            
         }
 
@@ -231,12 +239,15 @@ public class AuthService {
      @Transactional
      public void resetPassword(String token, String newPassword) {
         String email = otpService.validateResetToken(token);
-         
-        System.out.println(" eamil ที่ ตรงกับ token ที่ส่งเข้ามา :"+email);
+
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // รีเซ็ตเพราะบัญชีโดนขโมย → session ของคนร้ายต้องหลุดด้วย
+        refreshTokenService.revokeAll(user);
 
         otpService.invalidateToken(token);
         
@@ -253,7 +264,7 @@ public class AuthService {
     @Transactional
     public String sendResetPasswordOtp(String email) {
 
-        User user = userRepository.findByEmail(email)
+        userRepository.findByEmail(email)
         .orElseThrow(() -> new IllegalArgumentException("EMAIL_NOT_FOUND"));
 
 
@@ -280,11 +291,12 @@ public class AuthService {
     
         try {
             otpService.verifyOtp(token, otp);
-            System.out.println("Otp ที่ได้รับมา = " + otp);
-        } catch (Exception e) {
-            System.out.println("เกิดข้อผิดพลาดในการ verify OTP: " + e.getMessage());
-                throw new IllegalArgumentException(e.getMessage());
-           
+        } catch (RuntimeException e) {
+            // แปลงเฉพาะ code ของ OTP เป็น 400 — error อื่น (เช่น DB) ปล่อยไปเป็น 500 ข้อความกลาง ๆ
+            if (OTP_ERROR_CODES.contains(e.getMessage())) {
+                throw new IllegalArgumentException(e.getMessage(), e);
+            }
+            throw e;
         }
 
         return token;

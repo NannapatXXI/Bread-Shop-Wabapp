@@ -70,6 +70,7 @@ test api
    Index ใน Database — ทำให้ query เร็วขึ้น
    Caching (Redis) — ลด load DB
    HTTPS/TLS — production ต้องมี
+   การตั้ง limit เกี่ยวกับการส่ง otp
 
 
 
@@ -86,3 +87,10 @@ test api
 
 17/06/2026 | เทส bug แล้วก็ review code ในส่วนของ service แล้ว
 18/06/2026 | review dto
+
+
+#Spring boot
+- ./mvnw spring-boot:run
+
+#Test backend ใช้ jacoco
+- ./mvnw clean test

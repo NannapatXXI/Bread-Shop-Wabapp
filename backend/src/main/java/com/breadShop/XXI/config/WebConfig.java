@@ -1,9 +1,9 @@
 package com.breadShop.XXI.config;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -21,16 +21,14 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        Path base = Paths.get(System.getProperty("user.dir"));
-        Path candidate = base.resolve("uploads");
-        Path uploadsPath = candidate.toFile().exists() ? candidate : base.getParent().resolve("uploads");
+    public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
+        Path uploadsPath = UploadPaths.dir();
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadsPath.toAbsolutePath() + "/");
+                .addResourceLocations("file:" + uploadsPath + "/");
     }
 
     @Override
-    public void addInterceptors(InterceptorRegistry registry) {
+    public void addInterceptors(@NonNull InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns("/api/v1/auth/login", "/api/v1/auth/send-OTP-mail");
 

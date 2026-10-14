@@ -9,6 +9,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -107,5 +109,42 @@ class JwtServiceTest {
         // library โยน ExpiredJwtException ก่อน isTokenValid จะ return ค่า
         assertThatThrownBy(() -> jwtService.isTokenValid(expiredToken, user))
                 .isInstanceOf(ExpiredJwtException.class);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  extractRole
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("extractRole — token มี role ROLE_ADMIN → คืน ROLE_ADMIN")
+    void extractRole_withAdminAuthority_shouldReturnRoleAdmin() {
+        UserDetails admin = User.withUsername("admin@breadshop.com")
+                .password("password")
+                .authorities(List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .build();
+
+        String token = jwtService.generateToken(admin);
+
+        assertThat(jwtService.extractRole(token)).isEqualTo("ROLE_ADMIN");
+    }
+
+    @Test
+    @DisplayName("extractRole — token ไม่มี role เลย → default เป็น ROLE_USER")
+    void extractRole_withNoAuthorities_shouldDefaultToRoleUser() {
+        UserDetails user = mockUser("norole@breadshop.com");
+        String token = jwtService.generateToken(user);
+
+        assertThat(jwtService.extractRole(token)).isEqualTo("ROLE_USER");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  isTokenNotExpired
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("isTokenNotExpired — token ยังไม่หมดอายุ → true")
+    void isTokenNotExpired_withValidToken_shouldReturnTrue() {
+        String token = jwtService.generateToken(mockUser("fresh@breadshop.com"));
+        assertThat(jwtService.isTokenNotExpired(token)).isTrue();
     }
 }

@@ -2,17 +2,15 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useCart } from '../../../CartContext';
-import { useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { addproduct } from "@/services/auth.service";
 import Cropper from "react-easy-crop";
 import { useRouter } from "next/navigation";
-import { FiUploadCloud, FiX, FiCheck } from 'react-icons/fi';
+import Icon from '../../../components/Icon';
+import { CATEGORY_LABEL } from '../../../components/ProductCard';
 
 export default function AddProductPage() {
   const router = useRouter();
-  const { addToCart } = useCart();
 
   const fileInputRef = useRef(null);
   const [imageSrc, setImageSrc] = useState(null);
@@ -84,191 +82,145 @@ export default function AddProductPage() {
     });
   };
 
-  const inputClass = "mt-1 block w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0F2235]/20 focus:border-[#0F2235] transition";
-  const labelClass = "block text-sm font-medium text-gray-600 mb-1";
-
   return (
-    <div className="min-h-screen bg-[#EEF4FB] p-6 md:p-8">
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#0F2235]">เพิ่มสินค้าใหม่</h1>
-        <p className="text-gray-400 text-sm mt-1">กรอกข้อมูลสินค้าที่ต้องการเพิ่มเข้าระบบ</p>
-      </div>
-
-      <div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-
-          {/* Card Header */}
-          <div className="bg-[#0F2235] px-6 py-4">
-            <h2 className="text-white font-semibold text-base">ข้อมูลสินค้า</h2>
-          </div>
-
-          <div className="p-6 md:p-8">
-            <form onSubmit={handleAddProduct}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                {/* ชื่อสินค้า */}
-                <div>
-                  <label className={labelClass}>ชื่อสินค้า <span className="text-red-400">*</span></label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)}
-                    placeholder="เช่น ครัวซองค์เนย"
-                    className={inputClass} />
-                </div>
-
-                {/* ราคา */}
-                <div>
-                  <label className={labelClass}>ราคา (บาท) <span className="text-red-400">*</span></label>
-                  <input type="number" min="0" value={price}
-                    onChange={(e) => { const v = Number(e.target.value); if (v >= 0) setPrice(v); }}
-                    placeholder="0"
-                    className={inputClass} />
-                </div>
-
-                {/* จำนวน */}
-                <div>
-                  <label className={labelClass}>จำนวนคงเหลือ <span className="text-red-400">*</span></label>
-                  <input type="number" min="0" value={stock}
-                    onChange={(e) => { const v = Number(e.target.value); if (v >= 0) setStock(v); }}
-                    placeholder="0"
-                    className={inputClass} />
-                </div>
-
-                {/* หมวดหมู่ */}
-                <div>
-                  <label className={labelClass}>หมวดหมู่สินค้า <span className="text-red-400">*</span></label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
-                    <option value="BREAD">🍞 Bread</option>
-                    <option value="CAKE">🎂 Cake</option>
-                    <option value="DRINK">🥤 Drink</option>
-                    <option value="COOKIE">🍪 Cookie</option>
-                  </select>
-                </div>
-
-                {/* วันปิดรับ order */}
-                <div>
-                  <label className={labelClass}>วันปิดรับ order</label>
-                  <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-                    className={inputClass} />
-                </div>
-
-                {/* รูปภาพ */}
-                <div>
-                  <label className={labelClass}>รูปภาพสินค้า</label>
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-1 border-2 border-dashed border-gray-200 rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:border-[#0F2235] hover:bg-gray-50 transition"
-                  >
-                    {imagePreviewUrl ? (
-                      <>
-                        <img src={imagePreviewUrl} alt="preview" className="h-12 w-12 object-cover rounded-lg" />
-                        <span className="text-sm text-gray-500 truncate">เปลี่ยนรูปภาพ</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiUploadCloud className="text-gray-400 text-2xl flex-shrink-0" />
-                        <span className="text-sm text-gray-400">คลิกเพื่ออัปโหลดรูป</span>
-                      </>
-                    )}
-                  </div>
-                  <input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" />
-                </div>
-
-                {/* รายละเอียด */}
-                <div className="md:col-span-2">
-                  <label className={labelClass}>รายละเอียด</label>
-                  <textarea value={description} onChange={e => setDescription(e.target.value)} rows="3"
-                    placeholder="รายละเอียดสินค้า..."
-                    className={inputClass + " resize-none"} />
-                </div>
-
-              </div>
-
-              {/* Buttons */}
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
-                <button type="button" onClick={() => router.push("/admin/products")}
-                  className="px-6 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
-                  ยกเลิก
-                </button>
-                <button type="button" onClick={() => setShowPreviewOfAddProduct(true)}
-                  disabled={!name || !price || !stock}
-                  className="px-6 py-2.5 text-sm font-medium text-white bg-[#0F2235] hover:bg-[#1a3a5c] rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed">
-                  เพิ่มสินค้า
-                </button>
-              </div>
-
-            </form>
-          </div>
+    <>
+      <div className="page-head">
+        <div className="back">
+          <button className="icon-btn" aria-label="กลับ" onClick={() => router.push("/admin/products")} style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>
+            <Icon name="left" />
+          </button>
+          <div><h1>เพิ่มสินค้าใหม่</h1><p>กรอกข้อมูลสินค้าที่ต้องการเพิ่มเข้าระบบ</p></div>
         </div>
       </div>
 
-      {/* Modal Preview */}
-      {showPreviewOfAddProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPreviewOfAddProduct(false)}>
-          <div className="bg-white rounded-2xl w-96 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-[#0F2235] px-6 py-4 flex justify-between items-center">
-              <h2 className="text-white font-semibold">ยืนยันการเพิ่มสินค้า</h2>
-              <button onClick={() => setShowPreviewOfAddProduct(false)} className="text-gray-400 hover:text-white">
-                <FiX size={18} />
-              </button>
+      <div className="two" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start', maxWidth: 1080 }}>
+        <section className="card">
+          <div className="card-head"><h2>ข้อมูลสินค้า</h2></div>
+          <form className="pad grid-2" onSubmit={handleAddProduct}>
+            <div className="field">
+              <label htmlFor="pd-name">ชื่อสินค้า <span className="req">*</span></label>
+              <div className="control"><input id="pd-name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="เช่น ครัวซองต์เนย" /></div>
             </div>
-            <div className="p-6">
-              {imageFile && (
-                <img src={URL.createObjectURL(imageFile)} alt="preview"
-                  className="w-full h-40 object-cover rounded-xl mb-4" />
-              )}
-              <div className="space-y-2 text-sm text-gray-700">
-                <div className="flex justify-between"><span className="text-gray-400">ชื่อสินค้า</span><span className="font-medium">{name}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">ราคา</span><span className="font-medium">฿{price}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">จำนวน</span><span className="font-medium">{stock}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">หมวดหมู่</span><span className="font-medium">{category}</span></div>
-                {expiryDate && <div className="flex justify-between"><span className="text-gray-400">วันปิดรับ</span><span className="font-medium">{expiryDate}</span></div>}
+            <div className="field">
+              <label htmlFor="pd-cat">หมวดหมู่ <span className="req">*</span></label>
+              <div className="control">
+                <select id="pd-cat" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="BREAD">ขนมปัง</option>
+                  <option value="CAKE">เค้ก</option>
+                  <option value="DRINK">เครื่องดื่ม</option>
+                  <option value="COOKIE">คุกกี้</option>
+                </select>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => setShowPreviewOfAddProduct(false)}
-                  className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
-                  แก้ไข
-                </button>
-                <button onClick={handleAddProduct}
-                  className="flex-1 py-2.5 text-sm font-medium text-white bg-[#0F2235] hover:bg-[#1a3a5c] rounded-xl transition flex items-center justify-center gap-2">
-                  <FiCheck size={16} /> ยืนยัน
-                </button>
+            </div>
+            <div className="field">
+              <label htmlFor="pd-price">ราคา <span className="req">*</span></label>
+              <div className="control"><span>฿</span>
+                <input id="pd-price" type="number" min="0" inputMode="decimal" value={price} placeholder="0"
+                  onChange={(e) => { const v = Number(e.target.value); if (v >= 0) setPrice(v); }} />
               </div>
+            </div>
+            <div className="field">
+              <label htmlFor="pd-stock">จำนวนคงเหลือ <span className="req">*</span></label>
+              <div className="control">
+                <input id="pd-stock" type="number" min="0" inputMode="numeric" value={stock} placeholder="0"
+                  onChange={(e) => { const v = Number(e.target.value); if (v >= 0) setStock(v); }} />
+                <span style={{ whiteSpace: 'nowrap' }}>ชิ้น</span>
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="pd-exp">วันปิดรับออเดอร์</label>
+              <div className="control"><input id="pd-exp" type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} /></div>
+              <span className="hint">เว้นว่างไว้ถ้าขายตลอด</span>
+            </div>
+            <div />
+            <div className="field span-2">
+              <label>รูปสินค้า</label>
+              <div className="upload" role="button" tabIndex={0} style={{ cursor: 'pointer', ...(imagePreviewUrl ? {} : { justifyContent: 'center', flexDirection: 'column', padding: 28, textAlign: 'center' }) }}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), fileInputRef.current?.click())}>
+                {imagePreviewUrl ? (
+                  <>
+                    <img src={imagePreviewUrl} alt="preview" />
+                    <div>
+                      <b style={{ color: 'var(--ink)', fontWeight: 600 }}>เปลี่ยนรูปภาพ</b>
+                      <div className="hint">คลิกเพื่อเลือกรูปใหม่</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="ic" style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--surface)', display: 'grid', placeItems: 'center' }}><Icon name="upload" /></span>
+                    <div><b style={{ color: 'var(--ink)', fontWeight: 600 }}>คลิกเพื่ออัปโหลดรูป</b><div className="hint">แนะนำภาพสี่เหลี่ยมจัตุรัส · ปรับครอปได้หลังเลือกรูป</div></div>
+                  </>
+                )}
+              </div>
+              <input type="file" ref={fileInputRef} onChange={handleImageChange} hidden accept="image/*" />
+            </div>
+            <div className="field span-2">
+              <label htmlFor="pd-desc">รายละเอียด</label>
+              <textarea id="pd-desc" className="control" value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="รสชาติ ส่วนผสม หรือข้อควรรู้" />
+            </div>
+          </form>
+        </section>
+        <aside style={{ position: 'sticky', top: 88 }}>
+          <section className="card pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button className="btn btn-primary btn-block" onClick={() => setShowPreviewOfAddProduct(true)} disabled={!name || !price || !stock}>เพิ่มสินค้า</button>
+            <button className="btn btn-outline btn-block" onClick={() => router.push("/admin/products")}>ยกเลิก</button>
+          </section>
+        </aside>
+      </div>
+
+      {showPreviewOfAddProduct && (
+        <div className="modal-scrim" onClick={() => setShowPreviewOfAddProduct(false)}>
+          <div className="modal" role="dialog" aria-label="ยืนยันการเพิ่มสินค้า" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>ยืนยันการเพิ่มสินค้า</h2>
+              <button className="icon-btn" aria-label="ปิด" onClick={() => setShowPreviewOfAddProduct(false)}><Icon name="x" /></button>
+            </div>
+            <div className="modal-body">
+              {imageFile && <img src={URL.createObjectURL(imageFile)} alt="preview" style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: "var(--r-md)", marginBottom: 16 }} />}
+              <div className="rows">
+                <div className="r"><span className="muted">ชื่อสินค้า</span><b style={{ fontWeight: 600 }}>{name}</b></div>
+                <div className="r"><span className="muted">ราคา</span><span className="num">฿{price}</span></div>
+                <div className="r"><span className="muted">จำนวน</span><span className="num">{stock}</span></div>
+                <div className="r"><span className="muted">หมวดหมู่</span><span>{CATEGORY_LABEL[category] ?? category}</span></div>
+                {expiryDate && <div className="r"><span className="muted">วันปิดรับ</span><span>{expiryDate}</span></div>}
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowPreviewOfAddProduct(false)}>แก้ไข</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAddProduct}><Icon name="check" size="sm" />ยืนยัน</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Crop */}
       {showCrop && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-[420px] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-[#0F2235] mb-4">ปรับรูปภาพ</h2>
-            <div className="relative w-full h-64 bg-gray-100 rounded-xl overflow-hidden">
-              <Cropper image={imageSrc} crop={crop} zoom={zoom} aspect={1}
-                onCropChange={setCrop} onZoomChange={setZoom}
-                onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)} />
+        <div className="modal-scrim">
+          <div className="modal" role="dialog" aria-label="ปรับรูปภาพ" onClick={e => e.stopPropagation()}>
+            <div className="modal-head"><h2>ปรับรูปภาพ</h2></div>
+            <div className="modal-body">
+              <div style={{ position: 'relative', width: '100%', height: 256, background: 'var(--line)', borderRadius: 'var(--r-md)', overflow: 'hidden' }}>
+                <Cropper image={imageSrc} crop={crop} zoom={zoom} aspect={1}
+                  onCropChange={setCrop} onZoomChange={setZoom}
+                  onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)} />
+              </div>
+              <input type="range" min={1} max={3} step={0.1} value={zoom} aria-label="ซูม"
+                onChange={(e) => setZoom(e.target.value)} style={{ width: '100%', marginTop: 16, accentColor: 'var(--blue)' }} />
             </div>
-            <input type="range" min={1} max={3} step={0.1} value={zoom}
-              onChange={(e) => setZoom(e.target.value)} className="w-full mt-4 accent-[#0F2235]" />
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => { setShowCrop(false); setImageSrc(null); }}
-                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
-                ยกเลิก
-              </button>
-              <button onClick={async () => {
+            <div className="modal-foot">
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowCrop(false); setImageSrc(null); }}>ยกเลิก</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
                 const cropped = await getCroppedImg(imageSrc, croppedAreaPixels);
                 setImageFile(cropped);
                 setImagePreviewUrl(URL.createObjectURL(cropped));
                 setShowCrop(false);
                 setImageSrc(null);
-              }} className="flex-1 py-2.5 text-sm font-medium text-white bg-[#0F2235] hover:bg-[#1a3a5c] rounded-xl transition">
-                ตกลง
-              </button>
+              }}>ตกลง</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+      <style>{`@media(max-width:1100px){.two{grid-template-columns:1fr!important}.two aside{position:static!important}}`}</style>
+    </>
   );
 }

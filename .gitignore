@@ -16,6 +16,14 @@ build/
 # ถ้าไม่ต้องการเอาไฟล์ env ของ docker ขึ้น
 .env.docker
 
+# --- Secrets (ห้ามขึ้น git เด็ดขาด) ---
+.env
+.env.*
+!.env.example
+
+# --- macOS ---
+.DS_Store
+
 # --- IDE Config (เพิ่มเติม) ---
 .idea/
 *.iml

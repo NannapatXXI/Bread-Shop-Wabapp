@@ -18,6 +18,8 @@ import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.promotion.PromotionRequest;
 import com.breadShop.XXI.dto.promotion.PromotionResponse;
 import com.breadShop.XXI.dto.promotion.PromotionValidateResponse;
+
+import jakarta.validation.Valid;
 import com.breadShop.XXI.service.PromotionService;
 
 /**
@@ -52,7 +54,7 @@ public class PromotionController {
      * สร้างโปรโมชั่นใหม่ — ควร ROLE_ADMIN เท่านั้น
      */
     @PostMapping
-    public ResponseEntity<ApiResponse<PromotionResponse>> create(@RequestBody PromotionRequest request) {
+    public ResponseEntity<ApiResponse<PromotionResponse>> create(@Valid @RequestBody PromotionRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("สร้างโปรโมชั่นสำเร็จ", promotionService.create(request)));
     }
 

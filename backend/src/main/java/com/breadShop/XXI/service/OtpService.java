@@ -15,6 +15,8 @@ import com.breadShop.XXI.repository.EmailOtpRepository;
 @Service
 public class OtpService {
 
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final EmailOtpRepository otpRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -37,7 +39,7 @@ public class OtpService {
     public OtpResult generateOtp(String email, String purpose) {
 
         String otp = String.valueOf(
-            100000 + new SecureRandom().nextInt(900000)
+            100000 + RANDOM.nextInt(900000)
         );
 
         EmailOtp entity = new EmailOtp();

@@ -13,7 +13,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-noto-sans-thai)", "var(--font-inter)", "sans-serif"],
+        sans: ["var(--font-anuphan)", "var(--font-noto-sans-thai)", "var(--font-inter)", "sans-serif"],
       },
     },
   },

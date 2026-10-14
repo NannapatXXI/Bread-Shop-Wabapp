@@ -1,13 +1,16 @@
 package com.breadShop.XXI.service;
 
 import java.time.LocalDateTime; // 1. Import เพิ่ม
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -56,13 +59,14 @@ public class GoogleAuthService {
      * สร้าง URL สำหรับให้ผู้ใช้คลิกเพื่อเข้าสู่ระบบด้วย Google
      * @return URL ที่มีพารามิเตอร์ client_id, redirect_uri, response_type, scope และ prompt
      */ 
-    public String getGoogleLoginUrl() {
+    public String getGoogleLoginUrl(String state) {
         return "https://accounts.google.com/o/oauth2/auth?client_id="
-                + clientId
-                + "&redirect_uri=" + redirectUri
-                + "&response_type=code&scope=email%20profile"+
-                "&prompt=select_account" ;
-                
+                + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&response_type=code&scope=email%20profile"
+                + "&prompt=select_account"
+                // state ต้องกลับมาตรงกับ cookie ใน callback — กันคนร้ายส่งลิงก์ callback ที่มี code ของตัวเอง
+                + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8);
     }
 
     /**
@@ -88,17 +92,16 @@ public class GoogleAuthService {
         @SuppressWarnings("unchecked")
         Map<String, Object> tokenResponse = restTemplate.postForObject(tokenUri, params, Map.class);
 
-        String googleAccessToken = (String) tokenResponse.get("access_token");
+        String googleAccessToken = (String) Objects.requireNonNull(tokenResponse, "Google token response is empty").get("access_token");
 
         // 2. ดึงข้อมูล user
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(googleAccessToken);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Map> profileResponse = restTemplate.exchange(userInfoUri, HttpMethod.GET, entity, Map.class);
-
-        Map<String, Object> userInfo = profileResponse.getBody();
-        String email = (String) userInfo.get("email");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> userInfo = restTemplate.exchange(userInfoUri, HttpMethod.GET, entity, Map.class).getBody();
+        String email = (String) Objects.requireNonNull(userInfo, "Google userinfo response is empty").get("email");
 
         // 3. สมัคร user ใหม่ถ้ายังไม่มี หรือดึง user เดิมมา
         User user = userRepository.findByEmail(email)
@@ -124,7 +127,7 @@ public class GoogleAuthService {
         UserDetails userDetails = org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
-                .roles(user.getRole() == null ? "USER" : user.getRole().toUpperCase())
+                .roles(user.getRole().toUpperCase(Locale.ROOT))
                 .build();
 
         // 5. สร้าง access token + refresh token (เหมือน login ปกติ)

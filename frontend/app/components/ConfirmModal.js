@@ -1,49 +1,24 @@
 'use client';
 
+import Icon from './Icon';
+
 export default function ConfirmModal({ title, description, confirmLabel = 'ยืนยัน', cancelLabel = 'ยกเลิก', confirmColor = 'red', onConfirm, onCancel }) {
-  const confirmStyles = {
-    red:  'bg-red-600 hover:bg-red-700 text-white',
-    navy: 'bg-[#0B1F33] hover:bg-[#162d47] text-white',
-  };
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-
-        {/* Icon + Title */}
-        <div className="px-6 pt-6 pb-4 flex flex-col items-center text-center">
+    <div className="modal-scrim">
+      <div className="modal" role="alertdialog" aria-modal="true" aria-label={title}>
+        <div className="modal-body" style={{ textAlign: 'center', paddingTop: 28 }}>
           {confirmColor === 'red' && (
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <div className="empty" style={{ border: 0, padding: 0, background: 'none' }}>
+              <div className="ic" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}><Icon name="alert" /></div>
             </div>
           )}
-          <h3 className="text-base font-semibold text-gray-800">{title}</h3>
-          {description && (
-            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{description}</p>
-          )}
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{title}</h2>
+          {description && <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>{description}</p>}
         </div>
-
-        {/* Divider */}
-        <div className="border-t border-gray-100 mx-6" />
-
-        {/* Actions */}
-        <div className="px-6 py-4 flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${confirmStyles[confirmColor] ?? confirmStyles.navy}`}
-          >
-            {confirmLabel}
-          </button>
+        <div className="modal-foot">
+          <button className="btn btn-outline" style={{ flex: 1 }} onClick={onCancel}>{cancelLabel}</button>
+          <button className={`btn ${confirmColor === 'red' ? 'btn-danger' : 'btn-dark'}`} style={{ flex: 1 }} onClick={onConfirm}>{confirmLabel}</button>
         </div>
-
       </div>
     </div>
   );

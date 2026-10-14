@@ -12,9 +12,12 @@ import toast from 'react-hot-toast';
 import { useCart } from '../../CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { getAddresses, validatePromoCode, createOrder } from '@/services/auth.service';
+import Icon from '../../components/Icon';
+import Spinner from '../../components/Spinner';
+import StatusBadge from '../../components/StatusBadge';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const SHIPPING_FEE = 0; // ฟรีค่าจัดส่งสำหรับตอนนี้
+const SHIPPING_FEE = 0; // แสดงผลเท่านั้น — ค่าส่งจริง server เป็นคนกำหนด (OrderService.SHIPPING_FEE)
 
 export default function CheckoutPage() {
   const router            = useRouter();
@@ -51,7 +54,7 @@ export default function CheckoutPage() {
     if (items.length === 0 && !successOrder) {
       router.replace('/product');
     }
-  }, [items]);
+  }, [items, successOrder, router]);
 
   // ── ตรวจโค้ดส่วนลด ───────────────────────────────────────────
   const handleValidatePromo = async () => {
@@ -95,7 +98,6 @@ export default function CheckoutPage() {
         userId:        user.id,
         addressId:     selectedAddress,
         promotionCode: promoResult?.code ?? null,
-        shippingFee:   SHIPPING_FEE,
         note:          note.trim() || null,
         items: items.map(({ product, quantity }) => ({
           productId: product.id,
@@ -114,310 +116,167 @@ export default function CheckoutPage() {
   };
 
   // ════════════════════════════════════════════════════════════
-  // SUCCESS MODAL
+  // SUCCESS
   // ════════════════════════════════════════════════════════════
   if (successOrder) {
     return (
-      <div className="min-h-screen bg-[#EEF4FB] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
-          {/* Icon */}
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">✅</span>
+      <div style={{ display: 'grid', placeItems: 'center', padding: '48px 0' }}>
+        <div className="card pad" style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
+          <div className="empty" style={{ border: 0, padding: '8px 0 0', background: 'none' }}>
+            <div className="ic" style={{ background: 'var(--green-soft)', color: 'var(--green)', width: 64, height: 64 }}><Icon name="check" /></div>
           </div>
-
-          <h2 className="text-2xl font-bold text-gray-800 mb-1">สั่งซื้อสำเร็จ!</h2>
-          <p className="text-gray-500 text-sm mb-4">ขอบคุณที่ใช้บริการ BreadShop</p>
-
-          {/* Order number */}
-          <div className="bg-[#EEF4FB] rounded-xl p-4 mb-6">
-            <p className="text-xs text-gray-400 mb-1">หมายเลขคำสั่งซื้อ</p>
-            <p className="text-lg font-bold text-[#0B1F33] tracking-wider">{successOrder.orderNo}</p>
+          <h1 style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 600 }}>สั่งซื้อสำเร็จ!</h1>
+          <p className="muted" style={{ margin: '0 0 20px', fontSize: 14 }}>ขอบคุณที่ใช้บริการ BreadShop</p>
+          <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: 16, marginBottom: 20 }}>
+            <div className="faint" style={{ fontSize: 12 }}>หมายเลขคำสั่งซื้อ</div>
+            <b className="mono" style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 18, color: 'var(--blue)' }}>{successOrder.orderNo}</b>
           </div>
-
-          {/* ยอดรวม */}
-          <div className="flex justify-between text-sm text-gray-600 mb-1">
-            <span>ยอดรวมทั้งสิ้น</span>
-            <span className="font-bold text-[#0B1F33]">฿{Number(successOrder.totalAmount).toLocaleString()}</span>
+          <div className="rows" style={{ marginBottom: 24, textAlign: 'left' }}>
+            <div className="r"><span className="muted">ยอดรวมทั้งสิ้น</span><b className="num">฿{Number(successOrder.totalAmount).toLocaleString()}</b></div>
+            <div className="r"><span className="muted">สถานะ</span><StatusBadge status="PENDING" label="รอดำเนินการ" /></div>
           </div>
-          <div className="flex justify-between text-sm text-gray-400 mb-6">
-            <span>สถานะ</span>
-            <span className="text-yellow-600 font-medium">รอดำเนินการ</span>
-          </div>
-
-          {/* ปุ่ม */}
-          <div className="flex gap-3">
-            <Link href="/history" className="flex-1">
-              <button className="w-full py-3 bg-[#0B1F33] text-[#A8CEFF] font-semibold rounded-xl hover:bg-blue-900 transition">
-                ดูประวัติการสั่งซื้อ
-              </button>
-            </Link>
-            <Link href="/product" className="flex-1">
-              <button className="w-full py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition">
-                ซื้อต่อ
-              </button>
-            </Link>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Link href="/history" className="btn btn-primary" style={{ flex: 1 }}>ดูประวัติการสั่งซื้อ</Link>
+            <Link href="/product" className="btn btn-outline" style={{ flex: 1 }}>ซื้อต่อ</Link>
           </div>
         </div>
       </div>
     );
   }
 
+  const canSubmit = !(submitting || addresses.length === 0 || !selectedAddress);
+  const submitLabel = submitting ? <><Spinner size={16} /> กำลังส่งคำสั่งซื้อ...</> : 'ยืนยันคำสั่งซื้อ';
+
   // ════════════════════════════════════════════════════════════
   // CHECKOUT FORM
   // ════════════════════════════════════════════════════════════
   return (
-    <div className="bg-[#EEF4FB] min-h-screen p-6">
-
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-4">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-gray-200 text-gray-500 hover:bg-[#0F2235] hover:text-white hover:border-[#0F2235] transition shadow-sm"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">ยืนยันคำสั่งซื้อ</h1>
-          <p className="text-gray-500 text-sm">ตรวจสอบรายการและเลือกที่อยู่จัดส่ง</p>
+    <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+      <div className="page-head">
+        <div className="back">
+          <button className="icon-btn" onClick={() => router.back()} aria-label="กลับ" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>
+            <Icon name="left" />
+          </button>
+          <div><h1>ยืนยันคำสั่งซื้อ</h1><p>ตรวจสอบรายการและเลือกที่อยู่จัดส่ง</p></div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="co" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
-        {/* ════════════════ LEFT ════════════════ */}
-        <div className="lg:col-span-2 space-y-5">
-
-          {/* ── เลือกที่อยู่ ──────────────────────────────────── */}
-          <section className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="w-6 h-6 bg-[#0B1F33] text-[#A8CEFF] rounded-full text-xs flex items-center justify-center font-bold">1</span>
-              ที่อยู่จัดส่ง
-            </h2>
-
-            {addresses.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-gray-400 mb-3">ยังไม่มีที่อยู่ กรุณาเพิ่มที่อยู่ก่อน</p>
-                <Link href="/profile">
-                  <button className="px-5 py-2 bg-[#0B1F33] text-[#A8CEFF] rounded-lg text-sm font-semibold hover:bg-blue-900 transition">
-                    + เพิ่มที่อยู่ใน Profile
-                  </button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {addresses.map(addr => (
-                  <label
-                    key={addr.id}
-                    className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition
-                      ${selectedAddress === addr.id
-                        ? 'border-[#0B1F33] bg-blue-50'
-                        : 'border-gray-100 hover:border-gray-300'}`}
-                  >
-                    <input
-                      type="radio"
-                      name="address"
-                      value={addr.id}
-                      checked={selectedAddress === addr.id}
-                      onChange={() => setSelectedAddress(addr.id)}
-                      className="mt-1 accent-[#0B1F33]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-semibold text-gray-800">{addr.name}</span>
-                        {addr.isDefault && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                            ค่าเริ่มต้น
-                          </span>
-                        )}
+          <section className="card">
+            <div className="card-head"><h2><span className="step">1</span>ที่อยู่จัดส่ง</h2></div>
+            <div className="pad">
+              {addresses.length === 0 ? (
+                <div className="empty compact">
+                  <div className="ic"><Icon name="pin" /></div>
+                  <h3>ยังไม่มีที่อยู่</h3>
+                  <p>เพิ่มที่อยู่ก่อน แล้วค่อยกลับมายืนยันคำสั่งซื้อ</p>
+                  <Link className="btn btn-outline sm" href="/profile"><Icon name="plus" size="sm" />เพิ่มที่อยู่</Link>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {addresses.map(addr => (
+                    <label key={addr.id} className={`opt${selectedAddress === addr.id ? ' on' : ''}`}>
+                      <input type="radio" name="address" value={addr.id}
+                        checked={selectedAddress === addr.id} onChange={() => setSelectedAddress(addr.id)} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <b style={{ fontWeight: 600 }}>{addr.name}</b>
+                          {addr.isDefault && <span className="badge b-green plain">ค่าเริ่มต้น</span>}
+                        </div>
+                        <div className="muted" style={{ fontSize: 14 }}>{addr.recipientName} · {addr.phone}</div>
+                        <div className="muted" style={{ fontSize: 14 }}>
+                          {addr.address} แขวง{addr.subdistrict} เขต{addr.district} {addr.province} {addr.postcode}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600">{addr.recipientName} · {addr.phone}</p>
-                      <p className="text-sm text-gray-500 mt-0.5 leading-relaxed">
-                        {addr.address} แขวง{addr.subdistrict} เขต{addr.district} {addr.province} {addr.postcode}
-                      </p>
+                    </label>
+                  ))}
+                  <Link className="link" href="/profile" style={{ fontSize: 14, alignSelf: 'flex-start' }}>+ เพิ่ม / แก้ไขที่อยู่</Link>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="card-head"><h2><span className="step">2</span>โค้ดส่วนลด <span className="faint" style={{ fontWeight: 400, fontSize: 14, fontFamily: 'var(--font)' }}>(ถ้ามี)</span></h2></div>
+            <div className="pad">
+              {promoResult ? (
+                <div className="alert-ok" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <div>
+                    <b>{promoResult.name}</b>
+                    <div style={{ fontSize: 13 }}>ลด ฿{Number(promoResult.discountAmount).toLocaleString()}</div>
+                  </div>
+                  <button className="btn btn-ghost sm btn-danger-text" onClick={handleRemovePromo}>ยกเลิก</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div className="control" style={{ flex: 1 }}>
+                      <Icon name="ticket" size="sm" />
+                      <input value={promoCode} placeholder="เช่น BREAD50" aria-label="โค้ดส่วนลด"
+                        onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && handleValidatePromo()} />
                     </div>
-                  </label>
-                ))}
-
-                <Link href="/profile">
-                  <button className="text-sm text-blue-600 hover:underline mt-1">
-                    + เพิ่ม / แก้ไขที่อยู่
-                  </button>
-                </Link>
-              </div>
-            )}
+                    <button className="btn btn-outline" onClick={handleValidatePromo} disabled={!promoCode.trim() || promoLoading}>
+                      {promoLoading ? <Spinner size={16} /> : 'ใช้โค้ด'}
+                    </button>
+                  </div>
+                  {promoError && <p className="alert-error" style={{ margin: '10px 0 0' }}>{promoError}</p>}
+                </>
+              )}
+            </div>
           </section>
 
-          {/* ── โค้ดส่วนลด ────────────────────────────────────── */}
-          <section className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="w-6 h-6 bg-[#0B1F33] text-[#A8CEFF] rounded-full text-xs flex items-center justify-center font-bold">2</span>
-              โค้ดส่วนลด
-              <span className="text-gray-400 text-xs font-normal">(ถ้ามี)</span>
-            </h2>
-
-            {promoResult ? (
-              /* โค้ดใช้ได้แล้ว */
-              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
-                <div>
-                  <p className="font-semibold text-green-700">🎉 {promoResult.name}</p>
-                  <p className="text-sm text-green-600">
-                    ลด ฿{Number(promoResult.discountAmount).toLocaleString()}
-                  </p>
-                </div>
-                <button
-                  onClick={handleRemovePromo}
-                  className="text-red-400 hover:text-red-500 text-sm underline"
-                >
-                  ยกเลิก
-                </button>
-              </div>
-            ) : (
-              /* กรอกโค้ด */
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={promoCode}
-                    onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
-                    onKeyDown={e => e.key === 'Enter' && handleValidatePromo()}
-                    placeholder="ใส่โค้ดส่วนลด เช่น BREAD50"
-                    className="flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33] uppercase"
-                  />
-                  <button
-                    onClick={handleValidatePromo}
-                    disabled={!promoCode.trim() || promoLoading}
-                    className="px-5 py-2.5 bg-[#0B1F33] text-[#A8CEFF] text-sm font-semibold rounded-xl hover:bg-blue-900 disabled:opacity-50 transition"
-                  >
-                    {promoLoading ? '...' : 'ใช้โค้ด'}
-                  </button>
-                </div>
-                {promoError && (
-                  <p className="text-red-500 text-xs">{promoError}</p>
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* ── หมายเหตุ ──────────────────────────────────────── */}
-          <section className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="w-6 h-6 bg-[#0B1F33] text-[#A8CEFF] rounded-full text-xs flex items-center justify-center font-bold">3</span>
-              หมายเหตุ
-              <span className="text-gray-400 text-xs font-normal">(ถ้ามี)</span>
-            </h2>
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="เช่น ขอไม่ใส่ถุง, โทรก่อนส่ง..."
-              rows={3}
-              className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33] resize-none"
-            />
+          <section className="card">
+            <div className="card-head"><h2><span className="step">3</span>หมายเหตุถึงร้าน <span className="faint" style={{ fontWeight: 400, fontSize: 14, fontFamily: 'var(--font)' }}>(ถ้ามี)</span></h2></div>
+            <div className="pad">
+              <textarea className="control" style={{ width: '100%' }} value={note} onChange={e => setNote(e.target.value)}
+                placeholder="เช่น ไม่ใส่ถุง, โทรก่อนส่ง" aria-label="หมายเหตุถึงร้าน" />
+            </div>
           </section>
         </div>
 
-        {/* ════════════════ RIGHT: สรุปคำสั่งซื้อ ════════════ */}
-        <div className="space-y-5">
-
-          {/* รายการสินค้า */}
-          <section className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-bold text-gray-800 mb-4">
-              รายการสินค้า ({items.length} รายการ)
-            </h2>
-
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+        <aside className="card" style={{ position: 'sticky', top: 88 }}>
+          <div className="card-head"><h2>สรุปคำสั่งซื้อ</h2><span className="muted" style={{ fontSize: 14 }}>{items.length} รายการ</span></div>
+          <div className="pad" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 288, overflowY: 'auto' }}>
               {items.map(({ product, quantity }) => (
-                <div key={product.id} className="flex items-center gap-3">
-                  {/* รูป */}
-                  <div className="w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                    {product.imageUrl ? (
-                      <img
-                        src={`${API_URL}/${product.imageUrl}`}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl">🍞</div>
-                    )}
+                <div key={product.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  {product.imageUrl
+                    ? <img className="thumb" src={`${API_URL}/${product.imageUrl}`} alt={product.name} />
+                    : <span className="thumb" />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b style={{ fontWeight: 600 }}>{product.name}</b>
+                    <div className="muted" style={{ fontSize: 13 }}>× {quantity}</div>
                   </div>
-                  {/* ข้อมูล */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{product.name}</p>
-                    <p className="text-xs text-gray-400">x{quantity}</p>
-                  </div>
-                  <span className="text-sm font-bold text-gray-700 flex-shrink-0">
-                    ฿{(product.price * quantity).toLocaleString()}
-                  </span>
+                  <span className="num">฿{(product.price * quantity).toLocaleString()}</span>
                 </div>
               ))}
             </div>
-          </section>
-
-          {/* สรุปยอด */}
-          <section className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-bold text-gray-800 mb-4">สรุปยอด</h2>
-
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-gray-600">
-                <span>ราคาสินค้า</span>
-                <span>฿{cartTotal.toLocaleString()}</span>
-              </div>
-
+            <div className="rows" style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+              <div className="r"><span className="muted">ราคาสินค้า</span><span className="num">฿{cartTotal.toLocaleString()}</span></div>
               {discount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>ส่วนลด ({promoResult?.code})</span>
-                  <span>−฿{discount.toLocaleString()}</span>
-                </div>
+                <div className="r" style={{ color: 'var(--green)' }}><span>ส่วนลด ({promoResult?.code})</span><span className="num">−฿{discount.toLocaleString()}</span></div>
               )}
-
-              <div className="flex justify-between text-gray-600">
-                <span>ค่าจัดส่ง</span>
-                <span className="text-green-600 font-medium">ฟรี</span>
-              </div>
-
-              <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                <span className="font-bold text-gray-800">ยอดรวมทั้งสิ้น</span>
-                <span className="text-xl font-bold text-[#0B1F33]">
-                  ฿{totalAmount.toLocaleString()}
-                </span>
-              </div>
+              <div className="r"><span className="muted">ค่าจัดส่ง</span><span style={{ color: 'var(--green)', fontWeight: 600 }}>ฟรี</span></div>
+              <div className="r total"><span>ยอดรวม</span><b className="num">฿{totalAmount.toLocaleString()}</b></div>
             </div>
-
-            {/* ปุ่ม ยืนยัน */}
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || addresses.length === 0 || !selectedAddress}
-              className="
-                w-full mt-5 py-3.5
-                bg-[#0B1F33] text-[#A8CEFF]
-                font-bold rounded-xl text-base
-                hover:bg-blue-900 transition
-                disabled:opacity-50 disabled:cursor-not-allowed
-                flex items-center justify-center gap-2
-              "
-            >
-              {submitting ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                  </svg>
-                  กำลังส่งคำสั่งซื้อ...
-                </>
-              ) : (
-                '✓ ยืนยันการสั่งซื้อ'
-              )}
-            </button>
-
+            <button className="btn btn-primary btn-block" onClick={handleSubmit} disabled={!canSubmit}>{submitLabel}</button>
             {addresses.length === 0 && (
-              <p className="text-red-400 text-xs text-center mt-2">
-                กรุณาเพิ่มที่อยู่จัดส่งก่อน
+              <p className="hint" style={{ margin: '-6px 0 0', textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+                <Icon name="info" size="sm" />เพิ่มที่อยู่จัดส่งก่อนยืนยัน
               </p>
             )}
-          </section>
-        </div>
+          </div>
+        </aside>
       </div>
+
+      <div className="paybar m-only" style={{ display: 'none' }}>
+        <div><div className="muted" style={{ fontSize: 13 }}>ยอดรวม {items.length} รายการ</div><b className="num">฿{totalAmount.toLocaleString()}</b></div>
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{submitLabel}</button>
+      </div>
+      <style>{`@media(max-width:760px){.paybar{display:flex!important}main.shop{padding-bottom:150px}}@media(max-width:900px){.co{grid-template-columns:1fr!important}.co aside{position:static!important}}`}</style>
     </div>
   );
 }

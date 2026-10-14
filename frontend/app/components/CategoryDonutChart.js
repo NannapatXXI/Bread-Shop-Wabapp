@@ -19,6 +19,14 @@ export default function CategoryDonutChart() {
 
   const total = data.reduce((sum, item) => sum + Number(item.value), 0);
 
+  if (data.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <p className="text-gray-400 text-sm text-center">ใน 30 วันที่ผ่านมาไม่มี order</p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col md:flex-row items-center justify-between">
 
@@ -44,7 +52,7 @@ export default function CategoryDonutChart() {
 
         {/* ตัวเลขตรงกลาง */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h1 className="text-3xl font-bold">100%</h1>
+          <h1 className="text-3xl font-bold">฿{Number(total).toLocaleString('th-TH')}</h1>
           <p className="text-gray-400 text-sm">รวม</p>
         </div>
       </div>

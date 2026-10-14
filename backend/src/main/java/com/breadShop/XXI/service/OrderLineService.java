@@ -28,9 +28,12 @@ public class OrderLineService {
      * @return  List ของ OrderLineResponse ที่เกี่ยวข้องกับ order
      */
     @Transactional(readOnly = true)
-    public List<OrderLineResponse> getByOrderId(Integer orderId) {
-        return orderLineRepository.findByOrderId(orderId)
-                .stream()
+    public List<OrderLineResponse> getByOrderId(Integer orderId, Integer userId) {
+        List<OrderLine> lines = orderLineRepository.findByOrderId(orderId);
+        if (lines.stream().anyMatch(ol -> !isOwnedBy(ol, userId))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
+        }
+        return lines.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -41,11 +44,17 @@ public class OrderLineService {
     * @return OrderLineResponse ที่เกี่ยวข้องกับ order line
     */
     @Transactional(readOnly = true)
-    public OrderLineResponse getById(Integer id) {
+    public OrderLineResponse getById(Integer orderId, Integer id, Integer userId) {
+        // line ต้องอยู่ใน order ตาม path และ order นั้นต้องเป็นของ user — ไม่งั้นตอบ 404
         OrderLine line = orderLineRepository.findById(id)
+                .filter(ol -> ol.getOrder().getId().equals(orderId) && isOwnedBy(ol, userId))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "OrderLine not found"));
         return toResponse(line);
+    }
+
+    private boolean isOwnedBy(OrderLine ol, Integer userId) {
+        return ol.getOrder().getUser().getId().equals(userId);
     }
 
     private OrderLineResponse toResponse(OrderLine ol) {

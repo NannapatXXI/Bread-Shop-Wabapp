@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<ruleset name="BreadShop XXI"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>
+        กฎที่จับบั๊ก/โค้ดค้างได้จริง — ไม่รวมกฎเรื่อง style ล้วน ๆ (ไม่งั้น warning เป็นร้อยที่ไม่สำคัญ)
+    </description>
+
+    <!-- ชุดแนะนำของ PMD (บั๊กที่พบบ่อย + best practices) -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- JUnit rules ใช้กับ test code; เราสแกนเฉพาะ main -->
+        <exclude name="JUnit5TestShouldBePackagePrivate"/>
+        <exclude name="UnitTestContainsTooManyAsserts"/>
+        <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
+        <exclude name="UnitTestShouldIncludeAssert"/>
+        <!-- ใช้ ResponseEntity/Optional ตามแบบ Spring — กฎนี้ noisy -->
+        <exclude name="GuardLogStatement"/>
+        <exclude name="LooseCoupling"/>
+    </rule>
+    <!-- HttpHeaders ของ Spring ต้องใช้ตัว class (setLocation/setBearerAuth ไม่มีใน interface) -->
+    <rule ref="category/java/bestpractices.xml/LooseCoupling">
+        <properties>
+            <property name="allowedTypes" value="java.util.Properties,org.springframework.http.HttpHeaders"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/errorprone.xml">
+        <!-- ข้อความภาษาไทยซ้ำกันใน handler เป็นเรื่องปกติ -->
+        <exclude name="AvoidDuplicateLiterals"/>
+        <!-- JPA entity ต้องมี field แบบ mutable / ไม่มี serialVersionUID ได้ -->
+        <exclude name="MissingSerialVersionUID"/>
+        <exclude name="AvoidFieldNameMatchingMethodName"/>
+        <exclude name="AvoidFieldNameMatchingTypeName"/>
+        <!-- Lombok-free DTO ใช้ null เป็นค่าเริ่มต้นตั้งใจ -->
+        <exclude name="NullAssignment"/>
+        <exclude name="ReturnEmptyCollectionRatherThanNull"/>
+        <exclude name="AvoidLiteralsInIfCondition"/>
+    </rule>
+    <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
+</ruleset>

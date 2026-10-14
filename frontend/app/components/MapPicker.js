@@ -3,7 +3,7 @@
 // [Claude] MapPicker — แผนที่ให้ user ปักหมุดแล้วดึงที่อยู่จาก Nominatim (OpenStreetMap)
 // ไฟล์นี้ต้อง dynamic import { ssr: false } เพราะ Leaflet ใช้ window
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -38,14 +38,12 @@ export default function MapPicker({ onConfirm, onClose }) {
 
   const [markerPos, setMarkerPos]   = useState(null);     // ตำแหน่งที่ปักหมุด
   const [loading, setLoading]       = useState(false);    // กำลัง reverse geocode
-  const [preview, setPreview]       = useState('');       // ที่อยู่ preview ข้างล่างแผนที่
   const [geoResult, setGeoResult]   = useState(null);     // ผลลัพธ์จาก Nominatim
 
   // [Claude] เมื่อ user คลิกบนแผนที่ → ปักหมุด + เรียก Nominatim
   const handleMapClick = async (latlng) => {
     setMarkerPos(latlng);
     setLoading(true);
-    setPreview('กำลังค้นหาที่อยู่...');
     setGeoResult(null);
 
     try {
@@ -77,14 +75,9 @@ export default function MapPicker({ onConfirm, onClose }) {
         postcode: a.postcode || '',
       };
 
-      // log เพื่อ debug ถ้ายังมีปัญหา
-      console.log('[MapPicker] Nominatim address object:', a);
-      console.log('[MapPicker] mapped result:', mapped);
 
       setGeoResult(mapped);
-      setPreview(data.display_name || 'พบที่อยู่แล้ว');
     } catch {
-      setPreview('ไม่สามารถดึงข้อมูลที่อยู่ได้ กรุณาลองใหม่');
     } finally {
       setLoading(false);
     }

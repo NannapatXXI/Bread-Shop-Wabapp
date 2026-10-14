@@ -75,7 +75,7 @@ export const validatePromoCode = (code, amount) =>
 
 // ── Order ────────────────────────────────────────────────────
 /** สร้าง order ใหม่
- *  body: { userId, addressId, promotionCode?, shippingFee, note?, items: [{productId, quantity}] } */
+ *  body: { userId, addressId, promotionCode?, note?, items: [{productId, quantity}] } — ราคา/ส่วนลด/ค่าส่ง server คิดเอง */
 export const createOrder = (data) =>
   api.post(`/api/orders`, data);
 
