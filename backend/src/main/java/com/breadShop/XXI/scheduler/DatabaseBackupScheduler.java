@@ -40,6 +40,23 @@ public class DatabaseBackupScheduler {
     @Value("${DB_PASSWORD:}")
     private String dbPassword;
 
+    /** คำสั่ง mysqldump (ยังไม่รัน) — แยกออกมาให้เทสตรวจได้ว่ารหัสผ่านไม่อยู่ใน argument */
+    ProcessBuilder dumpCommand(String dbName, Path outputFile) {
+        ProcessBuilder pb = new ProcessBuilder(
+            "mysqldump",
+            "-u", dbUsername,
+            "--single-transaction",  // ไม่ lock table ระหว่าง backup
+            "--routines",
+            "--triggers",
+            dbName
+        );
+        // ส่งรหัสผ่าน env ไม่ใช่ "-p<รหัส>" — argument ของ process ใครบนเครื่องก็เห็นได้ด้วย `ps`
+        pb.environment().put("MYSQL_PWD", dbPassword);
+        pb.redirectOutput(outputFile.toFile());
+        pb.redirectErrorStream(false);
+        return pb;
+    }
+
     @Scheduled(cron = "0 0 2 * * *") // ตี 2 ทุกวัน
     public void backup() {
         try {
@@ -52,19 +69,7 @@ public class DatabaseBackupScheduler {
             Files.createDirectories(backupDir);
             Path outputFile = backupDir.resolve(filename);
 
-            ProcessBuilder pb = new ProcessBuilder(
-                "mysqldump",
-                "-u", dbUsername,
-                "-p" + dbPassword,
-                "--single-transaction",  // ไม่ lock table ระหว่าง backup
-                "--routines",
-                "--triggers",
-                dbName
-            );
-            pb.redirectOutput(outputFile.toFile());
-            pb.redirectErrorStream(false);
-
-            Process process = pb.start();
+            Process process = dumpCommand(dbName, outputFile).start();
             int exitCode = process.waitFor();
 
             if (exitCode == 0) {

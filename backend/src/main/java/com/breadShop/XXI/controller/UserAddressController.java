@@ -75,7 +75,7 @@ public class UserAddressController {
             @RequestBody UserAddressRequest request) {
         assertOwner(email, userId);
         return ResponseEntity.ok(ApiResponse.ok("แก้ไขที่อยู่สำเร็จ",
-                userAddressService.updateAddress(addressId, request)));
+                userAddressService.updateAddress(userId, addressId, request)));
     }
 
     @DeleteMapping("/{addressId}")
@@ -84,7 +84,7 @@ public class UserAddressController {
             @PathVariable Integer addressId,
             @AuthenticationPrincipal String email) {
         assertOwner(email, userId);
-        userAddressService.deleteAddress(addressId);
+        userAddressService.deleteAddress(userId, addressId);
         return ResponseEntity.ok(ApiResponse.ok("ลบที่อยู่สำเร็จ"));
     }
 

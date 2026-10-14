@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ข้อยกเว้นที่ตรวจแล้วว่าไม่ใช่ปัญหา — ทุกข้อต้องมีเหตุผล
+  เพิ่มข้อใหม่เมื่อไล่โค้ดแล้วยืนยันได้ว่าเป็น false positive เท่านั้น ห้ามใส่เพื่อให้ build ผ่านเฉย ๆ
+-->
+<FindBugsFilter>
+    <!--
+      EI_EXPOSE_REP / EI_EXPOSE_REP2: เตือนทุกครั้งที่เก็บ/คืน object ที่แก้ไขได้
+      ใน Spring คือ bean ที่ inject ผ่าน constructor และ JPA entity/DTO ทั้งหมด — เป็นรูปแบบปกติของ framework
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      ProcessBuilder ใน backup: argument มาจาก config ของ server (ไม่ใช่ request)
+      และ ProcessBuilder แบบ array ไม่ผ่าน shell — inject คำสั่งเพิ่มไม่ได้
+    -->
+    <Match>
+        <Class name="com.breadShop.XXI.scheduler.DatabaseBackupScheduler"/>
+        <Bug pattern="COMMAND_INJECTION"/>
+    </Match>
+
+    <!--
+      path ของรูปสินค้า: ชื่อไฟล์สร้างจาก UUID + นามสกุลที่อนุญาต และ resolveInside()
+      ยืนยันว่า path อยู่ในโฟลเดอร์ uploads เท่านั้น (มีเทสใน UploadPathsTest)
+    -->
+    <Match>
+        <Or>
+            <Class name="com.breadShop.XXI.config.UploadPaths"/>
+            <Class name="com.breadShop.XXI.service.ProductService"/>
+        </Or>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
+
+    <!--
+      GoogleAuthService: response จาก Google ถูกเช็คด้วย Objects.requireNonNull แล้ว
+      แต่ SpotBugs ไม่เข้าใจว่า requireNonNull กัน null ได้
+    -->
+    <Match>
+        <Class name="com.breadShop.XXI.service.GoogleAuthService"/>
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+    </Match>
+
+    <!--
+      AuditLogService: ค่าที่ log ผ่าน oneLine() ซึ่งแทน CR/LF ด้วย "_" แล้ว
+      FindSecBugs ไม่รู้จัก sanitizer ที่เขียนเอง
+    -->
+    <Match>
+        <Class name="com.breadShop.XXI.service.AuditLogService"/>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+</FindBugsFilter>

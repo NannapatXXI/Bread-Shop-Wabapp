@@ -5,10 +5,12 @@
 
 import { useState, useEffect } from 'react';
 import { useCart } from '../../CartContext';
-import { FaSearch } from 'react-icons/fa';
-import { AiFillProduct } from "react-icons/ai";
 import { getProducts } from "@/services/auth.service";
 import { boyerMooreContains } from "@/lib/boyerMoore"; // [Claude] Boyer-Moore search
+import Icon from '../../components/Icon';
+import ProductCard, { CATEGORY_LABEL } from '../../components/ProductCard';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export default function ProductPage() {
 
@@ -22,19 +24,14 @@ export default function ProductPage() {
   const [categoryFilter, setCategoryFilter] = useState('ALL'); // [Claude] filter หมวดหมู่
 
   useEffect(() => {
-    fetchProducts();
+    getProducts()
+      .then(res => setProducts(res.data))
+      .catch(err => {
+        if (err.response?.status !== 403) {
+          console.error(err);
+        }
+      });
   }, []);
-
-  const fetchProducts = async () => {
-    try {
-      const res = await getProducts();
-      setProducts(res.data);
-    } catch (err) {
-      if (err.response?.status !== 403) {
-        console.error(err);
-      }
-    }
-  };
 
   // [Claude] Boyer-Moore search + category filter
   const filteredProducts = products.filter(p => {
@@ -52,112 +49,40 @@ export default function ProductPage() {
   };
 
   return (
-    <div className="bg-[#EEF4FB] rounded-lg p-6 md:p-8">
-
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Product</h2>
-        <p className="text-gray-500">สินค้าทั้งหมด {filteredProducts.length} รายการ</p>
+    <>
+      <div className="page-head">
+        <div><h1>สินค้าทั้งหมด</h1><p>{filteredProducts.length} รายการ</p></div>
       </div>
-
-      {/* Search + Category Filter */}
-      <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-6 bg-white shadow-md p-2 rounded-lg">
-
-        {/* Category buttons — scroll horizontally on small screens */}
-        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
-          <button
-            onClick={() => handleCategoryChange('ALL')}
-            className={`flex items-center gap-1 px-3 py-2 rounded-md font-semibold whitespace-nowrap text-sm transition-all
-              ${categoryFilter === 'ALL' ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-            <AiFillProduct /> All
-          </button>
-          <span className="text-gray-300 text-lg shrink-0">|</span>
-          {['BREAD', 'CAKE', 'COOKIE', 'DRINK'].map(cat => (
-            <button key={cat}
-              onClick={() => handleCategoryChange(cat)}
-              className={`px-3 py-2 rounded-md font-semibold whitespace-nowrap text-sm transition-all
-                ${categoryFilter === cat ? 'bg-[#0B1F33] text-[#A8CEFF]' : 'text-gray-400 hover:bg-gray-200'}`}>
-              {cat.charAt(0) + cat.slice(1).toLowerCase()}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+        <div className="chips scrollbar-none" role="tablist" style={{ minWidth: 0, maxWidth: '100%' }}>
+          {['ALL', 'BREAD', 'CAKE', 'COOKIE', 'DRINK'].map(cat => (
+            <button key={cat} role="tab" aria-selected={categoryFilter === cat}
+              className={`chip${categoryFilter === cat ? ' on' : ''}`} onClick={() => handleCategoryChange(cat)}>
+              {cat === 'ALL' ? 'ทั้งหมด' : CATEGORY_LABEL[cat]}
             </button>
           ))}
         </div>
+        <label className="search" style={{ background: 'var(--surface)', flex: '0 1 280px' }}>
+          <Icon name="search" size="sm" />
+          <input placeholder="ค้นหาสินค้า" aria-label="ค้นหาสินค้า" value={search} onChange={handleSearchChange} />
+        </label>
+      </div>
 
-        {/* Search Box */}
-        <div className="relative flex-1 min-w-0">
-          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="ค้นหาสินค้า..."
-            value={search}
-            onChange={handleSearchChange}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#E0EBF8]"
-          />
+      {filteredProducts.length === 0 ? (
+        <div className="empty">
+          <div className="ic"><Icon name="box" /></div>
+          <h3>{search ? `ไม่พบสินค้า "${search}"` : 'ยังไม่มีสินค้า'}</h3>
+          <p>{search ? 'ลองค้นหาด้วยคำอื่น' : 'ไม่มีสินค้าในหมวดหมู่นี้'}</p>
         </div>
-      </div>
-
-      {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredProducts.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <div className="text-6xl mb-4 opacity-50">📦</div>
-            <h3 className="text-xl font-semibold text-gray-600">
-              {search ? `ไม่พบสินค้า "${search}"` : 'ยังไม่มีสินค้า'}
-            </h3>
-            <p className="text-gray-400">
-              {search ? 'ลองค้นหาด้วยคำอื่น' : 'ไม่มีสินค้าในหมวดหมู่นี้'}
-            </p>
-          </div>
-        ) : (
-          filteredProducts.map((product) => (
-            <div key={product.id}
-                 className="bg-white rounded-lg shadow border overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-
-              {/* รูปสินค้า — [Claude] เช็ค null ก่อน render ป้องกัน /null error */}
-              <div className="h-48 flex items-center justify-center bg-gray-100">
-                {product.imageUrl
-                  ? <img src={`http://localhost:8080/${product.imageUrl}`} alt={product.name} className="h-full w-full object-cover" />
-                  : <div className="text-gray-300 text-sm">No image</div>
-                }
-              </div>
-
-              <div className="p-4">
-                <h3 className="text-lg font-bold text-gray-800 truncate">{product.name}</h3>
-                <p className="text-sm text-gray-500 h-10 overflow-hidden">{product.description}</p>
-                <div className="border-t border-gray-100 my-2" />
-                <div className="flex justify-between items-center my-3">
-                  <span className="text-2xl font-bold text-blue-600">฿{product.price.toLocaleString()}</span>
-                  <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                    คงเหลือ {product.stock}
-                  </span>
-                </div>
-
-                {(() => {
-                  const inCart  = getCartQty(product.id);
-                  const maxed   = product.stock === 0 || inCart >= product.stock;
-                  return (
-                    <button
-                      onClick={() => !maxed && handleSelectProduct(product)}
-                      disabled={maxed}
-                      className={`w-full px-3 py-2 font-bold rounded-md transition
-                        ${maxed
-                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          : 'bg-[#0B1F33] text-[#A8CEFF] hover:bg-blue-700'}`}
-                    >
-                      {product.stock === 0
-                        ? 'หมดสต็อก'
-                        : inCart >= product.stock
-                          ? 'ครบแล้ว'
-                          : inCart > 0
-                            ? '+ เพิ่ม'
-                            : 'เลือกซื้อ'}
-                    </button>
-                  );
-                })()}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+      ) : (
+        <div className="pgrid">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} showStock
+              imageSrc={`${API_URL}/${product.imageUrl}`}
+              inCart={getCartQty(product.id)} onAdd={handleSelectProduct} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }

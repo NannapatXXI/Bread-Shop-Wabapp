@@ -86,11 +86,9 @@ public class UserAddressService {
      * @return ข้อมูลที่อยู่ที่ถูกอัปเดตในรูปแบบ UserAddressResponse DTO ซึ่งประกอบด้วยข้อมูลต่างๆ 
      */
     @Transactional
-    public UserAddressResponse updateAddress(Integer addressId, UserAddressRequest request) {
+    public UserAddressResponse updateAddress(Integer userId, Integer addressId, UserAddressRequest request) {
 
-        UserAddress address = userAddressRepository.findById(addressId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Address not found"));
+        UserAddress address = findOwnedAddress(userId, addressId);
 
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             unsetCurrentDefault(address.getUser().getId());
@@ -114,10 +112,8 @@ public class UserAddressService {
      * @param addressId ID ของที่อยู่ที่ต้องการลบ
      */
     @Transactional
-    public void deleteAddress(Integer addressId) {
-        UserAddress address = userAddressRepository.findById(addressId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Address not found"));
+    public void deleteAddress(Integer userId, Integer addressId) {
+        UserAddress address = findOwnedAddress(userId, addressId);
         userAddressRepository.delete(address);
     }
 
@@ -129,14 +125,22 @@ public class UserAddressService {
      */
     @Transactional
     public UserAddressResponse setDefault(Integer userId, Integer addressId) {
+        // เช็คก่อน unset — ไม่งั้น address ของคนอื่น/ไม่มีอยู่จะทำให้ default เดิมหายไปฟรี ๆ
+        UserAddress address = findOwnedAddress(userId, addressId);
         unsetCurrentDefault(userId);
-
-        UserAddress address = userAddressRepository.findById(addressId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Address not found"));
 
         address.setIsDefault(true);
         return toResponse(userAddressRepository.save(address));
+    }
+
+    /**
+     * หา address ที่เป็นของ user คนนี้ — ของคนอื่นตอบ 404 เหมือนไม่มีอยู่ (ไม่บอกว่า id นี้มีจริง)
+     */
+    private UserAddress findOwnedAddress(Integer userId, Integer addressId) {
+        return userAddressRepository.findById(addressId)
+                .filter(a -> a.getUser().getId().equals(userId))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Address not found"));
     }
 
     /**

@@ -1,5 +1,5 @@
 // app/layout.js
-import { Inter, Noto_Sans_Thai } from "next/font/google";
+import { Inter, Noto_Sans_Thai, Anuphan, Prompt } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
 
@@ -10,6 +10,8 @@ import { CartProvider } from "./CartContext";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const notoSansThai = Noto_Sans_Thai({ subsets: ["thai"], variable: "--font-noto-sans-thai", weight: ["300", "400", "500", "600", "700"] });
+const anuphan = Anuphan({ subsets: ["thai", "latin"], variable: "--font-anuphan", weight: ["400", "500", "600", "700"] });
+const prompt = Prompt({ subsets: ["thai", "latin"], variable: "--font-prompt", weight: ["500", "600", "700"] });
 
 export const metadata = {
   title: "BreadShop App",
@@ -18,8 +20,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="th">
-      <body className={`${inter.variable} ${notoSansThai.variable} font-sans`}>
+    <html lang="th" className={`${inter.variable} ${notoSansThai.variable} ${anuphan.variable} ${prompt.variable}`}>
+      <body className="font-sans">
         {/* 2. เอา AuthProvider มาครอบเนื้อหาทั้งหมดตรงนี้ */}
         <AuthProvider>
           <CartProvider>

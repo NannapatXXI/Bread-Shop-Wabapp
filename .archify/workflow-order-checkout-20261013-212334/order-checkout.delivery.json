@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "d9c8db2b-d209-4f12-b89a-62ae0a5d6d50",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/nannapat/Breadshop_Project/my-webapp/.archify/workflow-order-checkout-20261013-212334/candidate.json",
+  "output": "/Users/nannapat/Breadshop_Project/my-webapp/.archify/workflow-order-checkout-20261013-212334/order-checkout.html",
+  "specification": {
+    "sha256": "63e25c3fd156c1a9a4ab057fe50f6cb2304c57377e7a06557b03d9ffa2af39f1",
+    "bytes": 7699
+  },
+  "artifact": {
+    "sha256": "2de95be92895d851c82042e93245c4add1fa67e87fd4c34641ccfc64c9f82fcf",
+    "bytes": 773269
+  }
+}

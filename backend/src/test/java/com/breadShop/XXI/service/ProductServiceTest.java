@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -160,5 +161,207 @@ class ProductServiceTest {
         when(productRepository.countByStockGreaterThan(0)).thenReturn(6L);
 
         assertThat(productService.countProductsByStock(0)).isEqualTo(6L);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  createProduct
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("createProduct — สร้างสินค้าใหม่พร้อมอัปโหลดรูปสำเร็จ")
+    void createProduct_shouldSaveProductWithImage() throws Exception {
+        MultipartFile image = mock(MultipartFile.class);
+        when(image.getOriginalFilename()).thenReturn("bread.png");
+
+        com.breadShop.XXI.dto.product.ProductRequest request = new com.breadShop.XXI.dto.product.ProductRequest();
+        request.setName("Bagel");
+        request.setPrice(new BigDecimal("30.00"));
+        request.setStock(5);
+        request.setDescription("อร่อย");
+        request.setCategory(ProductCategory.BREAD);
+        request.setExpiryDate(LocalDate.of(2026, 12, 31));
+        request.setImage(image);
+
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Product result = productService.createProduct(request);
+
+        assertThat(result.getName()).isEqualTo("Bagel");
+        assertThat(result.getImageUrl()).startsWith("uploads/");
+        verify(image).transferTo(any(java.io.File.class));
+        verify(productRepository).save(any(Product.class));
+    }
+
+    private com.breadShop.XXI.dto.product.ProductRequest requestWithImage(MultipartFile image) {
+        com.breadShop.XXI.dto.product.ProductRequest request = new com.breadShop.XXI.dto.product.ProductRequest();
+        request.setName("Bagel");
+        request.setPrice(new BigDecimal("30.00"));
+        request.setStock(5);
+        request.setCategory(ProductCategory.BREAD);
+        request.setImage(image);
+        return request;
+    }
+
+    @Test
+    @DisplayName("createProduct — ชื่อไฟล์บน server สร้างเอง ไม่ใช้ชื่อ (และ path) ที่ client ส่งมา")
+    void createProduct_storesUnderAServerGeneratedName() throws Exception {
+        MultipartFile image = mock(MultipartFile.class);
+        when(image.getOriginalFilename()).thenReturn("../../evil.png");
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Product result = productService.createProduct(requestWithImage(image));
+
+        assertThat(result.getImageUrl()).matches("uploads/[0-9a-f-]{36}\\.png");
+        org.mockito.ArgumentCaptor<java.io.File> dest = org.mockito.ArgumentCaptor.forClass(java.io.File.class);
+        verify(image).transferTo(dest.capture());
+        assertThat(dest.getValue().toPath().getParent()).isEqualTo(com.breadShop.XXI.config.UploadPaths.dir());
+    }
+
+    @Test
+    @DisplayName("createProduct — ไฟล์ที่ไม่ใช่รูป (.html) ถูกปฏิเสธ ไม่บันทึกทั้งไฟล์และสินค้า")
+    void createProduct_rejectsNonImageFiles() throws Exception {
+        MultipartFile page = mock(MultipartFile.class);
+        when(page.getOriginalFilename()).thenReturn("promo.html");
+
+        assertThatThrownBy(() -> productService.createProduct(requestWithImage(page)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("INVALID_IMAGE_TYPE");
+        verify(page, never()).transferTo(any(java.io.File.class));
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createProduct — ไม่มีรูป → สร้างสินค้าได้ (ไม่ crash)")
+    void createProduct_withoutImage_savesWithoutImageUrl() throws Exception {
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Product result = productService.createProduct(requestWithImage(null));
+
+        assertThat(result.getImageUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateProduct — รูปใหม่ผิดชนิด → รูปเดิมยังอยู่ ไม่ถูกลบ")
+    void updateProduct_withInvalidNewImage_keepsTheOldImage() throws Exception {
+        sampleProduct.setImageUrl("uploads/keep.png");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        MultipartFile bad = mock(MultipartFile.class);
+        when(bad.isEmpty()).thenReturn(false);
+        when(bad.getOriginalFilename()).thenReturn("x.svg");
+
+        assertThatThrownBy(() -> productService.updateProduct(1L, requestWithImage(bad)))
+                .hasMessage("INVALID_IMAGE_TYPE");
+        assertThat(sampleProduct.getImageUrl()).isEqualTo("uploads/keep.png");
+        verify(productRepository, never()).save(any());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  updateProduct
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("updateProduct — ไม่พบสินค้า → throw 404")
+    void updateProduct_whenNotFound_shouldThrow404() {
+        when(productRepository.findById(999L)).thenReturn(Optional.empty());
+
+        com.breadShop.XXI.dto.product.ProductRequest request = new com.breadShop.XXI.dto.product.ProductRequest();
+
+        assertThatThrownBy(() -> productService.updateProduct(999L, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Product not found");
+    }
+
+    @Test
+    @DisplayName("updateProduct — ไม่มีรูปใหม่ → อัปเดตข้อมูลอื่นโดยไม่แตะรูป")
+    void updateProduct_withoutNewImage_shouldUpdateFieldsOnly() throws Exception {
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        com.breadShop.XXI.dto.product.ProductRequest request = new com.breadShop.XXI.dto.product.ProductRequest();
+        request.setName("Updated Name");
+        request.setPrice(new BigDecimal("99.00"));
+        request.setStock(3);
+        request.setDescription("desc ใหม่");
+        request.setCategory(ProductCategory.CAKE);
+        request.setExpiryDate(LocalDate.of(2027, 1, 1));
+
+        Product result = productService.updateProduct(1L, request);
+
+        assertThat(result.getName()).isEqualTo("Updated Name");
+        assertThat(result.getCategory()).isEqualTo(ProductCategory.CAKE);
+    }
+
+    @Test
+    @DisplayName("updateProduct — มีรูปใหม่และของเดิมมีรูปอยู่แล้ว → ลบรูปเก่าและบันทึกรูปใหม่")
+    void updateProduct_withNewImage_shouldReplaceImage() throws Exception {
+        sampleProduct.setImageUrl("uploads/old.png");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MultipartFile newImage = mock(MultipartFile.class);
+        when(newImage.isEmpty()).thenReturn(false);
+        when(newImage.getOriginalFilename()).thenReturn("new.png");
+
+        com.breadShop.XXI.dto.product.ProductRequest request = new com.breadShop.XXI.dto.product.ProductRequest();
+        request.setName("Croissant");
+        request.setPrice(new BigDecimal("45.00"));
+        request.setStock(10);
+        request.setDescription("อร่อยมาก");
+        request.setCategory(ProductCategory.BREAD);
+        request.setExpiryDate(LocalDate.of(2026, 12, 31));
+        request.setImage(newImage);
+
+        Product result = productService.updateProduct(1L, request);
+
+        assertThat(result.getImageUrl()).startsWith("uploads/");
+        verify(newImage).transferTo(any(java.io.File.class));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  countProductsByExpiryDate
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("countProductsByExpiryDate — คืนจำนวนสินค้าที่หมดอายุแล้ว")
+    void countProductsByExpiryDate_shouldReturnCount() {
+        when(productRepository.countByExpiryDateBefore(any(LocalDate.class))).thenReturn(4L);
+
+        assertThat(productService.countProductsByExpiryDate()).isEqualTo(4L);
+    }
+
+    @Test
+    @DisplayName("deleteProduct — พบสินค้าที่มีรูปภาพ → ลบรูปภาพและลบสินค้า")
+    void deleteProduct_withImage_shouldDeleteImageAndProduct() {
+        sampleProduct.setImageUrl("uploads/existing.png");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+
+        productService.deleteProduct(1L);
+
+        verify(productRepository).delete(sampleProduct);
+    }
+
+    @Test
+    @DisplayName("updateProduct — request มี image แต่เป็นไฟล์ว่าง → ไม่แตะรูปเดิม")
+    void updateProduct_withEmptyImage_shouldNotReplaceImage() throws Exception {
+        sampleProduct.setImageUrl("uploads/keep.png");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MultipartFile emptyImage = mock(MultipartFile.class);
+        when(emptyImage.isEmpty()).thenReturn(true);
+
+        com.breadShop.XXI.dto.product.ProductRequest request = new com.breadShop.XXI.dto.product.ProductRequest();
+        request.setName("Croissant");
+        request.setPrice(new BigDecimal("45.00"));
+        request.setStock(10);
+        request.setDescription("อร่อยมาก");
+        request.setCategory(ProductCategory.BREAD);
+        request.setExpiryDate(LocalDate.of(2026, 12, 31));
+        request.setImage(emptyImage);
+
+        Product result = productService.updateProduct(1L, request);
+
+        assertThat(result.getImageUrl()).isEqualTo("uploads/keep.png");
+        verify(emptyImage, never()).transferTo(any(java.io.File.class));
     }
 }

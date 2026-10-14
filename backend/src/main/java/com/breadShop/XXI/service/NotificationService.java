@@ -56,8 +56,10 @@ public class NotificationService {
      * @param notificationId รหัสของ Notification ที่ต้องการทำเครื่องหมายว่าอ่านแล้ว
      */ 
     @Transactional
-    public void markAsRead(Integer notificationId) {
-        notificationRepository.findById(notificationId).ifPresent(n -> {
+    public void markAsRead(Integer notificationId, Integer userId) {
+        notificationRepository.findById(notificationId)
+                .filter(n -> n.getUser().getId().equals(userId)) // ของคนอื่นเงียบไว้ ไม่แตะ
+                .ifPresent(n -> {
             n.setRead(true);
             notificationRepository.save(n);
         });

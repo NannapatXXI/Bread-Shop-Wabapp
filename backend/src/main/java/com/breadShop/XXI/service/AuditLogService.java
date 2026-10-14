@@ -37,7 +37,7 @@ public class AuditLogService {
             repo.save(new AuditLog(actor, actorName, actorRole, action,
                                    entityType, entityId, oldValue, newValue, details));
         } catch (Exception e) {
-            log.error("Failed to save AuditLog action={} entity={}/{}", action, entityType, entityId, e);
+            log.error("Failed to save AuditLog action={} entity={}/{}", oneLine(action), oneLine(entityType), oneLine(entityId), e);
         }
     }
 
@@ -66,5 +66,10 @@ public class AuditLogService {
      */
     public long total() {
         return repo.count();
+    }
+
+    /** ตัด CR/LF ออก — ค่าจาก request ใส่ขึ้นบรรทัดใหม่ปลอมเป็น log อีกรายการไม่ได้ */
+    private static String oneLine(String value) {
+        return value == null ? null : value.replaceAll("[\\r\\n]", "_");
     }
 }

@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../CartContext';
 import { getProducts, getMyOrders } from '@/services/auth.service';
+import Icon from '../../components/Icon';
+import ProductCard, { CATEGORY_LABEL } from '../../components/ProductCard';
+import StatusBadge from '../../components/StatusBadge';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -29,6 +33,8 @@ const statusLabel = (status) => {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { addToCart, items } = useCart();
+  const getCartQty = (productId) => items.find(i => i.product.id === productId)?.quantity ?? 0;
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -51,193 +57,126 @@ export default function HomePage() {
   }, [user]);
 
   const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'PROCESSING' || o.status === 'CONFIRMED');
-  const latestOrder = [...orders].reverse()[0];
+
+  const heroImage = products.find(p => p.imageUrl)?.imageUrl;
+  const categories = Object.entries(
+    products.reduce((acc, p) => {
+      if (!p.category) return acc;
+      acc[p.category] ??= { count: 0, imageUrl: null };
+      acc[p.category].count += 1;
+      acc[p.category].imageUrl ??= p.imageUrl || null;
+      return acc;
+    }, {})
+  ).slice(0, 3);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#EEF4FB', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-      {/* Welcome card */}
-      <div style={{ background: '#0B1F33', borderRadius: '14px', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <p style={{ color: '#8ba6ca', fontSize: '12px', margin: '0 0 4px' }}>{getGreeting()}</p>
-          <h2 style={{ color: 'white', fontSize: '18px', fontWeight: 500, margin: '0 0 6px' }}>
-            {user?.username || 'ผู้ใช้'} 👋
-          </h2>
-          {pendingOrders.length > 0 ? (
-            <p style={{ color: '#5a7a9a', fontSize: '13px', margin: 0 }}>
-              มีออเดอร์ที่รอดำเนินการ <span style={{ color: '#A8CEFF', fontWeight: 500 }}>{pendingOrders.length} รายการ</span>
-            </p>
-          ) : (
-            <p style={{ color: '#5a7a9a', fontSize: '13px', margin: 0 }}>ยังไม่มีออเดอร์ที่รอดำเนินการ</p>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ color: 'white', fontSize: '22px', fontWeight: 500, margin: 0 }}>{orders.length}</p>
-            <p style={{ color: '#5a7a9a', fontSize: '11px', margin: '4px 0 0' }}>ออเดอร์ทั้งหมด</p>
-          </div>
-          <div style={{ width: '1px', background: '#1a3a5c' }} />
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#A8CEFF', fontSize: '22px', fontWeight: 500, margin: 0 }}>{pendingOrders.length}</p>
-            <p style={{ color: '#5a7a9a', fontSize: '11px', margin: '4px 0 0' }}>รอดำเนินการ</p>
+    <>
+      <section className="hero" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, margin: '32px 0 40px' }}>
+        <div className="hero-box" style={{ background: 'var(--navy)', color: '#fff', borderRadius: 'var(--r-lg)', padding: heroImage ? '40px 300px 40px 40px' : 40, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 260 }}>
+          {heroImage && <img className="hero-img" src={`${API_URL}/${heroImage}`} alt="" />}
+          <p style={{ color: '#aab6ca', fontSize: 14, margin: '0 0 6px' }}>{getGreeting()}, {user?.username || 'ผู้ใช้'}</p>
+          <h1 style={{ margin: 0, fontSize: 36, lineHeight: 1.25, fontWeight: 600, maxWidth: 540 }}>ขนมอบใหม่ทุกเช้า พร้อมส่งถึงคุณ</h1>
+          <p style={{ margin: '12px 0 24px', color: '#c5cfdd', maxWidth: 460 }}>เลือกเค้ก ขนมปัง และขนมอบที่ทำใหม่ทุกวัน แล้วสั่งให้ส่งถึงบ้าน</p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Link className="btn btn-primary" href="/product">ดูสินค้าทั้งหมด</Link>
+            <Link className="btn btn-ghost-dark" href="/history">ดูออเดอร์ของฉัน</Link>
           </div>
         </div>
-      </div>
+        <aside className="card pad" style={{ display: 'flex', flexDirection: 'column' }} aria-label="สรุปออเดอร์">
+          <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>ออเดอร์ของฉัน</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: 16 }}>
+              <b className="head num" style={{ display: 'block', fontSize: 28, lineHeight: 1.1 }}>{orders.length}</b>
+              <span className="muted" style={{ fontSize: 13 }}>ทั้งหมด</span>
+            </div>
+            <div style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', padding: 16 }}>
+              <b className="head num" style={{ display: 'block', fontSize: 28, lineHeight: 1.1, color: pendingOrders.length > 0 ? 'var(--blue)' : undefined }}>{pendingOrders.length}</b>
+              <span className="muted" style={{ fontSize: 13 }}>รอดำเนินการ</span>
+            </div>
+          </div>
+          <p className="muted" style={{ margin: 'auto 0 0', paddingTop: 16, fontSize: 13 }}>
+            {pendingOrders.length > 0
+              ? <>มีออเดอร์ที่รอดำเนินการ <b style={{ color: 'var(--ink)' }}>{pendingOrders.length} รายการ</b></>
+              : 'ยังไม่มีออเดอร์ที่รอดำเนินการ'}
+          </p>
+        </aside>
+      </section>
 
-      {/* Latest order alert */}
-      {latestOrder && (
-        <div style={{ background: 'white', borderRadius: '12px', border: '0.5px solid #dce8f0', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* รูปสินค้าแรกในออเดอร์ */}
-          <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#EEF4FB' }}>
-            {latestOrder.orderLines?.[0]?.productImageUrl ? (
-              <img
-                src={`${API_URL}/${latestOrder.orderLines[0].productImageUrl}`}
-                alt={latestOrder.orderLines[0].productName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '20px' }}>🍞</span>
-              </div>
-            )}
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '13px', fontWeight: 500, color: '#0B1F33', margin: '0 0 2px' }}>
-              {latestOrder.orderNo} · {statusLabel(latestOrder.status).label}
-            </p>
-            <p style={{ fontSize: '12px', color: '#8ba6ca', margin: 0 }}>
-              {latestOrder.orderLines?.map(l => l.productName).join(', ')} · ฿{latestOrder.totalAmount}
-            </p>
-          </div>
-          <Link href="/history">
-            <span style={{ fontSize: '12px', color: '#378ADD', cursor: 'pointer', whiteSpace: 'nowrap' }}>ดูรายละเอียด →</span>
+      {categories.length > 0 && (
+        <nav className="cats" aria-label="หมวดหมู่">
+          {categories.map(([cat, info]) => (
+            <Link key={cat} className="cat" href="/product">
+              {info.imageUrl ? <img src={`${API_URL}/${info.imageUrl}`} alt="" /> : <span className="ci"><Icon name="tag" /></span>}
+              <span>{CATEGORY_LABEL[cat] ?? cat}<small>{info.count} รายการ</small></span>
+            </Link>
+          ))}
+          <Link className="cat" href="/product">
+            <span className="ci"><Icon name="shop" /></span>
+            <span>ทั้งหมด<small>{products.length} รายการ</small></span>
           </Link>
-        </div>
+        </nav>
       )}
 
-      {/* Products */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#0B1F33', margin: 0 }}>สินค้าแนะนำ</h3>
-          <Link href="/product">
-            <span style={{ fontSize: '12px', color: '#378ADD', cursor: 'pointer' }}>ดูทั้งหมด →</span>
-          </Link>
+      <section aria-labelledby="rec" style={{ marginBottom: 48 }}>
+        <div className="sec-head">
+          <h2 id="rec">สินค้าแนะนำ</h2>
+          <Link className="link" href="/product" style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 14 }}>ดูทั้งหมด <Icon name="right" size="sm" /></Link>
         </div>
-
-        {loadingProducts ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '0.5px solid #dce8f0' }}>
-                <div style={{ height: '100px', background: '#e8f0f8' }} className="animate-pulse" />
-                <div style={{ padding: '8px 10px' }}>
-                  <div style={{ height: '12px', background: '#e8f0f8', borderRadius: '4px', marginBottom: '8px', width: '70%' }} className="animate-pulse" />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ height: '12px', background: '#e8f0f8', borderRadius: '4px', width: '35%' }} className="animate-pulse" />
-                    <div style={{ height: '22px', width: '44px', background: '#e8f0f8', borderRadius: '5px' }} className="animate-pulse" />
-                  </div>
-                </div>
-              </div>
+        <div className="pgrid" style={{ marginTop: 20 }}>
+          {loadingProducts
+            ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i}><div className="sk" style={{ aspectRatio: '1/1', borderRadius: 'var(--r-md)' }} /><div className="sk" style={{ height: 14, width: '60%', marginTop: 12 }} /></div>
+            ))
+            : products.slice(0, 4).map(product => (
+              <ProductCard key={product.id} product={product} imageSrc={`${API_URL}/${product.imageUrl}`}
+                inCart={getCartQty(product.id)} onAdd={addToCart} />
             ))}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-            {products.slice(0, 4).map(product => (
-              <div key={product.id} style={{ background: 'white', borderRadius: '10px', overflow: 'hidden', border: '0.5px solid #dce8f0' }}>
-                <div style={{ height: '100px', background: '#f0f4f8', overflow: 'hidden', position: 'relative' }}>
-                  {product.imageUrl ? (
-                    <img src={`${API_URL}/${product.imageUrl}`} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '32px' }}>🍞</span>
-                    </div>
-                  )}
-                  {product.stock === 0 && (
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ color: 'white', fontSize: '11px', fontWeight: 500 }}>หมดแล้ว</span>
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: '8px 10px' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 500, color: '#0B1F33', margin: '0 0 6px' }}>{product.name}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#0B1F33' }}>฿{product.price}</span>
-                    <button
-                      disabled={product.stock === 0}
-                      style={{ background: product.stock === 0 ? '#e2e8f0' : '#0B1F33', border: 'none', color: product.stock === 0 ? '#94a3b8' : '#A8CEFF', padding: '3px 8px', borderRadius: '5px', fontSize: '11px', cursor: product.stock === 0 ? 'not-allowed' : 'pointer' }}
-                    >
-                      + เพิ่ม
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Recent orders */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#0B1F33', margin: 0 }}>ออเดอร์ล่าสุด</h3>
-          <Link href="/history">
-            <span style={{ fontSize: '12px', color: '#378ADD', cursor: 'pointer' }}>ดูทั้งหมด →</span>
-          </Link>
         </div>
+      </section>
 
+      <section aria-labelledby="recent">
+        <div className="sec-head">
+          <h2 id="recent">ออเดอร์ล่าสุด</h2>
+          <Link className="link" href="/history" style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 14 }}>ดูประวัติทั้งหมด <Icon name="right" size="sm" /></Link>
+        </div>
         {loadingOrders ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="animate-pulse" style={{ background: 'white', borderRadius: '10px', border: '0.5px solid #dce8f0', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#e8f0f8', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ height: '12px', background: '#e8f0f8', borderRadius: '4px', width: '40%', marginBottom: '6px' }} />
-                  <div style={{ height: '11px', background: '#e8f0f8', borderRadius: '4px', width: '60%' }} />
-                </div>
-                <div style={{ height: '22px', width: '64px', background: '#e8f0f8', borderRadius: '12px' }} />
-              </div>
-            ))}
+          <div className="card pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {Array.from({ length: 2 }).map((_, i) => <div key={i} className="sk" style={{ height: 44 }} />)}
           </div>
         ) : orders.length === 0 ? (
-          <div style={{ background: 'white', borderRadius: '10px', border: '0.5px solid #dce8f0', padding: '2rem', textAlign: 'center' }}>
-            <p style={{ color: '#8ba6ca', fontSize: '13px', margin: 0 }}>ยังไม่มีออเดอร์</p>
+          <div className="empty">
+            <div className="ic"><Icon name="receipt" /></div>
+            <h3>ยังไม่มีออเดอร์</h3>
+            <p>สั่งครั้งแรกแล้ว ออเดอร์จะแสดงที่นี่พร้อมสถานะ</p>
+            <Link className="btn btn-outline" href="/product">เริ่มเลือกสินค้า</Link>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[...orders].reverse().slice(0, 3).map(order => {
+          <div className="card">
+            {[...orders].reverse().slice(0, 3).map((order, idx) => {
               const s = statusLabel(order.status);
+              const first = order.orderLines?.[0];
               return (
-                <div key={order.id} style={{ background: 'white', borderRadius: '10px', border: '0.5px solid #dce8f0', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {/* รูปสินค้าแรกในออเดอร์ */}
-                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#EEF4FB' }}>
-                    {order.orderLines?.[0]?.productImageUrl ? (
-                      <img
-                        src={`${API_URL}/${order.orderLines[0].productImageUrl}`}
-                        alt={order.orderLines[0].productName}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '18px' }}>🍞</span>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#0B1F33', margin: '0 0 2px' }}>{order.orderNo}</p>
-                    <p style={{ fontSize: '11px', color: '#8ba6ca', margin: 0 }}>
+                <Link key={order.id} href="/history" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderTop: idx ? '1px solid var(--line)' : 0 }}>
+                  {first?.productImageUrl
+                    ? <img className="thumb" src={`${API_URL}/${first.productImageUrl}`} alt={first.productName} />
+                    : <span className="thumb" />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="mono" style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, color: 'var(--blue)', fontWeight: 500 }}>{order.orderNo}</span>
+                    <div className="muted" style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {order.orderLines?.map(l => l.productName).join(', ')} · {order.orderLines?.length} รายการ
-                    </p>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#0B1F33', margin: '0 0 4px' }}>฿{order.totalAmount}</p>
-                    <span style={{ fontSize: '11px', background: s.bg, color: s.color, padding: '2px 8px', borderRadius: '20px' }}>{s.label}</span>
+                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <b className="head num">฿{order.totalAmount}</b>
+                    <StatusBadge status={order.status} label={s.label} />
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
         )}
-      </div>
-
-    </div>
+      </section>
+      <style>{`@media(max-width:1024px){.hero{grid-template-columns:1fr!important}}`}</style>
+    </>
   );
 }

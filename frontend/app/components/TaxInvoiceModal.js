@@ -29,14 +29,6 @@ function buildPrintHtml(order) {
       <td style="padding:9px 12px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6">฿${fmt(line.totalPrice)}</td>
     </tr>`).join('');
 
-  const discountRow = discount > 0 ? `
-    <tr>
-      <td colspan="3" style="padding:4px 0;text-align:right;color:#16a34a;font-size:13px">
-        ส่วนลด${order.promotionCode ? ` (${order.promotionCode})` : ''}
-      </td>
-      <td style="padding:4px 0;text-align:right;color:#16a34a;font-size:13px;padding-left:24px">-฿${fmt(discount)}</td>
-    </tr>` : '';
-
   return `<!DOCTYPE html>
 <html lang="th">
 <head>

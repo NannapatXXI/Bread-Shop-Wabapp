@@ -1,5 +1,6 @@
 package com.breadShop.XXI.service;
 
+import java.util.Locale;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,8 +70,8 @@ public class SystemLogService {
                 .filter(e -> e != null)
                 .filter(e -> level == null || level.isBlank() || e.level().equalsIgnoreCase(level))
                 .filter(e -> keyword == null || keyword.isBlank()
-                          || e.message().toLowerCase().contains(keyword.toLowerCase())
-                          || e.logger().toLowerCase().contains(keyword.toLowerCase()))
+                          || e.message().toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT))
+                          || e.logger().toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT)))
                 .collect(Collectors.toCollection(ArrayList::new));
 
             Collections.reverse(all);   // newest first
@@ -134,10 +135,11 @@ public class SystemLogService {
                      String hour   = entry.timestamp().substring(11, 13) + ":00";
                      long[] counts = slots.get(hour);
                      if (counts == null) return;
-                     switch (entry.level().toUpperCase()) {
+                     switch (entry.level().toUpperCase(Locale.ROOT)) {
                          case "INFO"  -> counts[0]++;
                          case "WARN"  -> counts[1]++;
                          case "ERROR" -> counts[2]++;
+                         default      -> { /* DEBUG/TRACE ไม่นับในกราฟ */ }
                      }
                  });
         } catch (IOException ignored) {}

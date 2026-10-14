@@ -1,9 +1,15 @@
 package com.breadShop.XXI.controller;
 
+import org.springframework.web.bind.annotation.CookieValue;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.Map;
 
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,12 +37,12 @@ import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.UserRepository;
 import com.breadShop.XXI.service.AuthService;
 import com.breadShop.XXI.service.GoogleAuthService;
-import com.breadShop.XXI.service.Mailservice;
 import com.breadShop.XXI.service.RefreshTokenService;
 import com.breadShop.XXI.service.UserActivityLogService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 
 /**
  * [Claude] AuthController — Authentication & Authorization
@@ -53,24 +59,28 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
+    private static final String OAUTH_STATE_COOKIE = "oauth_state";
+    private static final int OAUTH_STATE_MAX_AGE = 10 * 60; // ต้องกลับจาก Google ภายใน 10 นาที
+    private static final SecureRandom STATE_RANDOM = new SecureRandom();
+
     @Value("${app.secure-cookie:false}")
     private boolean secureCookie;
 
     private final AuthService             authService;
     private final GoogleAuthService       googleAuthService;
     private final UserRepository          userRepository;
-    private final Mailservice             mailservice;
     private final RefreshTokenService     refreshTokenService;
     private final UserActivityLogService  activityLogService;
 
     public AuthController(AuthService authService, GoogleAuthService googleAuthService,
-                          UserRepository userRepository, Mailservice mailservice,
+                          UserRepository userRepository,
                           RefreshTokenService refreshTokenService,
                           UserActivityLogService activityLogService) {
         this.authService        = authService;
         this.googleAuthService  = googleAuthService;
         this.userRepository     = userRepository;
-        this.mailservice        = mailservice;
         this.refreshTokenService = refreshTokenService;
         this.activityLogService = activityLogService;
     }
@@ -127,8 +137,9 @@ public class AuthController {
                     try {
                         RefreshToken rt = refreshTokenService.validate(cookie.getValue());
                         refreshTokenService.revoke(rt);
-                    } catch (Exception e) {
-                        // token หมดอายุหรือไม่มีอยู่ ไม่ต้องทำอะไร
+                    } catch (RuntimeException e) {
+                        // token หมดอายุหรือไม่มีอยู่ — logout ต่อได้ตามปกติ
+                        log.debug("Logout with invalid refresh token: {}", e.getMessage());
                     }
                 }
             }
@@ -166,11 +177,12 @@ public class AuthController {
         var tokens = authService.refreshAccessToken(request);
 
         ResponseCookie accessCookie = ResponseCookie.from("access_token", tokens.accessToken())
-                .httpOnly(true).path("/").maxAge(15 * 60).build();
+                .httpOnly(true).secure(secureCookie).path("/").maxAge(15 * 60).sameSite("Lax").build();
 
         // refresh token ใหม่ (หลัง rotate) — path จำกัดไว้แค่ /api/v1/auth เพื่อ security
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", tokens.refreshToken())
-                .httpOnly(true).path("/api/v1/auth").maxAge(7 * 24 * 60 * 60).build();
+                .httpOnly(true).secure(secureCookie).path("/api/v1/auth")
+                .maxAge(7 * 24 * 60 * 60).sameSite("Lax").build();
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
@@ -317,8 +329,25 @@ public class AuthController {
      */
     @GetMapping("/google")
     public ResponseEntity<ApiResponse<Map<String, String>>> googleLogin() {
-        return ResponseEntity.ok(ApiResponse.ok(
-                Map.of("url", googleAuthService.getGoogleLoginUrl())));
+        // OAuth state: สุ่มใหม่ทุกครั้ง เก็บใน cookie ของ browser นี้ แล้วเทียบตอน callback
+        byte[] random = new byte[32];
+        STATE_RANDOM.nextBytes(random);
+        String state = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, oauthStateCookie(state, OAUTH_STATE_MAX_AGE).toString())
+                .body(ApiResponse.ok(Map.of("url", googleAuthService.getGoogleLoginUrl(state))));
+    }
+
+    private ResponseCookie oauthStateCookie(String value, int maxAgeSeconds) {
+        return ResponseCookie.from(OAUTH_STATE_COOKIE, value)
+                .httpOnly(true).secure(secureCookie).path("/api/v1/auth/google")
+                .maxAge(maxAgeSeconds).sameSite("Lax").build();
+    }
+
+    private static boolean sameState(String expected, String actual) {
+        return expected != null && actual != null && !expected.isEmpty()
+                && MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -327,7 +356,19 @@ public class AuthController {
      * [Claude] endpoint นี้ทำ HTTP 302 redirect จึงไม่ใช้ ApiResponse
      */
     @GetMapping("/google/callback")
-    public ResponseEntity<?> callback(@RequestParam("code") String code) {
+    public ResponseEntity<?> callback(
+            @RequestParam("code") String code,
+            @RequestParam(name = "state", required = false) String state,
+            @CookieValue(name = OAUTH_STATE_COOKIE, required = false) String expectedState) {
+
+        String clearState = oauthStateCookie("", 0).toString();
+        if (!sameState(expectedState, state)) {
+            // ไม่ได้เริ่ม login จาก browser นี้ (หรือลิงก์ถูกปลอม) — ไม่ login ให้
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, clearState)
+                    .body(ApiResponse.error("คำขอเข้าสู่ระบบด้วย Google ไม่ถูกต้อง กรุณาเริ่มใหม่จากหน้า login"));
+        }
+
         try {
             var tokens = googleAuthService.handleGoogleCallback(code);
 
@@ -342,13 +383,16 @@ public class AuthController {
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.SET_COOKIE, accessCookie.toString());
             headers.add(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+            headers.add(HttpHeaders.SET_COOKIE, clearState);
             headers.setLocation(URI.create("http://localhost:3000/home"));
 
             return new ResponseEntity<>(headers, HttpStatus.FOUND);
 
         } catch (Exception e) {
+            // log รายละเอียดไว้ฝั่ง server เท่านั้น — ไม่ส่ง error ภายใน (เช่น client secret ผิด) ให้ผู้ใช้เห็น
+            log.error("Google login failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Google Login Error: " + e.getMessage()));
+                    .body(ApiResponse.error("เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่"));
         }
     }
 }

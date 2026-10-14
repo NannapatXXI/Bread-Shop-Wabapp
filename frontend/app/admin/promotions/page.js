@@ -9,6 +9,7 @@ import { adminGetPromotions, adminCreatePromotion, adminTogglePromotion, adminDe
 import { exportCSV } from '@/lib/exportCSV';
 import Spinner from '@/app/components/Spinner';
 import { SkeletonRows } from '@/app/components/Skeleton';
+import Icon from '@/app/components/Icon';
 
 const EMPTY_FORM = {
   code: '', name: '', discountType: 'FIXED',
@@ -79,225 +80,172 @@ export default function AdminPromotionsPage() {
 
   const fmt = (dt) => dt ? new Date(dt).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '-';
 
+  const expiredActive = promos.filter(p => p.isActive && isExpired(p.expiredAt));
+
   return (
-    <div className="bg-[#EEF4FB] min-h-screen p-6">
-
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Promotion Management</h1>
-          <p className="text-gray-500 text-sm">สร้างและจัดการโค้ดส่วนลด</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => exportCSV(
-              promos,
-              ['โค้ด', 'ชื่อ', 'ประเภท', 'ส่วนลด', 'ยอดขั้นต่ำ', 'ใช้ไปแล้ว', 'จำกัดสิทธิ์', 'วันเริ่ม', 'วันหมดอายุ', 'สถานะ'],
-              ['code', 'name', 'discountType', 'discountValue', 'minOrderAmount', 'usedCount', 'usageLimit', 'startedAt', 'expiredAt', 'isActive'],
-              'promotions'
-            )}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 bg-white rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
+    <>
+      <div className="page-head">
+        <div><h1>โปรโมชั่น</h1><p>สร้างและจัดการโค้ดส่วนลด</p></div>
+        <div className="actions">
+          <button className="btn btn-outline" onClick={() => exportCSV(
+            promos,
+            ['โค้ด', 'ชื่อ', 'ประเภท', 'ส่วนลด', 'ยอดขั้นต่ำ', 'ใช้ไปแล้ว', 'จำกัดสิทธิ์', 'วันเริ่ม', 'วันหมดอายุ', 'สถานะ'],
+            ['code', 'name', 'discountType', 'discountValue', 'minOrderAmount', 'usedCount', 'usageLimit', 'startedAt', 'expiredAt', 'isActive'],
+            'promotions'
+          )}>
+            <Icon name="download" size="sm" />Export
           </button>
-          <button onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-[#0B1F33] text-[#A8CEFF] font-semibold rounded-xl hover:bg-blue-900 transition text-sm whitespace-nowrap">
-            + สร้างโปรโมชั่น
-          </button>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size="sm" />สร้างโค้ด</button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        {[
-          { label: 'ทั้งหมด',   value: promos.length,                         color: 'text-gray-800' },
-          { label: 'ใช้งานอยู่', value: promos.filter(p => p.isActive).length, color: 'text-green-600' },
-          { label: 'ปิดใช้งาน', value: promos.filter(p => !p.isActive).length, color: 'text-red-500'   },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm text-center">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+      <div className="stats" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+        <div className="stat"><div className="k">โค้ดทั้งหมด</div><div className="v">{promos.length}</div></div>
+        <div className="stat"><div className="k">ใช้งานอยู่</div><div className="v" style={{ color: 'var(--green)' }}>{promos.filter(p => p.isActive).length}</div></div>
+        <div className="stat"><div className="k">ปิดใช้งาน</div><div className="v">{promos.filter(p => !p.isActive).length}</div></div>
+      </div>
+
+      {expiredActive.length > 0 && (
+        <div role="status" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '14px 16px', borderRadius: 'var(--r-md)', background: 'var(--amber-soft)', color: 'var(--amber)', marginBottom: 16, fontSize: 14 }}>
+          <Icon name="alert" />
+          <div>
+            <b>โค้ด {expiredActive.map(p => p.code).join(', ')} หมดอายุแล้วแต่ยังเปิดอยู่</b>
+            <div style={{ color: 'var(--ink)' }}>ลูกค้าจะใช้โค้ดนี้ไม่ได้ ปิดโค้ดได้จากสวิตช์ในตาราง</div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
-        {loading ? (
-          <table className="w-full text-sm min-w-[600px]">
-            <tbody><SkeletonRows rows={6} cols={7} /></tbody>
-          </table>
-        ) : promos.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">ยังไม่มีโปรโมชั่น</div>
-        ) : (
-          <table className="w-full text-sm min-w-[600px]">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <tr>
-                <th className="px-4 py-3 text-left">โค้ด</th>
-                <th className="px-4 py-3 text-left">ชื่อ</th>
-                <th className="px-4 py-3 text-center">ประเภท / ส่วนลด</th>
-                <th className="px-4 py-3 text-center">ใช้ไปแล้ว</th>
-                <th className="px-4 py-3 text-center">วันหมดอายุ</th>
-                <th className="px-4 py-3 text-center">สถานะ</th>
-                <th className="px-4 py-3 text-center">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {promos.map(p => {
-                const expired = isExpired(p.expiredAt);
-                return (
-                <tr key={p.id} className={`hover:bg-gray-50 transition ${expired ? 'bg-red-50/40' : ''}`}>
-                  <td className="px-4 py-3">
-                    <span className={`font-mono font-bold tracking-wide ${expired ? 'text-red-500' : 'text-gray-800'}`}>
-                      {p.code}
-                    </span>
-                    {expired && (
-                      <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">หมดอายุ</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{p.name}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${p.discountType === 'FIXED' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                      {p.discountType === 'FIXED' ? `ลด ฿${Number(p.discountValue).toLocaleString()}` : `ลด ${p.discountValue}%`}
-                    </span>
-                    {p.minOrderAmount && (
-                      <p className="text-xs text-gray-400 mt-0.5">ขั้นต่ำ ฿{Number(p.minOrderAmount).toLocaleString()}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-600">
-                    {p.usedCount}{p.usageLimit ? `/${p.usageLimit}` : ''}
-                  </td>
-                  <td className={`px-4 py-3 text-center ${expired ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
-                    {fmt(p.expiredAt)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button onClick={() => handleToggle(p.id)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                        ${p.isActive ? 'bg-green-500' : 'bg-gray-300'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
-                        ${p.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleDelete(p.id, p.code)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                      title="ลบโปรโมชั่น">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* ── Create Form Modal ─────────────────────────────────── */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto"
-          onClick={e => e.target === e.currentTarget && setShowForm(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-4">
-
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="font-bold text-gray-800 text-lg">สร้างโปรโมชั่นใหม่</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      <section className="card">
+        <div className="table-wrap">
+          {loading ? (
+            <table className="t"><tbody><SkeletonRows rows={6} cols={7} /></tbody></table>
+          ) : promos.length === 0 ? (
+            <div className="empty" style={{ border: 0 }}>
+              <div className="ic"><Icon name="tag" /></div>
+              <h3>ยังไม่มีโปรโมชั่น</h3>
+              <p>สร้างโค้ดส่วนลดแรกให้ลูกค้าใช้ตอนชำระเงิน</p>
+              <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size="sm" />สร้างโค้ด</button>
             </div>
+          ) : (
+            <table className="t">
+              <thead>
+                <tr><th>โค้ด</th><th className="hide-m">ชื่อ</th><th>ส่วนลด</th><th>ใช้ไปแล้ว</th><th>หมดอายุ</th><th>เปิดใช้</th><th></th></tr>
+              </thead>
+              <tbody>
+                {promos.map(p => {
+                  const expired = isExpired(p.expiredAt);
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontWeight: 600, padding: '4px 8px', border: '1px dashed var(--line-2)', borderRadius: 6, color: expired ? 'var(--red)' : undefined }}>
+                          {p.code}
+                        </span>
+                      </td>
+                      <td className="hide-m">{p.name}</td>
+                      <td>
+                        <span className="badge plain b-blue">
+                          {p.discountType === 'FIXED' ? `ลด ฿${Number(p.discountValue).toLocaleString()}` : `ลด ${p.discountValue}%`}
+                        </span>
+                        {p.minOrderAmount && <span className="sub">ขั้นต่ำ ฿{Number(p.minOrderAmount).toLocaleString()}</span>}
+                      </td>
+                      <td>
+                        <div className="num" style={{ fontSize: 14 }}>{p.usedCount}{p.usageLimit ? ` / ${p.usageLimit}` : ''}</div>
+                        {p.usageLimit ? (
+                          <div style={{ height: 6, width: 96, borderRadius: 3, background: 'var(--bg)', marginTop: 4 }}>
+                            <div style={{ width: `${Math.min(100, (p.usedCount / p.usageLimit) * 100)}%`, height: '100%', background: 'var(--blue)', borderRadius: 3 }} />
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <span className="num">{fmt(p.expiredAt)}</span>
+                        {expired && <span className="sub" style={{ color: 'var(--red)' }}>หมดอายุแล้ว</span>}
+                      </td>
+                      <td>
+                        <button className={`switch${p.isActive ? ' on' : ''}`} onClick={() => handleToggle(p.id)}
+                          aria-label={`เปิดใช้โค้ด ${p.code}`} aria-pressed={!!p.isActive} />
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button className="icon-btn sm" onClick={() => handleDelete(p.id, p.code)} aria-label={`ลบโปรโมชั่น ${p.code}`} title="ลบโปรโมชั่น" style={{ color: 'var(--red)' }}>
+                            <Icon name="trash" size="sm" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">โค้ด *</label>
-                  <input required value={form.code}
-                    onChange={e => setForm(f => ({...f, code: e.target.value.toUpperCase()}))}
-                    placeholder="BREAD50" className="w-full border rounded-lg px-3 py-2 text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
+      {showForm && (
+        <div className="modal-scrim" onClick={e => e.target === e.currentTarget && setShowForm(false)}>
+          <div className="modal" role="dialog" aria-label="สร้างโปรโมชั่นใหม่" style={{ maxWidth: 560 }}>
+            <div className="modal-head">
+              <h2>สร้างโปรโมชั่นใหม่</h2>
+              <button className="icon-btn" onClick={() => setShowForm(false)} aria-label="ปิด"><Icon name="x" /></button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body grid-2" style={{ gap: 16 }}>
+                <div className="field">
+                  <label htmlFor="pr-code">โค้ด <span className="req">*</span></label>
+                  <div className="control"><input id="pr-code" required value={form.code} placeholder="BREAD50" style={{ textTransform: 'uppercase', fontFamily: 'ui-monospace,Menlo,monospace' }}
+                    onChange={e => setForm(f => ({...f, code: e.target.value.toUpperCase()}))} /></div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">ชื่อโปรโมชั่น *</label>
-                  <input required value={form.name}
-                    onChange={e => setForm(f => ({...f, name: e.target.value}))}
-                    placeholder="ลด 50 บาท" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
+                <div className="field">
+                  <label htmlFor="pr-name">ชื่อโปรโมชั่น <span className="req">*</span></label>
+                  <div className="control"><input id="pr-name" required value={form.name} placeholder="ลด 50 บาท"
+                    onChange={e => setForm(f => ({...f, name: e.target.value}))} /></div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">ประเภทส่วนลด *</label>
-                  <select value={form.discountType}
-                    onChange={e => setForm(f => ({...f, discountType: e.target.value}))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]">
-                    <option value="FIXED">FIXED — ลดคงที่ (บาท)</option>
-                    <option value="PERCENT">PERCENT — ลดเป็น %</option>
-                  </select>
+                <div className="field">
+                  <label htmlFor="pr-type">ประเภทส่วนลด <span className="req">*</span></label>
+                  <div className="control"><select id="pr-type" value={form.discountType} onChange={e => setForm(f => ({...f, discountType: e.target.value}))}>
+                    <option value="FIXED">ลดคงที่ (บาท)</option>
+                    <option value="PERCENT">ลดเป็น %</option>
+                  </select></div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">
-                    {form.discountType === 'FIXED' ? 'ลดกี่บาท *' : 'ลดกี่ % *'}
-                  </label>
-                  <input required type="number" min="0" value={form.discountValue}
-                    onChange={e => setForm(f => ({...f, discountValue: e.target.value}))}
+                <div className="field">
+                  <label htmlFor="pr-value">{form.discountType === 'FIXED' ? 'ลดกี่บาท' : 'ลดกี่ %'} <span className="req">*</span></label>
+                  <div className="control"><input id="pr-value" required type="number" min="0" value={form.discountValue}
                     placeholder={form.discountType === 'FIXED' ? '50' : '10'}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
+                    onChange={e => setForm(f => ({...f, discountValue: e.target.value}))} /></div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">ยอดขั้นต่ำ (บาท)</label>
-                  <input type="number" min="0" value={form.minOrderAmount}
-                    onChange={e => setForm(f => ({...f, minOrderAmount: e.target.value}))}
-                    placeholder="200 (ไม่บังคับ)" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
+                <div className="field">
+                  <label htmlFor="pr-min">ยอดขั้นต่ำ (บาท)</label>
+                  <div className="control"><input id="pr-min" type="number" min="0" value={form.minOrderAmount} placeholder="ไม่บังคับ"
+                    onChange={e => setForm(f => ({...f, minOrderAmount: e.target.value}))} /></div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">
-                    {form.discountType === 'PERCENT' ? 'ลดสูงสุดไม่เกิน (บาท)' : 'จำนวนสิทธิ์ (ครั้ง)'}
-                  </label>
-                  <input type="number" min="0"
+                <div className="field">
+                  <label htmlFor="pr-extra">{form.discountType === 'PERCENT' ? 'ลดสูงสุดไม่เกิน (บาท)' : 'จำนวนสิทธิ์ (ครั้ง)'}</label>
+                  <div className="control"><input id="pr-extra" type="number" min="0" placeholder="ไม่บังคับ"
                     value={form.discountType === 'PERCENT' ? form.maxDiscount : form.usageLimit}
                     onChange={e => setForm(f => form.discountType === 'PERCENT'
                       ? {...f, maxDiscount: e.target.value}
-                      : {...f, usageLimit: e.target.value})}
-                    placeholder="ไม่บังคับ" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
+                      : {...f, usageLimit: e.target.value})} /></div>
+                </div>
+                <div className="field">
+                  <label htmlFor="pr-start">วันเริ่ม <span className="req">*</span></label>
+                  <div className="control"><input id="pr-start" required type="datetime-local" value={form.startedAt}
+                    onChange={e => setForm(f => ({...f, startedAt: e.target.value}))} /></div>
+                </div>
+                <div className="field">
+                  <label htmlFor="pr-end">วันหมดอายุ <span className="req">*</span></label>
+                  <div className="control"><input id="pr-end" required type="datetime-local" value={form.expiredAt}
+                    onChange={e => setForm(f => ({...f, expiredAt: e.target.value}))} /></div>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">วันเริ่ม *</label>
-                  <input required type="datetime-local" value={form.startedAt}
-                    onChange={e => setForm(f => ({...f, startedAt: e.target.value}))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">วันหมดอายุ *</label>
-                  <input required type="datetime-local" value={form.expiredAt}
-                    onChange={e => setForm(f => ({...f, expiredAt: e.target.value}))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1F33]" />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="flex-1 py-2.5 border rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium">
-                  ยกเลิก
-                </button>
-                <button type="submit" disabled={saving}
-                  className="flex-1 py-2.5 bg-[#0B1F33] text-[#A8CEFF] rounded-xl font-semibold text-sm hover:bg-blue-900 disabled:opacity-50">
-                  {saving
-                    ? <span className="flex items-center justify-center gap-2"><Spinner size={16} color="#A8CEFF" /> กำลังสร้าง...</span>
-                    : 'สร้างโปรโมชั่น'}
+              <div className="modal-foot">
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowForm(false)}>ยกเลิก</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
+                  {saving ? <><Spinner size={16} /> กำลังสร้าง...</> : 'สร้างโปรโมชั่น'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

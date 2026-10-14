@@ -64,15 +64,15 @@ api.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    if (originalRequest.url?.includes("/auth/refresh")) {
-      redirectToLogin();
+    if (originalRequest.url?.includes("/auth/refresh") ||
+        originalRequest.url?.includes("/auth/login")) {
       return Promise.reject(err);
     }
 
     originalRequest._retry = true;
 
     try {
-      await api.post("/api/v1/auth/refresh");
+      await refreshSession();
       return api(originalRequest);
     } catch (e) {
       redirectToLogin();
@@ -80,5 +80,21 @@ api.interceptors.response.use(
     }
   }
 );
+
+/**
+ * refresh token ใช้ได้ครั้งเดียว (backend rotate ทุกครั้ง)
+ * ถ้าหลาย request ได้ 401 พร้อมกัน ต้องรอ refresh รอบเดียวกัน — ไม่งั้นรอบที่สองใช้ cookie เก่า
+ * แล้วได้ 401 ผู้ใช้หลุดไปหน้า login ทั้งที่ยัง login อยู่
+ */
+let refreshInFlight = null;
+
+function refreshSession() {
+  if (!refreshInFlight) {
+    refreshInFlight = api.post("/api/v1/auth/refresh").finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
 
 export default api;

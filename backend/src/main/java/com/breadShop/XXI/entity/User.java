@@ -1,5 +1,6 @@
 package com.breadShop.XXI.entity;
 
+import java.util.Locale;
 import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
@@ -48,7 +49,7 @@ public class User {
     private LocalDateTime lastLoginAt;
 
     @Column(nullable = false)
-    private String role = "USER"; // ค่าเริ่มต้น
+    private String role; // ทุก constructor ตั้งค่าเริ่มต้น "USER"
 
     @Column(nullable = false)
     private boolean isActive = true; // false = banned
@@ -88,7 +89,7 @@ public class User {
     public void setUsername(String username) { this.username = username; }
 
     public String getRole() {
-        return role != null ? role.toUpperCase() : "USER";
+        return role != null ? role.toUpperCase(Locale.ROOT) : "USER";
     }
     
     public void setRole(String role) { this.role = role; }

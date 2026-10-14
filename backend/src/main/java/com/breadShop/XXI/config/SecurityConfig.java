@@ -1,10 +1,13 @@
 package com.breadShop.XXI.config;
 
+import java.util.Locale;
 import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -45,7 +48,7 @@ public class SecurityConfig {
                     return org.springframework.security.core.userdetails.User
                             .withUsername(user.getEmail())
                             .password(user.getPassword())
-                            .roles(user.getRole().toUpperCase())
+                            .roles(user.getRole().toUpperCase(Locale.ROOT))
                             .build();
                 })
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -54,8 +57,7 @@ public class SecurityConfig {
     // Authentication Provider
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService());
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
@@ -96,6 +98,15 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
+            // ไม่ได้ login (ไม่มี/ไม่ผ่าน access token) → 401 เพื่อให้ frontend ลอง /auth/refresh ได้
+            // ส่วน login แล้วแต่ไม่มีสิทธิ์ ยังเป็น 403 ตามค่าเริ่มต้นของ Spring Security
+            .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
+                response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write(
+                    "{\"success\":false,\"message\":\"กรุณาเข้าสู่ระบบ\",\"data\":null}");
+            }))
             .authorizeHttpRequests(auth -> auth
 
             // preflight

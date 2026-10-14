@@ -1,5 +1,7 @@
 package com.breadShop.XXI.scheduler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
 
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,6 +23,8 @@ import com.breadShop.XXI.repository.RefreshTokenRepository;
 @Component
 public class RefreshTokenCleanupJob {
 
+    private static final Logger log = LoggerFactory.getLogger(RefreshTokenCleanupJob.class);
+
     private final RefreshTokenRepository repo;
 
     public RefreshTokenCleanupJob(RefreshTokenRepository repo) {
@@ -41,7 +45,7 @@ public class RefreshTokenCleanupJob {
 
         int total = deletedExpired + deletedRevoked;
         if (total > 0) {
-            System.out.printf("🧹 [RefreshToken Cleanup] ลบ %d rows (expired: %d, revoked: %d)%n",
+            log.info("[RefreshToken Cleanup] ลบ {} rows (expired: {}, revoked: {})",
                 total, deletedExpired, deletedRevoked);
         }
     }

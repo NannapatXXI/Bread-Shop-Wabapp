@@ -3,18 +3,20 @@
 // [Claude] หน้า Profile — แสดง/แก้ไขข้อมูลส่วนตัว และจัดการที่อยู่จัดส่ง
 // รองรับการเลือกที่อยู่จากแผนที่ผ่าน MapPicker (Leaflet + OpenStreetMap)
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/AuthContext';
 import api from '@/lib/api';
 import { sendOTPEmail, verifyOTP, resetPassword } from '@/services/auth.service';
 import Spinner from '@/app/components/Spinner';
+import Icon from '@/app/components/Icon';
+import PasswordField from '@/app/components/PasswordField';
 
 // [Claude] dynamic import เพราะ Leaflet ใช้ window ซึ่งไม่มีใน SSR
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { ssr: false });
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
 
   // ─── ข้อมูลส่วนตัว ────────────────────────────────────────────
   const [editingProfile, setEditingProfile] = useState(false);
@@ -48,22 +50,23 @@ export default function ProfilePage() {
   };
   const [form, setForm] = useState(emptyForm);
 
+  //  ดึงรายการที่อยู่ของ user จาก backend
+  const userId = user?.id;
+  const fetchAddresses = useCallback(async () => {
+    try {
+      const res = await api.get(`/api/users/${userId}/addresses`);
+      setAddresses(res.data);
+    } catch {
+      setAddressMsg('โหลดที่อยู่ไม่สำเร็จ');
+    }
+  }, [userId]);
+
   // ─── โหลดข้อมูลเริ่มต้น ──────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     setUsername(user.username || '');
     fetchAddresses();
-  }, [user]);
-
-  // [Claude] ดึงรายการที่อยู่ของ user จาก backend
-  const fetchAddresses = async () => {
-    try {
-      const res = await api.get(`/api/users/${user.id}/addresses`);
-      setAddresses(res.data);
-    } catch {
-      setAddressMsg('โหลดที่อยู่ไม่สำเร็จ');
-    }
-  };
+  }, [user, fetchAddresses]);
 
   // ─── เปลี่ยนรหัสผ่าน helpers ─────────────────────────────────
   const startCountdown = (sec = 60) => {
@@ -158,7 +161,7 @@ export default function ProfilePage() {
     setShowAddressForm(true);
   };
 
-  // [Claude] เปิดฟอร์มแก้ไขที่อยู่ที่มีอยู่แล้ว
+  // เปิดฟอร์มแก้ไขที่อยู่ที่มีอยู่แล้ว
   const openEditForm = (addr) => {
     setForm({
       name:          addr.name          || '',
@@ -175,7 +178,7 @@ export default function ProfilePage() {
     setShowAddressForm(true);
   };
 
-  // [Claude] รับค่าที่อยู่จาก MapPicker แล้วกรอกลงฟอร์ม
+  // รับค่าที่อยู่จาก MapPicker แล้วกรอกลงฟอร์ม
   // spread โดยตรง ไม่ใช้ || fallback เพื่อให้ค่าที่ map ดึงมา override ฟอร์มเสมอ
   // (name/recipientName/phone ไม่ถูกแตะเพราะ addressData ไม่มี key พวกนั้น)
   const handleMapConfirm = (addressData) => {
@@ -183,7 +186,7 @@ export default function ProfilePage() {
     setShowMap(false);
   };
 
-  // [Claude] บันทึกที่อยู่ — ถ้ามี editingAddressId คือแก้ไข, ไม่มีคือเพิ่มใหม่
+  //  บันทึกที่อยู่ — ถ้ามี editingAddressId คือแก้ไข, ไม่มีคือเพิ่มใหม่
   const handleSaveAddress = async () => {
     try {
       if (editingAddressId) {
@@ -201,7 +204,7 @@ export default function ProfilePage() {
     setTimeout(() => setAddressMsg(''), 3000);
   };
 
-  // [Claude] ลบที่อยู่
+  //  ลบที่อยู่
   const handleDeleteAddress = async (addressId) => {
     if (!confirm('ต้องการลบที่อยู่นี้?')) return;
     try {
@@ -214,7 +217,7 @@ export default function ProfilePage() {
     setTimeout(() => setAddressMsg(''), 3000);
   };
 
-  // [Claude] ตั้ง default ที่อยู่
+  // [ตั้ง default ที่อยู่
   const handleSetDefault = async (addressId) => {
     try {
       await api.put(`/api/users/${user.id}/addresses/${addressId}/default`);
@@ -226,353 +229,208 @@ export default function ProfilePage() {
   };
 
   if (loading) return (
-    <div className="max-w-2xl mx-auto flex flex-col gap-6 animate-pulse">
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-full bg-gray-200" />
-          <div className="flex-1 space-y-2">
-            <div className="h-4 bg-gray-200 rounded w-1/3" />
-            <div className="h-3 bg-gray-200 rounded w-1/2" />
-          </div>
-        </div>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="mb-4">
-            <div className="h-3 bg-gray-200 rounded w-1/4 mb-2" />
-            <div className="h-10 bg-gray-100 rounded-lg" />
-          </div>
-        ))}
+    <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      <div className="page-head"><div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div className="sk" style={{ width: 64, height: 64, borderRadius: '50%' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div className="sk" style={{ height: 20, width: 180 }} /><div className="sk" style={{ height: 14, width: 240 }} /></div>
+      </div></div>
+      <div className="card pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {Array.from({ length: 3 }).map((_, i) => <div key={i} className="sk" style={{ height: 40 }} />)}
       </div>
     </div>
   );
 
+  const textInput = (props) => <div className="control"><input {...props} /></div>;
+
   return (
-    <div className="max-w-2xl mx-auto flex flex-col gap-6">
-
-      {/* ─── ส่วนที่ 1: ข้อมูลส่วนตัว + เปลี่ยนรหัสผ่าน ─── */}
-      <section className="bg-white rounded-2xl shadow-sm p-7">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">ข้อมูลส่วนตัว</h2>
-          {!editingProfile && pwStep === 'idle' && (
-            <button
-              onClick={() => setEditingProfile(true)}
-              className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg transition-colors"
-            >
-              แก้ไข
-            </button>
-          )}
+    <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      <div className="page-head">
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <span className="avatar" style={{ width: 64, height: 64, fontSize: 24 }}>{username.charAt(0).toUpperCase()}</span>
+          <div><h1>{username}</h1><p>{user?.email}</p></div>
         </div>
+      </div>
 
-        {/* ชื่อผู้ใช้ */}
-        <div className="mb-4">
-          <p className="text-xs text-gray-500 mb-1 font-medium">ชื่อผู้ใช้</p>
-          {editingProfile ? (
-            <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          ) : (
-            <p className="text-sm text-gray-800">{username}</p>
-          )}
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* อีเมล */}
-        <div className="mb-4">
-          <p className="text-xs text-gray-500 mb-1 font-medium">อีเมล</p>
-          <p className="text-sm text-gray-800">{user?.email}</p>
-        </div>
-
-        {/* ปุ่มบันทึก/ยกเลิก สำหรับแก้ไขโปรไฟล์ */}
-        {editingProfile && (
-          <div className="flex gap-2 mt-1 mb-4">
-            <button
-              onClick={handleSaveProfile}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition-colors"
-            >
-              บันทึก
-            </button>
-            <button
-              onClick={() => { setEditingProfile(false); setUsername(user?.username || ''); }}
-              className="border border-gray-300 text-gray-600 text-sm px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              ยกเลิก
-            </button>
-          </div>
-        )}
-
-        {profileMsg && <p className="text-sm text-indigo-500 mb-4">{profileMsg}</p>}
-
-        {/* ─── เปลี่ยนรหัสผ่าน (inline) ─── */}
-        <div className="border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between mb-1">
-            <div>
-              <p className="text-xs text-gray-500 font-medium">รหัสผ่าน</p>
-              {pwStep === 'idle' && (
-                <p className="text-xs text-gray-400 mt-0.5">ระบบจะส่ง OTP ไปยัง {user?.email}</p>
-              )}
-            </div>
-            {pwStep === 'idle' && (
-              <button
-                onClick={handleSendOtp}
-                disabled={pwLoading}
-                className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {pwLoading
-                  ? <span className="flex items-center justify-center gap-2"><Spinner size={14} color="currentColor" /> กำลังส่ง...</span>
-                  : 'เปลี่ยนรหัสผ่าน'}
-              </button>
+        {/* ─── ข้อมูลส่วนตัว ─── */}
+        <section className="card">
+          <div className="card-head">
+            <h2>ข้อมูลส่วนตัว</h2>
+            {!editingProfile && pwStep === 'idle' && (
+              <button className="btn btn-outline sm" onClick={() => setEditingProfile(true)}><Icon name="edit" size="sm" />แก้ไข</button>
             )}
           </div>
-
-          {/* ── Step 1: กรอก OTP ── */}
-          {pwStep === 'otp' && (
-            <div className="space-y-3 mt-3">
-              <p className="text-sm text-gray-600">
-                กรอกรหัส OTP 6 หลักที่ส่งไปที่{' '}
-                <span className="font-semibold text-indigo-600">{user?.email}</span>
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text" maxLength={6} value={otpValue}
-                  onChange={e => setOtpValue(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-center tracking-widest font-mono text-lg focus:outline-none focus:border-indigo-400"
-                />
-                <button
-                  onClick={handleVerifyOtp}
-                  disabled={otpValue.length !== 6 || pwLoading}
-                  className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition disabled:opacity-40"
-                >
-                  {pwLoading ? <Spinner size={14} color="white" /> : 'ยืนยัน'}
-                </button>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSendOtp}
-                  disabled={countdown > 0 || pwLoading}
-                  className="text-xs text-indigo-500 hover:underline disabled:text-gray-400 disabled:no-underline"
-                >
-                  {countdown > 0 ? `ส่งซ้ำได้ใน ${countdown}s` : 'ส่ง OTP ใหม่'}
-                </button>
-                <button onClick={cancelPwChange} className="text-xs text-gray-400 hover:text-gray-600">
-                  ยกเลิก
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 2: ตั้งรหัสใหม่ ── */}
-          {pwStep === 'newpass' && (
-            <div className="space-y-3 mt-3">
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">
-                  รหัสผ่านใหม่ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="password" value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="อย่างน้อย 8 ตัวอักษร"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-                />
+          <div className="pad" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="pf-username" className="label muted" style={{ fontWeight: 500, fontSize: 13 }}>ชื่อผู้ใช้</label>
+                {editingProfile
+                  ? textInput({ id: 'pf-username', value: username, onChange: (e) => setUsername(e.target.value) })
+                  : <div>{username}</div>}
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">
-                  ยืนยันรหัสผ่านใหม่ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="password" value={confirmPw}
-                  onChange={e => setConfirmPw(e.target.value)}
-                  placeholder="กรอกรหัสผ่านอีกครั้ง"
-                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none transition
-                    ${confirmPw && confirmPw !== newPassword
-                      ? 'border-red-400 focus:border-red-400'
-                      : 'border-gray-300 focus:border-indigo-400'}`}
-                />
-                {confirmPw && confirmPw !== newPassword && (
-                  <p className="text-xs text-red-500 mt-1">รหัสผ่านไม่ตรงกัน</p>
-                )}
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={handleResetPassword}
-                  disabled={pwLoading || !newPassword || !confirmPw}
-                  className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition disabled:opacity-40"
-                >
-                  {pwLoading
-                    ? <span className="flex items-center justify-center gap-2"><Spinner size={14} color="white" /> กำลังบันทึก...</span>
-                    : 'บันทึกรหัสผ่านใหม่'}
-                </button>
-                <button onClick={cancelPwChange}
-                  className="border border-gray-300 text-gray-600 text-sm px-5 py-2 rounded-lg hover:bg-gray-50 transition">
-                  ยกเลิก
-                </button>
+                <div className="label muted" style={{ fontWeight: 500, fontSize: 13 }}>อีเมล</div>
+                <div style={{ overflowWrap: 'anywhere' }}>{user?.email}</div>
               </div>
             </div>
-          )}
-
-          {/* ข้อความแจ้งเตือน OTP/password */}
-          {pwMsg.text && (
-            <p className={`text-sm mt-3 ${pwMsg.ok ? 'text-indigo-500' : 'text-red-500'}`}>
-              {pwMsg.text}
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* ─── ส่วนที่ 2: ที่อยู่จัดส่ง ─── */}
-      <section className="bg-white rounded-2xl shadow-sm p-7">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">ที่อยู่จัดส่ง</h2>
-          <button
-            onClick={openAddForm}
-            className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg transition-colors"
-          >
-            + เพิ่มที่อยู่
-          </button>
-        </div>
-
-        {addressMsg && <p className="text-sm text-indigo-500 mb-3">{addressMsg}</p>}
-
-        {addresses.length === 0 && !showAddressForm && (
-          <p className="text-sm text-gray-400 text-center py-5">
-            ยังไม่มีที่อยู่ กด &quot;+ เพิ่มที่อยู่&quot; เพื่อเพิ่มเลยครับ
-          </p>
-        )}
-
-        {/* รายการที่อยู่ */}
-        <div className="flex flex-col gap-3">
-          {addresses.map((addr) => (
-            <div
-              key={addr.id}
-              className={`border rounded-xl p-4 transition-colors ${
-                addr.isDefault ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-gray-800 text-sm">{addr.name}</span>
-                {addr.isDefault && (
-                  <span className="bg-indigo-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    default
-                  </span>
-                )}
+            {editingProfile && (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn btn-primary sm" onClick={handleSaveProfile}>บันทึก</button>
+                <button className="btn btn-outline sm" onClick={() => { setEditingProfile(false); setUsername(user?.username || ''); }}>ยกเลิก</button>
               </div>
-              <p className="text-xs text-gray-500">{addr.recipientName} · {addr.phone}</p>
-              <p className="text-xs text-gray-500">
-                {addr.address} {addr.subdistrict} {addr.district} {addr.province} {addr.postcode}
-              </p>
-              <div className="flex gap-3 mt-2">
-                {!addr.isDefault && (
-                  <button
-                    onClick={() => handleSetDefault(addr.id)}
-                    className="text-xs text-indigo-500 hover:underline"
-                  >
-                    ตั้งเป็น default
-                  </button>
-                )}
-                <button
-                  onClick={() => openEditForm(addr)}
-                  className="text-xs text-indigo-500 hover:underline"
-                >
-                  แก้ไข
-                </button>
-                <button
-                  onClick={() => handleDeleteAddress(addr.id)}
-                  className="text-xs text-red-400 hover:underline"
-                >
-                  ลบ
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ─── ฟอร์มเพิ่ม/แก้ไขที่อยู่ ─── */}
-        {showAddressForm && (
-          <div className="mt-5 pt-5 border-t border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-700">
-                {editingAddressId ? 'แก้ไขที่อยู่' : 'เพิ่มที่อยู่ใหม่'}
-              </h3>
-              {/* [Claude] ปุ่มเปิด MapPicker */}
-              <button
-                type="button"
-                onClick={() => setShowMap(true)}
-                className="flex items-center gap-1.5 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-1.5 rounded-lg transition-colors border border-indigo-200"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                เลือกจากแผนที่
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              {[
-                { label: 'ชื่อที่อยู่ (เช่น บ้าน, ที่ทำงาน)', name: 'name' },
-                { label: 'ชื่อผู้รับ',      name: 'recipientName', required: true },
-                { label: 'เบอร์โทรศัพท์',  name: 'phone',          required: true },
-                { label: 'ที่อยู่',          name: 'address' },
-                { label: 'ตำบล / แขวง',    name: 'subdistrict' },
-                { label: 'อำเภอ / เขต',    name: 'district' },
-                { label: 'จังหวัด',         name: 'province' },
-                { label: 'รหัสไปรษณีย์',   name: 'postcode' },
-              ].map(({ label, name, required }) => {
-                const isEmpty = required && !form[name].trim();
-                return (
-                  <div key={name} className="flex flex-col gap-1">
-                    <label className="text-xs text-gray-500 font-medium">
-                      {label}
-                      {required && <span className="text-red-500 ml-0.5">*</span>}
-                    </label>
-                    <input
-                      className={`border rounded-lg px-3 py-2 text-sm focus:outline-none transition
-                        ${isEmpty
-                          ? 'border-red-400 focus:border-red-500 bg-red-50'
-                          : 'border-gray-300 focus:border-indigo-400'}`}
-                      name={name}
-                      value={form[name]}
-                      onChange={handleFormChange}
-                    />
-                    {isEmpty && (
-                      <p className="text-xs text-red-500">กรุณากรอก{label}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-gray-700 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                name="isDefault"
-                checked={form.isDefault}
-                onChange={handleFormChange}
-              />
-              ตั้งเป็นที่อยู่หลัก
-            </label>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleSaveAddress}
-                disabled={!form.recipientName.trim() || !form.phone.trim()}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg transition-colors
-                  disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-500"
-              >
-                บันทึก
-              </button>
-              <button
-                onClick={() => { setShowAddressForm(false); setEditingAddressId(null); }}
-                className="border border-gray-300 text-gray-600 text-sm px-5 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                ยกเลิก
-              </button>
-            </div>
+            )}
+            {profileMsg && <p className={profileMsg.includes('ไม่สำเร็จ') ? 'alert-error' : 'alert-ok'} style={{ margin: 0 }}>{profileMsg}</p>}
           </div>
-        )}
-      </section>
+        </section>
+
+        {/* ─── ความปลอดภัย / เปลี่ยนรหัสผ่าน ─── */}
+        <section className="card">
+          <div className="card-head"><h2>ความปลอดภัย</h2></div>
+          <div className="pad" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <b style={{ fontWeight: 600 }}>รหัสผ่าน</b>
+                {pwStep === 'idle' && <div className="hint">ระบบจะส่ง OTP ไปที่ {user?.email} เพื่อยืนยัน</div>}
+              </div>
+              {pwStep === 'idle' && (
+                <button className="btn btn-outline sm" onClick={handleSendOtp} disabled={pwLoading}>
+                  {pwLoading ? <><Spinner size={14} /> กำลังส่ง...</> : <><Icon name="lock" size="sm" />เปลี่ยนรหัสผ่าน</>}
+                </button>
+              )}
+            </div>
+
+            {pwStep === 'otp' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ margin: 0, fontSize: 14 }}>กรอกรหัส OTP 6 หลักที่ส่งไปที่ <b>{user?.email}</b></p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="control" style={{ flex: 1 }}>
+                    <input type="text" maxLength={6} value={otpValue} inputMode="numeric" aria-label="รหัส OTP"
+                      onChange={e => setOtpValue(e.target.value.replace(/\D/g, ''))} placeholder="000000"
+                      style={{ textAlign: 'center', letterSpacing: '.4em', fontFamily: 'var(--font-head)', fontSize: 18 }} />
+                  </div>
+                  <button className="btn btn-primary" onClick={handleVerifyOtp} disabled={otpValue.length !== 6 || pwLoading}>
+                    {pwLoading ? <Spinner size={16} /> : 'ยืนยัน'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 16, fontSize: 14 }}>
+                  <button className="link" style={{ background: 'none', border: 0, padding: 0, color: countdown > 0 || pwLoading ? 'var(--faint)' : undefined }}
+                    onClick={handleSendOtp} disabled={countdown > 0 || pwLoading}>
+                    {countdown > 0 ? `ส่งซ้ำได้ใน ${countdown}s` : 'ส่ง OTP ใหม่'}
+                  </button>
+                  <button className="muted" style={{ background: 'none', border: 0, padding: 0 }} onClick={cancelPwChange}>ยกเลิก</button>
+                </div>
+              </div>
+            )}
+
+            {pwStep === 'newpass' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <PasswordField id="pf-newpw" label="รหัสผ่านใหม่" placeholder="อย่างน้อย 8 ตัวอักษร"
+                  value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                <PasswordField id="pf-confirmpw" label="ยืนยันรหัสผ่านใหม่" placeholder="กรอกรหัสผ่านอีกครั้ง"
+                  value={confirmPw} onChange={e => setConfirmPw(e.target.value)} />
+                {confirmPw && confirmPw !== newPassword && (
+                  <p style={{ margin: '-6px 0 0', fontSize: 13, color: 'var(--red)' }}>รหัสผ่านไม่ตรงกัน</p>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-primary sm" onClick={handleResetPassword} disabled={pwLoading || !newPassword || !confirmPw}>
+                    {pwLoading ? <><Spinner size={14} /> กำลังบันทึก...</> : 'บันทึกรหัสผ่านใหม่'}
+                  </button>
+                  <button className="btn btn-outline sm" onClick={cancelPwChange}>ยกเลิก</button>
+                </div>
+              </div>
+            )}
+
+            {pwMsg.text && <p className={pwMsg.ok ? 'alert-ok' : 'alert-error'} style={{ margin: 0 }}>{pwMsg.text}</p>}
+          </div>
+        </section>
+
+        {/* ─── ที่อยู่จัดส่ง ─── */}
+        <section className="card">
+          <div className="card-head">
+            <h2>ที่อยู่จัดส่ง</h2>
+            <button className="btn btn-outline sm" onClick={openAddForm}><Icon name="plus" size="sm" />เพิ่มที่อยู่</button>
+          </div>
+          <div className="pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {addressMsg && <p className={addressMsg.includes('ไม่สำเร็จ') ? 'alert-error' : 'alert-ok'} style={{ margin: 0 }}>{addressMsg}</p>}
+
+            {addresses.length === 0 && !showAddressForm && (
+              <div className="empty compact">
+                <div className="ic"><Icon name="pin" /></div>
+                <h3>ยังไม่มีที่อยู่</h3>
+                <p>เพิ่มที่อยู่ไว้ จะได้สั่งขนมได้เร็วขึ้น</p>
+              </div>
+            )}
+
+            {addresses.map((addr) => (
+              <div key={addr.id} className={`opt${addr.isDefault ? ' on' : ''}`} style={{ cursor: 'default', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <b style={{ fontWeight: 600 }}>{addr.name}</b>
+                  {addr.isDefault && <span className="badge b-blue plain">ที่อยู่หลัก</span>}
+                </div>
+                <div className="muted" style={{ fontSize: 14 }}>{addr.recipientName} · {addr.phone}</div>
+                <div className="muted" style={{ fontSize: 14 }}>
+                  {addr.address} {addr.subdistrict} {addr.district} {addr.province} {addr.postcode}
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4, marginLeft: -12 }}>
+                  {!addr.isDefault && (
+                    <button className="btn btn-ghost sm" onClick={() => handleSetDefault(addr.id)}>ตั้งเป็นที่อยู่หลัก</button>
+                  )}
+                  <button className="btn btn-ghost sm" onClick={() => openEditForm(addr)}><Icon name="edit" size="sm" />แก้ไข</button>
+                  <button className="btn btn-ghost sm btn-danger-text" onClick={() => handleDeleteAddress(addr.id)}><Icon name="trash" size="sm" />ลบ</button>
+                </div>
+              </div>
+            ))}
+
+            {showAddressForm && (
+              <div style={{ borderTop: addresses.length ? '1px solid var(--line)' : 0, paddingTop: addresses.length ? 16 : 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{editingAddressId ? 'แก้ไขที่อยู่' : 'เพิ่มที่อยู่ใหม่'}</h3>
+                  <button type="button" className="btn btn-outline sm" onClick={() => setShowMap(true)}><Icon name="pin" size="sm" />เลือกจากแผนที่</button>
+                </div>
+
+                <div className="grid-2">
+                  {[
+                    { label: 'ชื่อที่อยู่ (เช่น บ้าน, ที่ทำงาน)', name: 'name' },
+                    { label: 'ชื่อผู้รับ',      name: 'recipientName', required: true },
+                    { label: 'เบอร์โทรศัพท์',  name: 'phone',          required: true },
+                    { label: 'ที่อยู่',          name: 'address' },
+                    { label: 'ตำบล / แขวง',    name: 'subdistrict' },
+                    { label: 'อำเภอ / เขต',    name: 'district' },
+                    { label: 'จังหวัด',         name: 'province' },
+                    { label: 'รหัสไปรษณีย์',   name: 'postcode' },
+                  ].map(({ label, name, required }) => {
+                    const isEmpty = required && !form[name].trim();
+                    return (
+                      <div key={name} className="field">
+                        <label htmlFor={`addr-${name}`}>{label}{required && <span className="req"> *</span>}</label>
+                        <div className="control" style={isEmpty ? { borderColor: 'var(--red)' } : undefined}>
+                          <input id={`addr-${name}`} name={name} value={form[name]} onChange={handleFormChange} />
+                        </div>
+                        {isEmpty && <span style={{ fontSize: 13, color: 'var(--red)' }}>กรุณากรอก{label}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <label className="check">
+                  <input type="checkbox" name="isDefault" checked={form.isDefault} onChange={handleFormChange} />
+                  ตั้งเป็นที่อยู่หลัก
+                </label>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-primary sm" onClick={handleSaveAddress} disabled={!form.recipientName.trim() || !form.phone.trim()}>บันทึก</button>
+                  <button className="btn btn-outline sm" onClick={() => { setShowAddressForm(false); setEditingAddressId(null); }}>ยกเลิก</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <button className="btn btn-ghost" onClick={logout} style={{ alignSelf: 'flex-start', color: 'var(--red)' }}>
+          <Icon name="logout" size="sm" />ออกจากระบบ
+        </button>
+      </div>
 
       {/* [Claude] MapPicker modal — render เฉพาะเมื่อ showMap=true */}
       {showMap && (

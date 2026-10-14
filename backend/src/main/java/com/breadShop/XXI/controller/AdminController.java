@@ -1,10 +1,14 @@
 package com.breadShop.XXI.controller;
 
+import java.util.Locale;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.customer.CustomerResponse;
@@ -77,7 +82,7 @@ public class AdminController {
      */
     @PostMapping(value = "/add-products", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
-            @ModelAttribute ProductRequest request) throws IOException {
+            @Valid @ModelAttribute ProductRequest request) throws IOException {
 
         Product product = productService.createProduct(request);
         auditLogService.log(currentUser(), "CREATE", "Product",
@@ -115,7 +120,7 @@ public class AdminController {
     @PutMapping(value = "/products/{id}", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable Long id,
-            @ModelAttribute ProductRequest request) throws IOException {
+            @Valid @ModelAttribute ProductRequest request) throws IOException {
 
         Product product = productService.updateProduct(id, request);
         auditLogService.log(currentUser(), "UPDATE", "Product",
@@ -208,10 +213,10 @@ public class AdminController {
             @RequestParam String role) {
 
         var user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ไม่พบผู้ใช้"));
 
-        String normalized = role.toUpperCase();
-        if (!normalized.equals("USER") && !normalized.equals("ADMIN")) {
+        String normalized = role.toUpperCase(Locale.ROOT);
+        if (!"USER".equals(normalized) && !"ADMIN".equals(normalized)) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("role ต้องเป็น USER หรือ ADMIN เท่านั้น"));
         }
@@ -231,7 +236,7 @@ public class AdminController {
     @PatchMapping("/customers/{id}/ban")
     public ResponseEntity<ApiResponse<Void>> toggleBan(@PathVariable Integer id) {
         var user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ไม่พบผู้ใช้"));
         boolean wasBanned = user.isActive();
         user.setActive(!user.isActive());
         userRepository.save(user);
@@ -254,7 +259,7 @@ public class AdminController {
             return ResponseEntity.badRequest().body(ApiResponse.error("username ห้ามว่าง"));
         }
         var user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ไม่พบผู้ใช้"));
         user.setUsername(username.trim());
         userRepository.save(user);
         return ResponseEntity.ok(ApiResponse.ok("อัปเดต username สำเร็จ"));

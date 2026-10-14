@@ -2,83 +2,44 @@
 'use client'; 
 
 import { useEffect ,useState } from 'react'; // 1. Import useEffect
-import { useCart } from '../../CartContext';
 import { useAuth } from '../../context/AuthContext'; 
-import { getMe } from "@/services/auth.service";
-import { MdOutlineAttachMoney } from "react-icons/md";
-import { BiChevronDownSquare,BiGroup,BiMessageSquareX } from "react-icons/bi";
+import Icon from "../../components/Icon";
+import StatusBadge from "../../components/StatusBadge";
 import SalesChart from "../../components/SalesChart";
 import CategoryDonutChart from "../../components/CategoryDonutChart";
 import { getorders } from "@/services/auth.service";
 import api from "@/lib/api"; // [Claude] ใช้ดึง summary และ top products
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
 
 export default function HomePage() {
 
   const router = useRouter();
   const [active, setActive] = useState("A");
-  const { addToCart } = useCart();
-  const { user, loading } = useAuth();
-  const [mail, setMail] = useState("");
+  const { user } = useAuth();
   const [count, setCount] = useState(0);
-  const [categoryFilter, setcategoryFilter] = useState("");
   const [orders, setOrders] = useState([]);
   const [summary, setSummary] = useState(null);       // [Claude] ข้อมูล summary cards
   const [topProducts, setTopProducts] = useState([]); // [Claude] สินค้าขายดี
-  useEffect(() => {
-  
-    const token = localStorage.getItem('token');
-    
-    
-    console.log("=========== DEBUG LOGIN ===========");
-    console.log("Token:", token);      
-    console.log("User:", user);      
-    console.log("Loading:", loading);  
-    console.log("===================================");
-  }, [user, loading]); // ให้ทำงานใหม่เมื่อ user หรือ loading เปลี่ยนแปลง
-
  
+  // โหลดออเดอร์ + summary cards + สินค้าขายดี ครั้งเดียวตอนเปิดหน้า
   useEffect(() => {
-    const savedMail = localStorage.getItem("test_mail");
-    if (savedMail) {
-      setMail(savedMail);
-    }
-    console.log("User ตอน render:", user);
-  }, [user]); // ให้ทำงานใหม่เมื่อ user เปลี่ยนแปลง
+    getorders()
+      .then(res => setOrders(res.data))
+      .catch(err => console.error(err));
 
-  // บันทึกลง localStorage ทุกครั้งที่ mail เปลี่ยน
-  useEffect(() => {
-    fetchOrders();
-    fetchDashboard(); // [Claude] ดึง summary + top products พร้อมกัน
-    localStorage.setItem("test_mail", mail);
-  }, [mail]);
-
-
-
-  
-  const fetchOrders = async () => {
-    try {
-      const res = await getorders();
-      setOrders(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // [Claude] ดึง summary cards และ top products จาก dashboard endpoints
-  const fetchDashboard = async () => {
-    try {
-      const [sumRes, topRes] = await Promise.all([
-        api.get("/api/v1/admin/dashboard/summary"),
-        api.get("/api/v1/admin/dashboard/top-products"),
-      ]);
-      setSummary(sumRes.data);
-      setTopProducts(topRes.data);
-    } catch (err) {
-      console.error("dashboard fetch error", err);
-    }
-  };
+    Promise.all([
+      api.get("/api/v1/admin/dashboard/summary"),
+      api.get("/api/v1/admin/dashboard/top-products"),
+    ])
+      .then(([sumRes, topRes]) => {
+        setSummary(sumRes.data);
+        setTopProducts(topRes.data);
+      })
+      .catch(err => console.error("dashboard fetch error", err));
+  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -127,280 +88,137 @@ export default function HomePage() {
   };
 
 
-  const renderStatus = (status) => {
-   
-    if (status === 'DELIVERED')  return <div className="px-3 py-1 bg-green-100 text-green-700 rounded-md">สำเร็จ</div>
-    if (status === 'PENDING')    return <div className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-md">รอดำเนินการ</div>
-    if (status === 'CONFIRMED')  return <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md">ยืนยันแล้ว</div>
-    if (status === 'PROCESSING') return <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md">กำลังเตรียม</div>
-    if (status === 'SHIPPED')    return <div className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md">จัดส่งแล้ว</div>
-    if (status === 'CANCELLED')  return <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded-md">ยกเลิก</div>
-    if (status === 'REFUNDED')   return <div className="px-3 py-1 bg-red-100 text-red-700 rounded-md">คืนเงิน</div>
+  const STATUS_LABEL = {
+    DELIVERED: 'สำเร็จ', PENDING: 'รอดำเนินการ', CONFIRMED: 'ยืนยันแล้ว', PROCESSING: 'กำลังเตรียม',
+    SHIPPED: 'จัดส่งแล้ว', CANCELLED: 'ยกเลิก', REFUNDED: 'คืนเงิน',
   };
 
-  
+  const change = (pct) => {
+    const v = pct ?? 0;
+    return (
+      <span style={{ color: v >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+        {v >= 0 ? '▲' : '▼'} {Math.abs(v).toFixed(1)}%
+      </span>
+    );
+  };
+
+  const statIcon = (name, soft, color) => (
+    <span style={{ width: 36, height: 36, borderRadius: 10, background: `var(${soft})`, color: `var(${color})`, display: 'grid', placeItems: 'center' }}>
+      <Icon name={name} />
+    </span>
+  );
 
   return (
-    <div className='w-full min-h-screen bg-[#EEF4FB]'>
-        <div className='w-full bg-[#0B1F33] bg-[radial-gradient(circle_at_80%_50%,rgba(58,123,213,0.35),transparent_40%)] rounded-2xl p-6 flex flex-wrap gap-4 justify-between items-center'>
-            {/* Greeting */}
-            <div className='text-white'>
-                <p className='text-sm text-[#8ba6ca] pb-1'>{getGreeting()}</p>
-                <h1 className='text-xl font-bold'>ยินดีต้อนรับกลับมา,{' '}
-                    <span className="text-[#A8CEFF]">{user?.username || "ผู้ใช้"}</span>
-                </h1>
-                <p className='text-sm text-gray-500 mt-1'>วันนี้มีออเดอร์ใหม่ {summary?.todayOrders ?? '...'} รายการ</p>
-            </div>
-
-            {/* Stats */}
-            <div className='flex items-center gap-4 text-white flex-wrap'>
-                <div>
-                    <p className='text-xl font-bold'>฿{summary ? Number(summary.todayRevenue).toLocaleString('th-TH') : '...'}</p>
-                    <p className='text-xs text-gray-400'>ยอดขายวันนี้</p>
-                </div>
-                <div className='text-gray-600 text-xl hidden sm:block'>|</div>
-                <div>
-                    <p className='text-xl font-bold'>{summary?.todayOrders ?? '...'}</p>
-                    <p className='text-xs text-gray-400'>คำสั่งซื้อวันนี้</p>
-                </div>
-                <div className='text-gray-600 text-xl hidden sm:block'>|</div>
-                <div>
-                    <p className='text-xl font-bold'>{summary?.totalCustomers ?? '...'}</p>
-                    <p className='text-xs text-gray-400'>ลูกค้าทั้งหมด</p>
-                </div>
-            </div>
+    <>
+      <div className="page-head">
+        <div>
+          <p className="faint" style={{ margin: 0, fontSize: 12, letterSpacing: '.08em' }}>{getGreeting()}</p>
+          <h1>ยินดีต้อนรับกลับมา, {user?.username || 'ผู้ใช้'}</h1>
+          <p>
+            วันนี้มีออเดอร์ใหม่ {summary?.todayOrders ?? '...'} รายการ · ยอดขายวันนี้ ฿{summary ? Number(summary.todayRevenue).toLocaleString('th-TH') : '...'}
+          </p>
         </div>
+      </div>
 
-
-        <div className="w-full grid grid-cols-2 xl:grid-cols-4 gap-3 mt-6">
-
-                {/* CARD 1 */}
-                <div className="bg-white rounded-2xl shadow-md border-b-2 border-blue-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-3 md:p-5">
-                    <div className="min-w-0">
-                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">รายได้รวมเดือนนี้</p>
-                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3 truncate">
-                        ฿{summary ? Number(summary.monthRevenue).toLocaleString('th-TH') : '...'}
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-1">
-                        <span className={`text-xs font-semibold ${(summary?.monthRevenueChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                          {(summary?.monthRevenueChangePercent ?? 0) >= 0 ? '▲' : '▼'} {Math.abs(summary?.monthRevenueChangePercent ?? 0).toFixed(1)}%
-                        </span>
-                        <span className="text-gray-400 text-xs hidden sm:inline">vs เดือนที่แล้ว</span>
-                    </div>
-                    </div>
-                    <div className="bg-blue-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
-                    <MdOutlineAttachMoney size={20} className="text-blue-600 md:w-7 md:h-7" />
-                    </div>
-                </div>
-                </div>
-
-                {/* CARD 2 */}
-                <div className="bg-white rounded-2xl shadow-md border-b-2 border-green-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-3 md:p-5">
-                    <div className="min-w-0">
-                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">ออเดอร์ทั้งหมด</p>
-                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3">
-                        {summary?.totalOrders ?? '...'}
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-1">
-                        <span className={`text-xs font-semibold ${(summary?.totalOrdersChangePercent ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                          {(summary?.totalOrdersChangePercent ?? 0) >= 0 ? '▲' : '▼'} {Math.abs(summary?.totalOrdersChangePercent ?? 0).toFixed(1)}%
-                        </span>
-                        <span className="text-gray-400 text-xs hidden sm:inline">vs เดือนที่แล้ว</span>
-                    </div>
-                    </div>
-                    <div className="bg-green-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
-                    <BiChevronDownSquare size={20} className="text-green-600" />
-                    </div>
-                </div>
-                </div>
-
-                {/* CARD 3 */}
-                <div className="bg-white rounded-2xl shadow-md border-b-2 border-orange-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-3 md:p-5">
-                    <div className="min-w-0">
-                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">ลูกค้าทั้งหมด</p>
-                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3">
-                        {summary?.totalCustomers ?? '...'}
-                    </h1>
-                    <div className="flex items-center gap-1">
-                        <span className="text-gray-400 text-xs">ลูกค้าสะสม</span>
-                    </div>
-                    </div>
-                    <div className="bg-orange-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
-                    <BiGroup size={20} className="text-orange-600" />
-                    </div>
-                </div>
-                </div>
-
-                {/* CARD 4 */}
-                <div className="bg-white rounded-2xl shadow-md border-b-2 border-red-500 hover:shadow-xl transition">
-                <div className="flex justify-between items-start p-3 md:p-5">
-                    <div className="min-w-0">
-                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-4">ออเดอร์ยกเลิก</p>
-                    <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1.5 md:mb-3">
-                        {summary?.cancelledOrders ?? '...'}
-                    </h1>
-                    <div className="flex items-center gap-1">
-                        <span className="text-gray-400 text-xs">ถูกยกเลิก</span>
-                    </div>
-                    </div>
-                    <div className="bg-red-100 p-2.5 md:p-4 rounded-xl flex-shrink-0 ml-2">
-                    <BiMessageSquareX size={20} className="text-red-600" />
-                    </div>
-                </div>
-                </div>
-
+      <div className="stats">
+        <div className="stat">
+          <div className="k">รายได้รวมเดือนนี้{statIcon('money', '--blue-soft', '--blue')}</div>
+          <div className="v">฿{summary ? Number(summary.monthRevenue).toLocaleString('th-TH') : '...'}</div>
+          <div className="d">{change(summary?.monthRevenueChangePercent)} จากเดือนที่แล้ว</div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
-            <div className='col-span-1 lg:col-span-2 rounded-2xl bg-white shadow-md flex flex-col' style={{minHeight:'24rem'}}>
-                    {/* Header — flex-wrap so title + buttons stack on mobile */}
-                    <div className='flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-gray-500 font-semibold shrink-0'>
-                        <div>
-                            <h1 className='text-black text-lg sm:text-2xl leading-snug'>{getGraph()}</h1>
-                            <p className='text-xs sm:text-sm'>{getInfoGraph()}</p>
-                        </div>
-                        <div className='flex gap-1.5 shrink-0'>
-                            <button onClick={() => { setActive("A"); perweek(); }}
-                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${active === "A" ? "bg-[#0F2235] text-[#A8CEFF]" : "hover:bg-gray-200 text-gray-400"}`}>
-                                สัปดาห์
-                            </button>
-                            <button onClick={() => { setActive("B"); permonth(); }}
-                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${active === "B" ? "bg-[#0F2235] text-[#A8CEFF]" : "hover:bg-gray-200 text-gray-400"}`}>
-                                เดือน
-                            </button>
-                            <button onClick={() => { setActive("C"); peryear(); }}
-                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${active === "C" ? "bg-[#0F2235] text-[#A8CEFF]" : "hover:bg-gray-200 text-gray-400"}`}>
-                                ปี
-                            </button>
-                        </div>
-                    </div>
-                    {/* Chart fills remaining height */}
-                    <div className="flex-1 p-3 min-h-0" style={{height:'300px'}}>
-                        <SalesChart period={active} />
-                    </div>
+        <div className="stat">
+          <div className="k">ออเดอร์ทั้งหมด{statIcon('receipt', '--green-soft', '--green')}</div>
+          <div className="v">{summary?.totalOrders ?? '...'}</div>
+          <div className="d">{change(summary?.totalOrdersChangePercent)} จากเดือนที่แล้ว</div>
+        </div>
+        <div className="stat">
+          <div className="k">ลูกค้าทั้งหมด{statIcon('users', '--amber-soft', '--amber')}</div>
+          <div className="v">{summary?.totalCustomers ?? '...'}</div>
+          <div className="d">ลูกค้าสะสม</div>
+        </div>
+        <div className="stat">
+          <div className="k">ออเดอร์ยกเลิก{statIcon('x', '--red-soft', '--red')}</div>
+          <div className="v">{summary?.cancelledOrders ?? '...'}</div>
+          <div className="d">ถูกยกเลิก</div>
+        </div>
+      </div>
+
+      <div className="two" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
+        <section className="card" style={{ minWidth: 0 }}>
+          <div className="card-head" style={{ flexWrap: 'wrap' }}>
+            <div><h2>{getGraph()}</h2><div className="hint">{getInfoGraph()}</div></div>
+            <div className="chips">
+              {[['A', 'สัปดาห์', perweek], ['B', 'เดือน', permonth], ['C', 'ปี', peryear]].map(([key, label, fn]) => (
+                <button key={key} className={`chip${active === key ? ' on' : ''}`} style={{ height: 32 }}
+                  onClick={() => { setActive(key); fn(); }}>{label}</button>
+              ))}
             </div>
-           
-           
-                <div className='rounded-2xl bg-white shadow-md font-semibold flex flex-col' style={{minHeight:'24rem'}}>
-                    <div className='px-5 pt-4 shrink-0'>
-                        <h1 className='text-black text-xl sm:text-2xl'>หมวดหมู่สินค้า</h1>
-                        <p className='text-gray-600 text-sm'>สัดส่วนยอดขาย 30 วันล่าสุด</p>
-                    </div>
-                    <div className="flex-1 p-4 min-h-0">
-                        <CategoryDonutChart />
-                    </div>
-                </div>
-           
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 w-full mt-6 rounded-2xl">
-            <div className="col-span-1 lg:col-span-3 flex flex-col rounded-2xl bg-white shadow-md font-semibold w-full min-h-[400px]">
-                    
-                    <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 shrink-0 text-gray-500 font-semibold">
-                        <div>
-                            <h1 className='text-black text-xl sm:text-2xl'>ออเดอร์ล่าสุด</h1>
-                            <p className='text-sm'>5 ออเดอร์ล่าสุด</p>
-                        </div>
-                        <div onClick={() => router.push("/admin/orders")}
-                            className='text-blue-500 hover:underline cursor-pointer text-sm'>
-                            ดูทั้งหมด ⭢
-                        </div>
-                    </div>
-                    <div className="flex-1 min-h-0 px-4 pt-2 pb-4">
-                        <div className="overflow-x-auto rounded-xl border border-gray-300 bg-white">
-                                        <table className="w-full min-w-[560px] border-separate border-spacing-0">
-                                            <thead className="text-white">
-                                            <tr className="h-14">
-                                                <th className="rounded-tl-xl bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
-                                                เลขออเดอร์
-                                                </th>
-                                                <th className="bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
-                                                ชื่อลูกค้า
-                                                </th>
-                                                <th className="bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
-                                                สินค้า
-                                                </th>
-                                                <th className="bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
-                                                ราคา
-                                                </th>
-                                                <th className="rounded-tr-xl bg-[#0B1F33] px-4 py-3 text-center text-sm font-semibold align-middle">
-                                                สถานะ
-                                                </th>
-                                            </tr>
-                                            </thead>
-                
-                                            <tbody className="divide-y divide-gray-200">
-                
-                                            {orders.length === 0 ? (
-                                            <tr className="h-20">
-                                                <td colSpan={5} className="text-gray-400 text-center align-middle">
-                                                ไม่มีข้อมูลสินค้า
-                                                </td>
-                                            </tr>
-                                            ) : orders.slice().reverse().slice(0, 5).map((order) => (
-                                              
-                                            <tr key={order.id} className="h-16 text-center hover:bg-gray-50">
-                                                <td className="text-[#8ba6ca] px-4 align-middle">{order.orderNo}</td>
-                                                <td className="px-4 align-middle">{order.shippingName}</td>
-                                                <td className="px-4 text-sm align-middle">
-                                                    {order.orderLines.map(line => line.productName).join(', ')}
-                                                </td>
-                                                <td className="px-4 align-middle">{order.totalAmount}</td>
-                                                <td className="px-4 align-middle">
-                                                    {renderStatus(order.status) || (
-                                                        <span className="inline-block px-3 py-1 bg-gray-100 rounded-md text-sm">ไม่พบค่า</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                            ))}
-                                            </tbody>
-                                        </table>
-                        </div>
-                    </div>
-            </div>
-            <div className='  rounded-2xl bg-white  shadow-md   font-semibold   ' >  
-                 <div className='p-6 '>
-                                <h1 className='text-black text-2xl font-bold'>สินค้าขายดี</h1>
-                                <p className='text-gray-600 text-sm mb-4'>30 วันล่าสุด</p>
+          </div>
+          <div className="pad" style={{ height: 320 }}>
+            <SalesChart period={active} />
+          </div>
+        </section>
+        <section className="card" style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div className="card-head"><div><h2>ยอดขายตามหมวด</h2><div className="hint">สัดส่วนยอดขาย 30 วันล่าสุด</div></div></div>
+          <div className="pad" style={{ flex: 1, minHeight: 300 }}>
+            <CategoryDonutChart />
+          </div>
+        </section>
+      </div>
 
-                                {/* [Claude] แสดง top products จาก backend แทน hardcode */}
-                                {topProducts.length === 0 && (
-                                  <p className='text-gray-400 text-sm text-center py-4'>ยังไม่มีข้อมูล</p>
-                                )}
-                                {topProducts.map((item, index) => {
-                                  const maxQty = topProducts[0]?.totalQty || 1;
-                                  return (
-                                    <div key={item.productId} className='flex items-center gap-3 mb-3'>
-                                      <span className='text-gray-400 text-sm w-4'>{index + 1}</span>
-                                      {item.imageUrl
-                                        ? <img src={`http://localhost:8080/${item.imageUrl}`} alt={item.productName} className='w-10 h-10 rounded-md object-cover border flex-shrink-0' />
-                                        : <div className='w-10 h-10 rounded-md bg-gray-100 border flex-shrink-0 flex items-center justify-center text-gray-300 text-xs'>No img</div>
-                                      }
-                                      <div className='flex-1'>
-                                        <p className='text-sm font-semibold'>{item.productName}</p>
-                                        <p className='text-xs text-gray-400'>ขายแล้ว {item.totalQty} ชิ้น</p>
-                                        <div className='w-full bg-gray-200 rounded-full h-1 mt-1'>
-                                          <div
-                                            className='bg-blue-500 h-1 rounded-full'
-                                            style={{ width: `${(item.totalQty / maxQty) * 100}%` }}
-                                          />
-                                        </div>
-                                      </div>
-                                      <span className='text-sm font-bold text-gray-700'>
-                                        ฿{Number(item.totalRevenue).toLocaleString('th-TH')}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
+      <div className="two" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+        <section className="card" style={{ minWidth: 0 }}>
+          <div className="card-head">
+            <div><h2>ออเดอร์ล่าสุด</h2><div className="hint">5 ออเดอร์ล่าสุด</div></div>
+            <a className="link" href="/admin/orders" style={{ fontSize: 14 }}
+              onClick={(e) => { e.preventDefault(); router.push('/admin/orders'); }}>ดูทั้งหมด</a>
+          </div>
+          <div className="table-wrap">
+            <table className="t">
+              <thead><tr><th>เลขออเดอร์</th><th className="hide-m">สินค้า</th><th className="right">ราคา</th><th>สถานะ</th></tr></thead>
+              <tbody>
+                {orders.length === 0 ? (
+                  <tr><td colSpan={4} className="muted" style={{ textAlign: 'center', padding: 32 }}>ยังไม่มีออเดอร์</td></tr>
+                ) : orders.slice().reverse().slice(0, 5).map((order) => (
+                  <tr key={order.id}>
+                    <td><span className="mono">{order.orderNo}</span><span className="sub">{order.shippingName}</span></td>
+                    <td className="hide-m" style={{ fontSize: 14 }}>{order.orderLines.map(line => line.productName).join(', ')}</td>
+                    <td className="right num">฿{order.totalAmount}</td>
+                    <td><StatusBadge status={order.status} label={STATUS_LABEL[order.status] ?? 'ไม่พบค่า'} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="card" style={{ minWidth: 0 }}>
+          <div className="card-head"><div><h2>สินค้าขายดี</h2><div className="hint">30 วันล่าสุด</div></div></div>
+          <div className="pad" style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 14 }}>
+            {topProducts.length === 0 && <p className="muted" style={{ margin: 0, textAlign: 'center' }}>ยังไม่มีข้อมูล</p>}
+            {topProducts.map((item, index) => {
+              const maxQty = topProducts[0]?.totalQty || 1;
+              return (
+                <div key={item.productId} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <span className="faint num" style={{ width: 14 }}>{index + 1}</span>
+                  {item.imageUrl
+                    ? <img className="thumb" src={`${API_URL}/${item.imageUrl}`} alt={item.productName} />
+                    : <span className="thumb" />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b style={{ fontWeight: 600 }}>{item.productName}</b>
+                    <div className="muted" style={{ fontSize: 13 }}>ขายแล้ว {item.totalQty} ชิ้น</div>
+                    <div className="bars"><div className="track" style={{ height: 4, marginTop: 4 }}>
+                      <div className="fill" style={{ width: `${(item.totalQty / maxQty) * 100}%` }} />
+                    </div></div>
+                  </div>
+                  <b className="num">฿{Number(item.totalRevenue).toLocaleString('th-TH')}</b>
                 </div>
-            </div>
-                            
-        </div>
-        <div className='  rounded-2xlbg-[#EEF4FB]    h-[200]  ' >  
-                  
-        </div>
-            
-    </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+      <style>{`@media(max-width:1100px){.two{grid-template-columns:1fr!important}}`}</style>
+    </>
   );
 }

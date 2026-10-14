@@ -2,27 +2,34 @@ version: "3.9"
 services:
   backend:
     build: ./backend
+    env_file:
+      - ./backend/.env
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/mydb
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: example
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/breadProject
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: mysql:8.1
     environment:
-      MYSQL_ROOT_PASSWORD: 480621@Pk
-      MYSQL_DATABASE: root
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: breadProject
     ports:
       - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
     depends_on:
       - backend

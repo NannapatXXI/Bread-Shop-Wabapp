@@ -61,8 +61,11 @@ public class OrderController {
      * ดึง order ตาม id — ใช้ใน order detail page
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<OrderResponse>> getById(@PathVariable Integer id) {
-        return ResponseEntity.ok(ApiResponse.ok(orderService.getById(id)));
+    public ResponseEntity<ApiResponse<OrderResponse>> getById(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal String email) {
+        User user = resolveUser(email);
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getByIdForUser(id, user.getId())));
     }
 
     /**

@@ -3,7 +3,6 @@ package com.breadShop.XXI.config;
 import java.io.IOException;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.breadShop.XXI.service.JwtService;
 
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +28,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @SuppressWarnings("unused")
     private final UserDetailsService userDetailsService;
 
-    @Autowired
     public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
@@ -72,6 +71,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             """);
             return;
+        } catch (JwtException | IllegalArgumentException e) {
+            // token ปลอม/เสีย — ไม่ยืนยันตัวตน ปล่อยให้ SecurityConfig ตัดสิน (path ที่ต้อง login จะได้ 401)
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
@@ -79,7 +81,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         String path = request.getServletPath();
     
         return List.of(

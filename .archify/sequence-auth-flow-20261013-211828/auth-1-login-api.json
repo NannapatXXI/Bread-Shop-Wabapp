@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "BreadShop XXI — Auth (1/2): Login และการเรียก API",
+    "output": ".archify/sequence-auth-flow-20261013-211828/auth-1-login-api.html",
+    "viewBox": [
+      1080,
+      666
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "ผู้ใช้",
+      "sublabel": "browser"
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Next.js",
+      "sublabel": "AuthContext + lib/api.js"
+    },
+    {
+      "id": "ratelimit",
+      "type": "security",
+      "label": "RateLimit",
+      "sublabel": "login, send-OTP"
+    },
+    {
+      "id": "jwtfilter",
+      "type": "security",
+      "label": "JwtAuthFilter",
+      "sublabel": "cookie access_token"
+    },
+    {
+      "id": "auth",
+      "type": "backend",
+      "label": "Auth API",
+      "sublabel": "AuthController + AuthService"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "MySQL",
+      "sublabel": "users, refresh_tokens"
+    }
+  ],
+  "segments": [
+    {
+      "from": 154,
+      "to": 362,
+      "label": "Login"
+    },
+    {
+      "from": 382,
+      "to": 530,
+      "label": "เรียก API"
+    }
+  ],
+  "messages": [
+    {
+      "id": "enter-credentials",
+      "from": "user",
+      "to": "web",
+      "y": 170,
+      "label": "กรอก username/email + รหัสผ่าน",
+      "variant": "default"
+    },
+    {
+      "id": "post-login",
+      "from": "web",
+      "to": "ratelimit",
+      "y": 200,
+      "label": "POST /auth/login",
+      "variant": "emphasis",
+      "note": "นับ IP จาก X-Forwarded-For ซึ่ง client ปลอมได้"
+    },
+    {
+      "id": "rate-pass",
+      "from": "ratelimit",
+      "to": "auth",
+      "y": 230,
+      "label": "ไม่เกิน 10 ครั้ง/นาที → ผ่าน",
+      "variant": "security"
+    },
+    {
+      "id": "find-user",
+      "from": "auth",
+      "to": "db",
+      "y": 260,
+      "label": "หา user, provider=google → 400",
+      "variant": "default"
+    },
+    {
+      "id": "user-row",
+      "from": "db",
+      "to": "auth",
+      "y": 290,
+      "label": "user + BCrypt hash",
+      "variant": "return"
+    },
+    {
+      "id": "save-refresh",
+      "from": "auth",
+      "to": "db",
+      "y": 320,
+      "label": "ลบ refresh เก่าทั้งหมด, เก็บ SHA-256 ใหม่",
+      "variant": "emphasis"
+    },
+    {
+      "id": "login-cookies",
+      "from": "auth",
+      "to": "web",
+      "y": 350,
+      "label": "Set-Cookie access 15 นาที + refresh 7 วัน",
+      "variant": "return"
+    },
+    {
+      "id": "api-call",
+      "from": "web",
+      "to": "jwtfilter",
+      "y": 398,
+      "label": "GET /api/orders + cookie",
+      "variant": "emphasis"
+    },
+    {
+      "id": "verify-jwt",
+      "from": "jwtfilter",
+      "to": "auth",
+      "y": 428,
+      "label": "ลายเซ็น + อายุ ผ่าน, role จาก token",
+      "variant": "security",
+      "note": "ไม่ query DB — ผู้ใช้ที่ถูกแบนยังใช้ token เดิมได้ ≤15 นาที"
+    },
+    {
+      "id": "owned-query",
+      "from": "auth",
+      "to": "db",
+      "y": 458,
+      "label": "query ด้วย userId จาก token",
+      "variant": "default"
+    },
+    {
+      "id": "owned-rows",
+      "from": "db",
+      "to": "auth",
+      "y": 488,
+      "label": "เฉพาะข้อมูลของตัวเอง",
+      "variant": "return"
+    },
+    {
+      "id": "api-ok",
+      "from": "auth",
+      "to": "web",
+      "y": 518,
+      "label": "200 ApiResponse",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "web",
+      "from": 164,
+      "to": 524,
+      "type": "frontend"
+    },
+    {
+      "participant": "ratelimit",
+      "from": 194,
+      "to": 236,
+      "type": "security"
+    },
+    {
+      "participant": "auth",
+      "from": 224,
+      "to": 356,
+      "type": "backend"
+    },
+    {
+      "participant": "jwtfilter",
+      "from": 392,
+      "to": 434,
+      "type": "security"
+    },
+    {
+      "participant": "auth",
+      "from": 422,
+      "to": 524,
+      "type": "backend"
+    },
+    {
+      "participant": "db",
+      "from": 254,
+      "to": 296,
+      "type": "database"
+    },
+    {
+      "participant": "db",
+      "from": 452,
+      "to": 494,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "ที่ทำไว้ดีแล้ว",
+      "items": [
+        "Token อยู่ใน cookie HttpOnly + SameSite=Lax — JavaScript อ่านไม่ได้",
+        "Refresh token เก็บเป็น SHA-256 และ rotate ทุกครั้งที่ใช้",
+        "Token ปลอม/ไม่มี → 401, login แล้วแต่ไม่มีสิทธิ์ → 403",
+        "ข้อมูลออเดอร์/ที่อยู่/แจ้งเตือน เช็คเจ้าของจาก token เสมอ"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "ต้องแก้ในส่วนนี้",
+      "items": [
+        "Rate limit เชื่อ X-Forwarded-For → เดารหัสผ่านได้ไม่จำกัด",
+        "ผู้ใช้ที่ถูกแบนยังใช้ access token เดิมได้สูงสุด 15 นาที"
+      ]
+    }
+  ]
+}

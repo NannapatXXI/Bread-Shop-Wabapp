@@ -185,7 +185,7 @@ public class DashboardService {
             LocalDate prevDay = day.minusDays(7);
             BigDecimal cur = sumOnDay(orders, day);
             BigDecimal prev = sumOnDay(orders, prevDay);
-            String label = day.getDayOfWeek().getDisplayName(TextStyle.SHORT, new Locale("th"));
+            String label = day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.of("th"));
             points.add(new DataPoint(label, cur, prev));
         }
         return points;
@@ -206,7 +206,7 @@ public class DashboardService {
             LocalDate prevEnd = prevStart.plusMonths(1);
             BigDecimal cur = sumRevenue(orders, start, end);
             BigDecimal prev = sumRevenue(orders, prevStart, prevEnd);
-            String label = m.getDisplayName(TextStyle.SHORT, new Locale("th"));
+            String label = m.getDisplayName(TextStyle.SHORT, Locale.of("th"));
             points.add(new DataPoint(label, cur, prev));
         }
         return points;
@@ -287,12 +287,4 @@ public class DashboardService {
         return ((double)(cur - prev) / prev) * 100.0;
     }
 
-    /**
-     * ตรวจสอบว่าสถานะของ order อยู่ในรายการ excluded หรือไม่ โดยจะไม่รวม order ที่มีสถานะเป็น CANCELLED หรือ REFUNDED ในการคำนวณยอดขายและสถิติอื่นๆ
-     * @param status สถานะของ order ที่ต้องการตรวจสอบ
-     * @return true หากสถานะของ order อยู่ในรายการ excluded (CANCELLED หรือ REFUNDED) และ false หากไม่อยู่ในรายการ excluded
-     */
-    private boolean isExcluded(OrderStatus status) {
-        return status == OrderStatus.CANCELLED || status == OrderStatus.REFUNDED;
-    }
 }

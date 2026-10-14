@@ -1,8 +1,6 @@
 // dto/orderline/OrderLineRequest.java
 package com.breadShop.XXI.dto.orderline;
 
-import java.math.BigDecimal;
-
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
@@ -14,7 +12,7 @@ public class OrderLineRequest {
     @NotNull(message = "กรุณาระบุจำนวน")
     @Min(value = 1, message = "จำนวนสินค้าต้องมากกว่า 0")
     private Integer quantity;
-    private BigDecimal discountAmount;
+    // ไม่มี discountAmount / ราคา — ราคาและส่วนลดคิดฝั่ง server เท่านั้น (field อื่นที่ client ส่งมาถูกเมิน)
 
    
     public Integer getProductId() { return productId; }
@@ -22,7 +20,4 @@ public class OrderLineRequest {
 
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
-
-    public BigDecimal getDiscountAmount() { return discountAmount; }
-    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
 }

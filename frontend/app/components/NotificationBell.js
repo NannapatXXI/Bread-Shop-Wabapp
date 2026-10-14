@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FaBell } from 'react-icons/fa';
 import Link from 'next/link';
 import { useNotification } from '../context/NotificationContext';
+import Icon from './Icon';
+import StatusBadge from './StatusBadge';
 
 const STATUS_LABEL = {
   PENDING:    'รอดำเนินการ',
@@ -13,16 +14,6 @@ const STATUS_LABEL = {
   DELIVERED:  'ส่งถึงแล้ว',
   CANCELLED:  'ยกเลิก',
   REFUNDED:   'คืนเงินแล้ว',
-};
-
-const STATUS_COLOR = {
-  PENDING:    'bg-yellow-100 text-yellow-700',
-  CONFIRMED:  'bg-blue-100 text-blue-700',
-  PROCESSING: 'bg-orange-100 text-orange-700',
-  SHIPPED:    'bg-indigo-100 text-indigo-700',
-  DELIVERED:  'bg-green-100 text-green-700',
-  CANCELLED:  'bg-red-100 text-red-700',
-  REFUNDED:   'bg-gray-100 text-gray-700',
 };
 
 function formatDate(dateStr) {
@@ -56,73 +47,36 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="relative" ref={ref}>
-      {/* ── ปุ่มกระดิ่ง ── */}
-      <button
-        onClick={() => setOpen(prev => !prev)}
-        className="relative p-1 hover:text-blue-600 transition-colors"
-        title="การแจ้งเตือน"
-      >
-        <FaBell size={22} className="text-gray-600 hover:text-[#0B1F33] transition-colors" />
-        {unreadCount > 0 && (
-          <span className="
-            absolute -top-1 -right-1
-            bg-red-500 text-white text-xs font-bold
-            rounded-full min-w-[18px] h-[18px] px-0.5
-            flex items-center justify-center
-          ">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button className="icon-btn" onClick={() => setOpen(prev => !prev)}
+        aria-label={`การแจ้งเตือน${unreadCount > 0 ? ` ${unreadCount} รายการใหม่` : ''}`} aria-expanded={open}>
+        <Icon name="bell" />
+        {unreadCount > 0 && <span className="count">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 
-      {/* ── Dropdown ── */}
       {open && (
-        <div className="
-          absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100
-          z-50 overflow-hidden
-        ">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <span className="font-semibold text-gray-800 text-sm">การแจ้งเตือน</span>
+        <div className="pop">
+          <div className="pop-head">
+            <span>การแจ้งเตือน</span>
             {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
-              >
+              <button className="link" style={{ background: 'none', border: 0, padding: 0, fontSize: 13 }} onClick={markAllAsRead}>
                 อ่านทั้งหมด
               </button>
             )}
           </div>
-
-          {/* List */}
-          <ul className="max-h-96 overflow-y-auto divide-y divide-gray-50">
+          <ul className="pop-list">
             {notifications.length === 0 ? (
-              <li className="px-4 py-8 text-center text-gray-400 text-sm">
-                ยังไม่มีการแจ้งเตือน
-              </li>
+              <li className="muted" style={{ padding: '32px 16px', textAlign: 'center', fontSize: 14 }}>ยังไม่มีการแจ้งเตือน</li>
             ) : (
               notifications.map(noti => (
                 <li key={noti.id}>
-                  <Link
-                    href="/history"
-                    onClick={() => handleItemClick(noti)}
-                    className={`
-                      flex flex-col gap-1 px-4 py-3 hover:bg-gray-50 transition-colors
-                      ${!noti.isRead ? 'bg-indigo-50/60' : ''}
-                    `}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-gray-500">{noti.orderNo}</span>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[noti.newStatus] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {STATUS_LABEL[noti.newStatus] ?? noti.newStatus}
-                      </span>
+                  <Link href="/history" onClick={() => handleItemClick(noti)} className={`pop-item${!noti.isRead ? ' unread' : ''}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <span className="mono" style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12, color: 'var(--blue)' }}>{noti.orderNo}</span>
+                      <StatusBadge status={noti.newStatus} label={STATUS_LABEL[noti.newStatus] ?? noti.newStatus} />
                     </div>
-                    <p className="text-sm text-gray-700 leading-snug">{noti.message}</p>
-                    <span className="text-[11px] text-gray-400">{formatDate(noti.createdAt)}</span>
-                    {!noti.isRead && (
-                      <span className="w-2 h-2 rounded-full bg-indigo-500 self-end mt-0.5" />
-                    )}
+                    <span>{noti.message}</span>
+                    <span className="faint" style={{ fontSize: 12 }}>{formatDate(noti.createdAt)}</span>
                   </Link>
                 </li>
               ))

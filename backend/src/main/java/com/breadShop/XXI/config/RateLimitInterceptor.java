@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -32,9 +34,14 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     // IP → [attemptCount, windowStartEpochMs]
     private final Map<String, long[]> loginAttempts = new ConcurrentHashMap<>();
+    private final Object lock = new Object(); // อ่าน-แก้ bucket ต้องเป็น atomic ทั้งก้อน
 
+
+    /** 
+     * ตรวจสอบจำนวนครั้งที่พยายามเข้าสู่ระบบจาก IP ของผู้ใช้ ถ้าเกิน MAX_ATTEMPTS ใน WINDOW_MS จะส่ง 429 Too Many Requests และบล็อกการเข้าถึง
+     */
     @Override
-    public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object handler)
+    public boolean preHandle(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res, @NonNull Object handler)
             throws IOException {
 
         String uri = req.getRequestURI();
@@ -44,7 +51,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         String ip = getClientIp(req);
         long now = Instant.now().toEpochMilli();
 
-        synchronized (loginAttempts) {
+        synchronized (lock) {
             long[] bucket = loginAttempts.get(ip);
 
             if (bucket == null || now - bucket[1] > WINDOW_MS) {
@@ -68,8 +75,31 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    /**
+     * ใช้ IP ของ connection จริงเท่านั้น — ห้ามเชื่อ X-Forwarded-For จาก client
+     * (ไม่งั้นเปลี่ยน header ทุก request ก็เดารหัสผ่านได้ไม่จำกัด)
+     * ถ้า deploy หลัง reverse proxy ให้ตั้ง server.forward-headers-strategy=native
+     * Tomcat จะเชื่อ header เฉพาะจาก proxy ภายในแล้วใส่ IP จริงให้ getRemoteAddr() เอง
+     */
     private String getClientIp(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        return (xff != null && !xff.isBlank()) ? xff.split(",")[0].trim() : req.getRemoteAddr();
+        return req.getRemoteAddr();
+    }
+
+    /** ล้าง bucket ที่หมดหน้าต่างเวลาแล้วทุกนาที — map จะไม่โตไปเรื่อย ๆ */
+    @Scheduled(fixedRate = WINDOW_MS)
+    public void evictExpired() {
+        evictExpired(Instant.now().toEpochMilli());
+    }
+
+    void evictExpired(long now) {
+        synchronized (lock) {
+            loginAttempts.values().removeIf(bucket -> now - bucket[1] > WINDOW_MS);
+        }
+    }
+
+    int trackedClients() {
+        synchronized (lock) {
+            return loginAttempts.size();
+        }
     }
 }

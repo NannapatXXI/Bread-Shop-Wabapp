@@ -29,7 +29,6 @@ public class Mailservice {
                 "รหัส OTP ของคุณคือ: " + otp +
                 "\nรหัสนี้มีอายุ 5 นาที"
         );
-        System.out.println("กำลังส่ง OTP ไปที่อีเมล: " + to);
 
         mailSender.send(message);
     }
@@ -49,7 +48,6 @@ public class Mailservice {
                 "ขอให้มีวันที่ดี!\n" +
                 "ทีมงาน PeakPung By MomHmee"
         );
-        System.out.println("กำลังส่งอีเมลต้อนรับไปที่: " + to);
 
         mailSender.send(message);
     }
