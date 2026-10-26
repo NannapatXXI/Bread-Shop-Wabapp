@@ -1,0 +1,76 @@
+// อ่าน log (stdout/stderr) ของทุก container ผ่าน Docker แล้วส่งเข้า Loki
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// แปะ label ไว้ค้นหาใน Grafana: {service="backend"} หรือ {container="my-webapp-backend-1"}
+discovery.relabel "labels" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.labels.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ─── log ของ backend ที่รันด้วย Maven บนเครื่อง (ไม่ได้อยู่ใน Docker) ───
+// Logback เขียนไฟล์ ~/.breadshop/logs/breadshop.log — mount เข้ามาที่ /var/log/breadshop
+
+local.file_match "backend" {
+  path_targets = [{
+    "__path__" = "/var/log/breadshop/breadshop.log",
+    "service"  = "backend",
+    "source"   = "file",
+  }]
+}
+
+loki.source.file "backend" {
+  targets    = local.file_match.backend.targets
+  forward_to = [loki.process.backend.receiver]
+}
+
+loki.process "backend" {
+  // stack trace หลายบรรทัด → รวมเป็น log เดียว (บรรทัดใหม่เริ่มด้วยวันที่เสมอ)
+  stage.multiline {
+    firstline     = "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}"
+    max_wait_time = "3s"
+  }
+
+  // รูปแบบจาก logback-spring.xml: 2026-10-14 16:47:11.301 [thread] INFO  logger - message
+  stage.regex {
+    expression = "^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}) \\[(?P<thread>[^\\]]+)\\] (?P<level>[A-Z]+)"
+  }
+
+  // level เป็น label — ค้นได้ด้วย {service="backend", level="ERROR"}
+  stage.labels {
+    values = { level = "" }
+  }
+
+  // ใช้เวลาจริงในบรรทัด log (ไม่ใช่เวลาที่ Alloy อ่าน)
+  stage.timestamp {
+    source   = "ts"
+    format   = "2006-01-02 15:04:05.000"
+    location = "Asia/Bangkok"
+  }
+
+  forward_to = [loki.write.local.receiver]
+}

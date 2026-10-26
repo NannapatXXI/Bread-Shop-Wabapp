@@ -13,7 +13,7 @@ import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.entity.UserActivityLog;
 import com.breadShop.XXI.repository.UserActivityLogRepository;
 
-//เอาไว้เก็บ log ของกิจกรรมผู้ใช้ | reviewd by peak
+/** กิจกรรมของลูกค้า (login, สมัคร, สั่งซื้อ, ยกเลิก ...) — บันทึกพลาดแค่ log ไว้ ไม่ทำให้งานหลักล้ม */
 @Service
 public class UserActivityLogService {
 
@@ -35,7 +35,7 @@ public class UserActivityLogService {
      * @param details รายละเอียดเพิ่มเติมเกี่ยวกับกิจกรรม (สามารถเป็น null ถ้าไม่ระบุ)
      * @param status สถานะของกิจกรรม (เช่น "SUCCESS", "FAILURE")
      */
-    public void log(User user, String username, String action,
+    private void log(User user, String username, String action,
                     String ipAddress, String userAgent, String details, String status) {
         try {
             repo.save(new UserActivityLog(user, username, action, ipAddress, userAgent, details, status));
@@ -56,17 +56,6 @@ public class UserActivityLogService {
         log(user, user != null ? user.getUsername() : "anonymous", action, ipAddress, userAgent, details, "SUCCESS");
     }
 
-    /**
-     * บันทึก log ของกิจกรรมผู้ใช้ที่ล้มเหลว โดยเรียกใช้เมธอด log() และกำหนด status เป็น "FAILURE"
-     * @param username ชื่อผู้ใช้ที่ทำกิจกรรม (สามารถเป็น null ถ้าไม่ระบุ)
-     * @param action กิจกรรมที่เกิดขึ้น (เช่น "LOGIN", "LOGOUT", "UPDATE_PROFILE")
-     * @param ipAddress ที่อยู่ IP ของผู้ใช้ที่ทำกิจกรรม
-     * @param userAgent ข้อมูล user agent ของผู้ใช้ที่ทำกิจกรรม
-     * @param details รายละเอียดเพิ่มเติมเกี่ยวกับกิจกรรม (สามารถเป็น null ถ้าไม่ระบุ)
-     */
-    public void logFailure(String username, String action, String ipAddress, String userAgent, String details) {
-        log(null, username, action, ipAddress, userAgent, details, "FAILURE");
-    }
     /**
      * ค้นหา log ของกิจกรรมผู้ใช้ โดยรับพารามิเตอร์ userId, action, status, keyword, start, end, page และ size และส่งกลับ Page ของ UserActivityLogResponse (DTO)
      * @param userId รหัสผู้ใช้ที่ต้องการค้นหา (สามารถเป็น null ถ้าไม่ระบุ)

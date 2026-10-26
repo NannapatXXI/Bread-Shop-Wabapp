@@ -1,0 +1,16 @@
+# Prometheus ดึง metrics จาก backend ทุก 15 วินาที
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # backend ที่รันด้วย Maven บนเครื่อง (management port 8081)
+      - targets: ["host.docker.internal:8081"]
+        labels:
+          instance: local-maven
+      # backend ที่รันใน docker-compose.yml (เครือข่ายเดียวกัน ไม่ต้องเปิด port ออกนอก)
+      - targets: ["backend:8081"]
+        labels:
+          instance: docker

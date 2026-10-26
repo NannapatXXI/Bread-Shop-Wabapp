@@ -1,13 +1,16 @@
 package com.breadShop.XXI.repository;
 
-import com.breadShop.XXI.entity.User;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
+import com.breadShop.XXI.entity.User;
 
-// --- 2. Database Repository ---
-// (Interface สำหรับคุยกับตาราง User)
+/**
+ * Repository สำหรับจัดการ entity User
+ * UserRepository
+ */
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> { // (ใช้ ID เป็น Integer)
     

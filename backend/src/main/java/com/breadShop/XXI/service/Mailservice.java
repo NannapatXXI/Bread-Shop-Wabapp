@@ -1,5 +1,6 @@
 package com.breadShop.XXI.service;
 
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class Mailservice {
      * @param to ที่อยู่อีเมลของผู้รับ OTP
      * @param otp รหัส OTP ที่จะส่งไปในเนื้อหาอีเมล โดยจะแสดงข้อความว่า "รหัส OTP ของคุณคือ: {otp} รหัสนี้มีอายุ 5 นาที" เพื่อแจ้งผู้ใช้ถึงรหัส OTP และระยะเวลาที่สามารถใช้งานได้
      */
+    @Async
     public void sendOtpEmail(String to, String otp) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);

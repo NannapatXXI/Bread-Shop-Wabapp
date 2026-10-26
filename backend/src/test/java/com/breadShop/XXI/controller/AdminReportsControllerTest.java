@@ -25,7 +25,6 @@ import com.breadShop.XXI.dto.dashboard.SalesChartResponse;
 import com.breadShop.XXI.service.AuditLogService;
 import com.breadShop.XXI.service.DashboardService;
 import com.breadShop.XXI.service.OrderLogService;
-import com.breadShop.XXI.service.SystemLogService;
 import com.breadShop.XXI.service.UserActivityLogService;
 
 @WebMvcTest({ DashboardController.class, LogController.class })
@@ -38,7 +37,6 @@ class AdminReportsControllerTest extends ControllerTestSupport {
     @MockitoBean private UserActivityLogService activityService;
     @MockitoBean private AuditLogService auditService;
     @MockitoBean private OrderLogService orderLogService;
-    @MockitoBean private SystemLogService systemLogService;
 
     // ───────────── access ─────────────
 
@@ -51,7 +49,7 @@ class AdminReportsControllerTest extends ControllerTestSupport {
         mockMvc.perform(get("/api/v1/admin/logs/summary").cookie(userToken(ALICE)))
                 .andExpect(status().isForbidden());
 
-        verifyNoInteractions(dashboardService, activityService, systemLogService);
+        verifyNoInteractions(dashboardService, activityService);
     }
 
     @Test
@@ -112,10 +110,6 @@ class AdminReportsControllerTest extends ControllerTestSupport {
         when(activityService.countByAction("LOGIN")).thenReturn(45L);
         when(activityService.countByAction("REGISTER")).thenReturn(6L);
         when(activityService.countActiveUsersToday()).thenReturn(2L);
-        when(systemLogService.countByLevel("ERROR")).thenReturn(1L);
-        when(systemLogService.countByLevel("WARN")).thenReturn(24L);
-        when(apiRequestLogService.totalRequests()).thenReturn(993L);
-        when(apiRequestLogService.totalErrors()).thenReturn(65L);
 
         mockMvc.perform(get("/api/v1/admin/logs/summary").cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
@@ -124,24 +118,12 @@ class AdminReportsControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.loginCount").value(45))
                 .andExpect(jsonPath("$.data.registerCount").value(6))
                 .andExpect(jsonPath("$.data.activeUsersToday").value(2))
-                .andExpect(jsonPath("$.data.systemErrorCount").value(1))
-                .andExpect(jsonPath("$.data.systemWarnCount").value(24))
-                .andExpect(jsonPath("$.data.totalApiRequests").value(993))
-                .andExpect(jsonPath("$.data.totalApiErrors").value(65));
-    }
-
-    @Test
-    void systemLogs_passesLevelKeywordAndPaging_inTheRightOrder() throws Exception {
-        stubUser(1, ADMIN, "ADMIN");
-        when(systemLogService.readLogs("ERROR", "timeout", 2, 50)).thenReturn(Page.empty());
-
-        mockMvc.perform(get("/api/v1/admin/logs/system")
-                        .param("level", "ERROR").param("keyword", "timeout")
-                        .param("page", "2").param("size", "50")
-                        .cookie(adminToken(ADMIN)))
-                .andExpect(status().isOk());
-
-        verify(systemLogService).readLogs("ERROR", "timeout", 2, 50);
+                // log ของระบบ (ERROR/WARN จาก Logback) ย้ายไป Grafana — ไม่อยู่ใน summary แล้ว
+                .andExpect(jsonPath("$.data.systemErrorCount").doesNotExist())
+                .andExpect(jsonPath("$.data.systemWarnCount").doesNotExist())
+                // สถิติ API ย้ายไป Grafana (Prometheus) แล้ว
+                .andExpect(jsonPath("$.data.totalApiRequests").doesNotExist())
+                .andExpect(jsonPath("$.data.totalApiErrors").doesNotExist());
     }
 
     @Test
@@ -187,26 +169,15 @@ class AdminReportsControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void errorTrend_defaultsToSevenDays() throws Exception {
+    void systemAndApiLogEndpoints_areGone_theyLiveInGrafanaNow() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
-        when(systemLogService.getErrorTrendByDay(7)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/admin/logs/error-trend").cookie(adminToken(ADMIN)))
-                .andExpect(status().isOk());
-
-        verify(systemLogService).getErrorTrendByDay(7);
-    }
-
-    @Test
-    void failedRequests_forwardsPaging() throws Exception {
-        stubUser(1, ADMIN, "ADMIN");
-        when(apiRequestLogService.getFailedRequests(1, 10)).thenReturn(Page.empty());
-
-        mockMvc.perform(get("/api/v1/admin/logs/failed-requests").param("page", "1").param("size", "10")
-                        .cookie(adminToken(ADMIN)))
-                .andExpect(status().isOk());
-
-        verify(apiRequestLogService).getFailedRequests(1, 10);
+        for (String path : new String[] {"/api/v1/admin/logs/system", "/api/v1/admin/logs/trend", "/api/v1/admin/logs/error-trend",
+                                         "/api/v1/admin/logs/api-stats", "/api/v1/admin/logs/failed-requests",
+                                         "/api/v1/admin/logs/error-breakdown"}) {
+            mockMvc.perform(get(path).cookie(adminToken(ADMIN)))
+                    .andExpect(status().isNotFound());
+        }
     }
 
     @Test

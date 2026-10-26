@@ -1,7 +1,6 @@
 package com.breadShop.XXI.config;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,90 +15,55 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Rate limiting สำหรับ /api/v1/auth/login
- * อนุญาต MAX_ATTEMPTS ครั้งต่อ WINDOW_MS มิลลิวินาทีต่อ IP
- * ถ้าเกิน → 429 Too Many Requests
+ * กันเดารหัสผ่าน / ยิง OTP รัว: POST ได้ไม่เกิน MAX_ATTEMPTS ครั้งต่อนาทีต่อ IP เกิน → 429
+ * path ที่ใช้กำหนดไว้ใน WebConfig ที่เดียว
  *
- * ทำไมต้องมี: ป้องกัน brute-force password โดย attacker วน loop ทดสอบ password
- * ConcurrentHashMap + synchronized เพื่อ thread-safe กับ concurrent requests
+ * IP = req.getRemoteAddr() เท่านั้น — ห้ามเชื่อ X-Forwarded-For จาก client (เปลี่ยน header ทุกครั้งก็หลบได้)
+ * ถ้าอยู่หลัง reverse proxy ให้ตั้ง server.forward-headers-strategy=native แทน
  */
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    private static final int    MAX_ATTEMPTS = 10;
-    private static final long   WINDOW_MS    = 60_000L; // 1 นาที
+    private static final int  MAX_ATTEMPTS = 10;
+    private static final long WINDOW_MS    = 60_000L;
 
-    private static final String LOGIN_PATH   = "/api/v1/auth/login";
-    private static final String SEND_OTP     = "/api/v1/auth/send-OTP-mail";
+    /** หน้าต่างเวลาของแต่ละ IP: เริ่มนับเมื่อไหร่ และนับได้กี่ครั้งแล้ว */
+    private record Window(long startMs, int count) {}
 
-    // IP → [attemptCount, windowStartEpochMs]
-    private final Map<String, long[]> loginAttempts = new ConcurrentHashMap<>();
-    private final Object lock = new Object(); // อ่าน-แก้ bucket ต้องเป็น atomic ทั้งก้อน
+    private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
-
-    /** 
-     * ตรวจสอบจำนวนครั้งที่พยายามเข้าสู่ระบบจาก IP ของผู้ใช้ ถ้าเกิน MAX_ATTEMPTS ใน WINDOW_MS จะส่ง 429 Too Many Requests และบล็อกการเข้าถึง
-     */
     @Override
     public boolean preHandle(@NonNull HttpServletRequest req, @NonNull HttpServletResponse res, @NonNull Object handler)
             throws IOException {
-
-        String uri = req.getRequestURI();
-        if (!LOGIN_PATH.equals(uri) && !SEND_OTP.equals(uri)) return true;
         if (!"POST".equalsIgnoreCase(req.getMethod())) return true;
 
-        String ip = getClientIp(req);
-        long now = Instant.now().toEpochMilli();
+        long now = System.currentTimeMillis();
+        // compute ทำงานแบบ atomic ต่อ key — สอง request จาก IP เดียวกันพร้อมกันนับไม่หาย
+        Window w = windows.compute(req.getRemoteAddr(), (ip, old) ->
+            old == null || now - old.startMs() > WINDOW_MS ? new Window(now, 1) : new Window(old.startMs(), old.count() + 1));
 
-        synchronized (lock) {
-            long[] bucket = loginAttempts.get(ip);
+        if (w.count() <= MAX_ATTEMPTS) return true;
 
-            if (bucket == null || now - bucket[1] > WINDOW_MS) {
-                loginAttempts.put(ip, new long[]{ 1, now });
-                return true;
-            }
-
-            bucket[0]++;
-            if (bucket[0] > MAX_ATTEMPTS) {
-                long retryAfterSec = (WINDOW_MS - (now - bucket[1])) / 1000;
-                res.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                res.setHeader("Retry-After", String.valueOf(retryAfterSec));
-                res.getWriter().write(
-                    "{\"success\":false,\"message\":\"พยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอ "
-                    + retryAfterSec + " วินาที\"}"
-                );
-                return false;
-            }
-        }
-        return true;
+        long retryAfterSec = (WINDOW_MS - (now - w.startMs())) / 1000;
+        res.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        res.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        res.setHeader("Retry-After", String.valueOf(retryAfterSec));
+        res.getWriter().write("{\"success\":false,\"message\":\"พยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอ "
+            + retryAfterSec + " วินาที\"}");
+        return false;
     }
 
-    /**
-     * ใช้ IP ของ connection จริงเท่านั้น — ห้ามเชื่อ X-Forwarded-For จาก client
-     * (ไม่งั้นเปลี่ยน header ทุก request ก็เดารหัสผ่านได้ไม่จำกัด)
-     * ถ้า deploy หลัง reverse proxy ให้ตั้ง server.forward-headers-strategy=native
-     * Tomcat จะเชื่อ header เฉพาะจาก proxy ภายในแล้วใส่ IP จริงให้ getRemoteAddr() เอง
-     */
-    private String getClientIp(HttpServletRequest req) {
-        return req.getRemoteAddr();
-    }
-
-    /** ล้าง bucket ที่หมดหน้าต่างเวลาแล้วทุกนาที — map จะไม่โตไปเรื่อย ๆ */
+    /** ล้างหน้าต่างที่หมดเวลาแล้วทุกนาที — map ไม่โตไปเรื่อย ๆ */
     @Scheduled(fixedRate = WINDOW_MS)
     public void evictExpired() {
-        evictExpired(Instant.now().toEpochMilli());
+        evictExpired(System.currentTimeMillis());
     }
 
     void evictExpired(long now) {
-        synchronized (lock) {
-            loginAttempts.values().removeIf(bucket -> now - bucket[1] > WINDOW_MS);
-        }
+        windows.values().removeIf(w -> now - w.startMs() > WINDOW_MS);
     }
 
     int trackedClients() {
-        synchronized (lock) {
-            return loginAttempts.size();
-        }
+        return windows.size();
     }
 }

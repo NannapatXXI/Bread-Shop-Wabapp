@@ -36,8 +36,8 @@ graph TB
             AC[AuthController\n/api/v1/auth/**]
             ADC[AdminController\n/api/v1/admin/**]
             PC[ProductController\n/api/v1/products/**]
-            OC[OrderController\n/api/orders/**]
-            UAC[UserAddressController\n/api/users/**]
+            OC[OrderController\n/api/v1/orders/**]
+            UAC[UserAddressController\n/api/v1/users/me/addresses/**]
             DC[DashboardController\n/api/v1/admin/dashboard/**]
         end
 
@@ -128,7 +128,7 @@ sequenceDiagram
 
     Note over FE,DB: ── เรียก API ปกติ ──
 
-    FE->>AC: GET /api/v1/auth/me\n(Cookie: access_token อัตโนมัติ)
+    FE->>AC: GET /api/v1/users/me\n(Cookie: access_token อัตโนมัติ)
     AC->>JS: validateToken(access_token)
     JS-->>AC: UserDetails
     AC-->>FE: ApiResponse { data: { id, email, username, roles } }

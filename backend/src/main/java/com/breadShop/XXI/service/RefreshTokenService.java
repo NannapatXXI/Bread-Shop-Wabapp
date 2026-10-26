@@ -2,6 +2,7 @@ package com.breadShop.XXI.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.UUID;
@@ -13,25 +14,16 @@ import com.breadShop.XXI.entity.RefreshToken;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.RefreshTokenRepository;
 
-/*
- * Strategy ที่ใช้:
- *
- * 1. One-Token-Per-User:
- *    ตอน login ลบ token เก่าของ user คนนั้นก่อน แล้วค่อยสร้างใหม่
- *
- * 2. Token Rotation:
- *    ตอน refresh ลบ token เดิม แล้วสร้างใหม่
- *    → ถ้า token ถูกขโมยไป พอ rotate แล้วตัวเก่าใช้ไม่ได้
- *
- * 3. Token Hashing (S-5):
- *    เก็บ SHA-256 hash ใน DB แทน plain UUID
- *    → ถ้า DB รั่ว ผู้โจมตีไม่มี plain token
- *    → create() และ rotate() คืน plain String ให้ caller ส่งใส่ cookie
- *    → validate() รับ plain token แล้ว hash ก่อน lookup
+/**
+ * Refresh token (อายุ 7 วัน)
+ *   - DB เก็บแค่ SHA-256 ของ token — DB รั่วก็เอาไปใช้ไม่ได้ ส่วนตัวจริงอยู่ใน cookie ของผู้ใช้
+ *   - 1 user มีได้ 1 token: login ใหม่จะลบของเก่า (login ได้ทีละอุปกรณ์)
+ *   - rotation: ทุกครั้งที่ refresh ตัวเก่าถูกลบแล้วออกตัวใหม่
  */
-// เอาไว้สร้าง token ใหม่, validate token, rotate token, revoke token (ตอน logout) | reviewd by peak
 @Service
 public class RefreshTokenService {
+
+    private static final int TTL_DAYS = 7;
 
     private final RefreshTokenRepository repo;
 
@@ -39,83 +31,62 @@ public class RefreshTokenService {
         this.repo = repo;
     }
 
-    /**
-     * สร้าง refresh token ใหม่สำหรับ user
-     * @return plain token ที่ต้องส่งใส่ cookie (ไม่ใช่ hash)
-     */
+    /** login ใหม่ — ลบ token เก่าของ user แล้วออกใหม่ @return token ตัวจริงสำหรับใส่ cookie */
     @Transactional
     public String create(User user) {
         repo.deleteAllByUser(user);
-
-        String plainToken = UUID.randomUUID().toString();
-        RefreshToken token = new RefreshToken();
-        token.setUser(user);
-        token.setToken(sha256(plainToken)); // เก็บ hash ใน DB
-        token.setExpiresAt(LocalDateTime.now().plusDays(7));
-        repo.save(token);
-        return plainToken;
+        return issue(user);
     }
 
-    /**
-     * ตรวจสอบ plain token — hash ก่อน lookup
-     * @param plainToken token จาก cookie
-     * @return RefreshToken entity ที่ใช้งานได้
-     */
+    /** @return token ใน DB ที่ยังใช้ได้ — ไม่เจอ/ถูก revoke → INVALID_REFRESH_TOKEN, หมดอายุ → REFRESH_TOKEN_EXPIRED */
     public RefreshToken validate(String plainToken) {
-        RefreshToken rt = repo.findByTokenAndRevokedFalse(sha256(plainToken))
-            .orElseThrow(() -> new RuntimeException("INVALID_REFRESH_TOKEN"));
+        RefreshToken token = repo.findByTokenAndRevokedFalse(sha256(plainToken))
+                .orElseThrow(() -> new RuntimeException("INVALID_REFRESH_TOKEN"));
 
-        if (rt.getExpiresAt().isBefore(LocalDateTime.now())) {
-            rt.setRevoked(true);
-            repo.save(rt);
+        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            token.setRevoked(true);
+            repo.save(token);
             throw new RuntimeException("REFRESH_TOKEN_EXPIRED");
         }
-
-        return rt;
+        return token;
     }
 
-    /**
-     * Token Rotation — ลบเก่า สร้างใหม่
-     * @return plain token ใหม่ (ส่งใส่ cookie)
-     */
+    /** ลบตัวเก่า ออกตัวใหม่ @return token ตัวจริงตัวใหม่ */
     @Transactional
     public String rotate(RefreshToken oldToken) {
-        repo.deleteByToken(oldToken.getToken()); // oldToken.getToken() เป็น hash อยู่แล้ว
-
-        String plainToken = UUID.randomUUID().toString();
-        RefreshToken newToken = new RefreshToken();
-        newToken.setUser(oldToken.getUser());
-        newToken.setToken(sha256(plainToken));
-        newToken.setExpiresAt(LocalDateTime.now().plusDays(7));
-        repo.save(newToken);
-        return plainToken;
+        repo.deleteByToken(oldToken.getToken());   // getToken() เป็น hash อยู่แล้ว
+        return issue(oldToken.getUser());
     }
 
-    /**
-     * ยกเลิก refresh token ทุกตัวของ user — ใช้ตอนเปลี่ยน/รีเซ็ตรหัสผ่าน
-     * ทุกอุปกรณ์ต้อง login ใหม่ (access token ที่ออกไปแล้วหมดเองใน 15 นาที)
-     */
-    @Transactional
-    public void revokeAll(User user) {
-        repo.deleteAllByUser(user);
-    }
-
-    /**
-     * Revoke token (ตอน logout)
-     */
+    /** logout */
     @Transactional
     public void revoke(RefreshToken token) {
         token.setRevoked(true);
         repo.save(token);
     }
 
-    private String sha256(String input) {
+    /** ทุกอุปกรณ์ต้อง login ใหม่ — ใช้ตอน reset รหัสผ่าน หรือบัญชีถูกแบน */
+    @Transactional
+    public void revokeAll(User user) {
+        repo.deleteAllByUser(user);
+    }
+
+    private String issue(User user) {
+        String plainToken = UUID.randomUUID().toString();
+        RefreshToken token = new RefreshToken();
+        token.setUser(user);
+        token.setToken(sha256(plainToken));
+        token.setExpiresAt(LocalDateTime.now().plusDays(TTL_DAYS));
+        repo.save(token);
+        return plainToken;
+    }
+
+    private static String sha256(String input) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to hash token", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);   // JVM ทุกตัวต้องมี — ไม่ควรเกิด
         }
     }
 }

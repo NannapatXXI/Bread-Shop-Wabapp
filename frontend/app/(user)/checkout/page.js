@@ -38,7 +38,7 @@ export default function CheckoutPage() {
   // ── ดึงที่อยู่ของ user ────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    getAddresses(user.id)
+    getAddresses()
       .then(res => {
         const list = res.data ?? [];
         setAddresses(list);

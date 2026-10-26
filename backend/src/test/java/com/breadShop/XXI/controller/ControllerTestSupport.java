@@ -3,6 +3,7 @@ package com.breadShop.XXI.controller;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Date;
@@ -15,17 +16,18 @@ import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcBuilderCus
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.breadShop.XXI.config.SecurityConfig;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.UserRepository;
-import com.breadShop.XXI.service.ApiRequestLogService;
 import com.breadShop.XXI.service.JwtService;
 
 import io.jsonwebtoken.Jwts;
@@ -39,7 +41,7 @@ import jakarta.servlet.http.Cookie;
  * (กฎสิทธิ์ชุดเดียวกับ production) แล้ว mock เฉพาะ service/repository ด้านหลัง
  * token ในเทสเซ็นด้วย secret ที่สุ่มใหม่ทุกครั้ง — ไม่ใช้ secret จริงของระบบ
  */
-@Import({ SecurityConfig.class, JwtService.class, ControllerTestSupport.ProductionLikeServletPath.class })
+@Import({ SecurityConfig.class, JwtService.class, CurrentUser.class, ControllerTestSupport.ProductionLikeServletPath.class })
 abstract class ControllerTestSupport {
 
     private static final String TEST_JWT_SECRET = randomBase64Key();
@@ -61,14 +63,19 @@ abstract class ControllerTestSupport {
     @MockitoBean
     protected UserRepository userRepository;
 
-    // ApiLoggingInterceptor (ผ่าน WebConfig) บันทึกทุก request — mock ไว้ไม่ให้แตะ DB
-    @MockitoBean
-    protected ApiRequestLogService apiRequestLogService;
-
     protected Cookie tokenFor(String email, String role) {
         UserDetails details = org.springframework.security.core.userdetails.User
                 .withUsername(email).password("unused").roles(role).build();
         return new Cookie("access_token", jwtService.generateToken(details));
+    }
+
+    /** body JSON ของ request — ใช้คู่กับ .with(json("{...}")) */
+    protected static RequestPostProcessor json(String body) {
+        return request -> {
+            request.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            request.setContent(body.getBytes(StandardCharsets.UTF_8));
+            return request;
+        };
     }
 
     protected Cookie userToken(String email) {

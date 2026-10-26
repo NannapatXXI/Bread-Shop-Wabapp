@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    api.get("/api/v1/auth/me")
+    api.get("/api/v1/users/me")
       .then(res => setUser(res.data))
       .catch(() => {
         setUser(null);

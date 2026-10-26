@@ -30,9 +30,14 @@ build/
 .vscode/
 # ยกเว้น settings.json ถ้าอยากแชร์กับทีม แต่แนะนำให้ข้ามไปก่อน
 # --- Logs ---
-logs/
+# /logs/ = เฉพาะที่ root — ถ้าไม่มี / นำหน้าจะไปโดน frontend/app/admin/logs/ (หน้าเว็บ) ด้วย
+/logs/
 backend/logs/
 *.log
 
 # --- Uploads ---
 uploads/
+
+# --- เครื่องมือ (ผลลัพธ์ที่สร้างใหม่ได้ ไม่ต้องขึ้น git) ---
+.scannerwork/
+.archify/

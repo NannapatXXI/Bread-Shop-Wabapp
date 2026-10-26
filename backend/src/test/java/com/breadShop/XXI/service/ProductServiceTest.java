@@ -95,8 +95,8 @@ class ProductServiceTest {
         when(productRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.getProductById(999L))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Not Found");
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -123,18 +123,6 @@ class ProductServiceTest {
                 .isInstanceOf(ResponseStatusException.class);
 
         verify(productRepository, never()).delete(any());
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  countAllProducts
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("countAllProducts — คืนจำนวนสินค้าทั้งหมด")
-    void countAllProducts_shouldReturnTotalCount() {
-        when(productRepository.count()).thenReturn(8L);
-
-        assertThat(productService.countAllProducts()).isEqualTo(8L);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -315,18 +303,6 @@ class ProductServiceTest {
 
         assertThat(result.getImageUrl()).startsWith("uploads/");
         verify(newImage).transferTo(any(java.io.File.class));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  countProductsByExpiryDate
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("countProductsByExpiryDate — คืนจำนวนสินค้าที่หมดอายุแล้ว")
-    void countProductsByExpiryDate_shouldReturnCount() {
-        when(productRepository.countByExpiryDateBefore(any(LocalDate.class))).thenReturn(4L);
-
-        assertThat(productService.countProductsByExpiryDate()).isEqualTo(4L);
     }
 
     @Test

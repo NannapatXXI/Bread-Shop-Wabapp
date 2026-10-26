@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -20,24 +19,26 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.breadShop.XXI.dto.customer.CustomerResponse;
 import com.breadShop.XXI.dto.order.OrderResponse;
 import com.breadShop.XXI.dto.product.ProductRequest;
 import com.breadShop.XXI.entity.Order.OrderStatus;
 import com.breadShop.XXI.entity.Product;
 import com.breadShop.XXI.entity.ProductCategory;
 import com.breadShop.XXI.entity.User;
-import com.breadShop.XXI.repository.OrderRepository;
 import com.breadShop.XXI.service.AuditLogService;
+import com.breadShop.XXI.service.CustomerService;
 import com.breadShop.XXI.service.OrderService;
 import com.breadShop.XXI.service.ProductService;
 
@@ -49,7 +50,7 @@ class AdminControllerTest extends ControllerTestSupport {
 
     @MockitoBean private ProductService productService;
     @MockitoBean private OrderService orderService;
-    @MockitoBean private OrderRepository orderRepository;
+    @MockitoBean private CustomerService customerService;
     @MockitoBean private AuditLogService auditLogService;
 
     private Product product(long id, String name) {
@@ -63,14 +64,6 @@ class AdminControllerTest extends ControllerTestSupport {
         return new OrderResponse(id, "ORD-" + id, 7, "Alice", "080", "1 Road", "BKK", "D", "S", "10330",
                 BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN, null, status, trackingNo,
                 null, List.of(), LocalDateTime.now());
-    }
-
-    private User customer(int id, String username, String role, boolean active, String provider) {
-        User u = new User(username, username + "@example.com", "hashed", role);
-        ReflectionTestUtils.setField(u, "id", id);
-        u.setActive(active);
-        u.setProvider(provider);
-        return u;
     }
 
     // ───────────── role rules ─────────────
@@ -87,14 +80,13 @@ class AdminControllerTest extends ControllerTestSupport {
         stubUser(7, ALICE, "USER");
 
         mockMvc.perform(get("/api/v1/admin/orders").cookie(userToken(ALICE))).andExpect(status().isForbidden());
-        mockMvc.perform(delete("/api/v1/admin/5").cookie(userToken(ALICE))).andExpect(status().isForbidden());
-        mockMvc.perform(patch("/api/v1/admin/customers/8/role").param("role", "ADMIN").cookie(userToken(ALICE)))
+        mockMvc.perform(delete("/api/v1/admin/products/5").cookie(userToken(ALICE))).andExpect(status().isForbidden());
+        mockMvc.perform(patch("/api/v1/admin/customers/8/role").with(json("{\"role\":\"ADMIN\"}")).cookie(userToken(ALICE)))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(patch("/api/v1/admin/customers/8/ban").cookie(userToken(ALICE)))
+        mockMvc.perform(patch("/api/v1/admin/customers/8/active").with(json("{\"active\":false}")).cookie(userToken(ALICE)))
                 .andExpect(status().isForbidden());
 
-        verifyNoInteractions(orderService, productService, auditLogService);
-        verify(userRepository, never()).save(any());
+        verifyNoInteractions(orderService, productService, customerService, auditLogService);
     }
 
     // ───────────── products ─────────────
@@ -105,11 +97,11 @@ class AdminControllerTest extends ControllerTestSupport {
         when(productService.createProduct(any())).thenReturn(product(30, "Croissant"));
         MockMultipartFile image = new MockMultipartFile("image", "c.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
 
-        mockMvc.perform(multipart("/api/v1/admin/add-products").file(image)
+        mockMvc.perform(multipart("/api/v1/admin/products").file(image)
                         .param("name", "Croissant").param("price", "25.00").param("stock", "12")
                         .param("category", "BREAD").param("expiryDate", "2027-01-01")
                         .cookie(adminToken(ADMIN)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("เพิ่มสินค้าสำเร็จ"))
                 .andExpect(jsonPath("$.data.id").value(30))
                 .andExpect(jsonPath("$.data.name").value("Croissant"));
@@ -131,7 +123,7 @@ class AdminControllerTest extends ControllerTestSupport {
     void createProduct_asUser_isRejectedBeforeServiceRuns() throws Exception {
         stubUser(7, ALICE, "USER");
 
-        mockMvc.perform(multipart("/api/v1/admin/add-products").param("name", "Hack").cookie(userToken(ALICE)))
+        mockMvc.perform(multipart("/api/v1/admin/products").param("name", "Hack").cookie(userToken(ALICE)))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(productService);
@@ -141,7 +133,7 @@ class AdminControllerTest extends ControllerTestSupport {
     void createProduct_withNegativeStock_isRejectedByValidation() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
 
-        mockMvc.perform(multipart("/api/v1/admin/add-products")
+        mockMvc.perform(multipart("/api/v1/admin/products")
                         .param("name", "Bad").param("price", "10").param("stock", "-5")
                         .cookie(adminToken(ADMIN)))
                 .andExpect(status().isBadRequest());
@@ -168,7 +160,7 @@ class AdminControllerTest extends ControllerTestSupport {
     void deleteProduct_deletesAndAudits() throws Exception {
         User admin = stubUser(1, ADMIN, "ADMIN");
 
-        mockMvc.perform(delete("/api/v1/admin/30").cookie(adminToken(ADMIN)))
+        mockMvc.perform(delete("/api/v1/admin/products/30").cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("ลบสินค้าสำเร็จ"));
 
@@ -182,7 +174,7 @@ class AdminControllerTest extends ControllerTestSupport {
         stubUser(1, ADMIN, "ADMIN");
         when(productService.getProductById(30L)).thenReturn(product(30, "Croissant"));
 
-        mockMvc.perform(get("/api/v1/admin/get-product-by-id/30").cookie(adminToken(ADMIN)))
+        mockMvc.perform(get("/api/v1/admin/products/30").cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("Croissant"))
                 .andExpect(jsonPath("$.data.stock").value(12));
@@ -196,8 +188,8 @@ class AdminControllerTest extends ControllerTestSupport {
         when(orderService.updateStatus(55, OrderStatus.SHIPPED, "TH123"))
                 .thenReturn(order(55, OrderStatus.SHIPPED, "TH123"));
 
-        mockMvc.perform(patch("/api/v1/admin/55/status")
-                        .param("status", "SHIPPED").param("trackingNo", "TH123")
+        mockMvc.perform(patch("/api/v1/admin/orders/55/status")
+                        .with(json("{\"status\":\"SHIPPED\",\"trackingNo\":\"TH123\"}"))
                         .cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.trackingNo").value("TH123"));
@@ -210,7 +202,7 @@ class AdminControllerTest extends ControllerTestSupport {
     void updateStatus_withUnknownStatus_returns400_andChangesNothing() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
 
-        mockMvc.perform(patch("/api/v1/admin/55/status").param("status", "TELEPORTED")
+        mockMvc.perform(patch("/api/v1/admin/orders/55/status").with(json("{\"status\":\"TELEPORTED\"}"))
                         .cookie(adminToken(ADMIN)))
                 .andExpect(status().isBadRequest());
 
@@ -227,110 +219,95 @@ class AdminControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.length()").value(2));
     }
 
-    // ───────────── customers ─────────────
+    // ───────────── customers (logic อยู่ใน CustomerServiceTest — ที่นี่เช็คว่าส่งต่อ + ลง audit) ─────────────
 
     @Test
-    void customers_joinsOrderCounts_andDefaultsProviderToCredentials() throws Exception {
+    void customers_returnsServiceResult() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
-        when(userRepository.findAll()).thenReturn(List.of(
-                customer(7, "alice", "USER", true, null),
-                customer(8, "bob", "USER", false, "google")));
-        when(orderRepository.countOrdersGroupByUser()).thenReturn(List.<Object[]>of(new Object[] { 7, 3L }));
+        when(customerService.getAll()).thenReturn(List.of(
+                new CustomerResponse(7, "alice", ALICE, "USER", "credentials", LocalDateTime.now(), 3, true)));
 
         mockMvc.perform(get("/api/v1/admin/customers").cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].username").value("alice"))
-                .andExpect(jsonPath("$.data[0].provider").value("credentials"))
-                .andExpect(jsonPath("$.data[0].orderCount").value(3))
-                .andExpect(jsonPath("$.data[1].provider").value("google"))
-                .andExpect(jsonPath("$.data[1].orderCount").value(0))
-                .andExpect(jsonPath("$.data[1].isActive").value(false));
+                .andExpect(jsonPath("$.data[0].orderCount").value(3));
     }
 
     @Test
-    void updateRole_normalizesCase_savesAndAuditsOldAndNewRole() throws Exception {
+    void updateRole_auditsOldAndNewRole() throws Exception {
         User admin = stubUser(1, ADMIN, "ADMIN");
-        User bob = customer(8, "bob", "USER", true, null);
-        when(userRepository.findById(8)).thenReturn(Optional.of(bob));
+        when(customerService.updateRole(8, "admin")).thenReturn("USER");
 
-        mockMvc.perform(patch("/api/v1/admin/customers/8/role").param("role", "admin")
+        mockMvc.perform(patch("/api/v1/admin/customers/8/role").with(json("{\"role\":\"admin\"}"))
                         .cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk());
 
-        assertThat(bob.getRole()).isEqualTo("ADMIN");
-        verify(userRepository).save(bob);
         verify(auditLogService).log(eq(admin), eq("CHANGE_ROLE"), eq("User"), eq("8"),
                 eq("USER"), eq("ADMIN"), anyString());
     }
 
     @Test
-    void updateRole_invalidRole_returns400_andDoesNotSave() throws Exception {
+    void updateRole_whenServiceRejects_returnsItsMessage_andDoesNotAudit() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
-        User bob = customer(8, "bob", "USER", true, null);
-        when(userRepository.findById(8)).thenReturn(Optional.of(bob));
+        when(customerService.updateRole(8, "SUPERADMIN")).thenThrow(
+                new ResponseStatusException(HttpStatus.BAD_REQUEST, "role ต้องเป็น USER หรือ ADMIN เท่านั้น"));
 
-        mockMvc.perform(patch("/api/v1/admin/customers/8/role").param("role", "SUPERADMIN")
+        mockMvc.perform(patch("/api/v1/admin/customers/8/role").with(json("{\"role\":\"SUPERADMIN\"}"))
                         .cookie(adminToken(ADMIN)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("role ต้องเป็น USER หรือ ADMIN เท่านั้น"));
 
-        assertThat(bob.getRole()).isEqualTo("USER");
-        verify(userRepository, never()).save(any());
         verifyNoInteractions(auditLogService);
     }
 
     @Test
-    void toggleBan_flipsActiveFlag_bothDirections() throws Exception {
-        stubUser(1, ADMIN, "ADMIN");
-        User bob = customer(8, "bob", "USER", true, null);
-        when(userRepository.findById(8)).thenReturn(Optional.of(bob));
+    void setActive_sendsRequestedState_andAuditsOldAndNew() throws Exception {
+        User admin = stubUser(1, ADMIN, "ADMIN");
+        when(customerService.setActive(8, false)).thenReturn(true);
+        when(customerService.setActive(8, true)).thenReturn(false);
 
-        mockMvc.perform(patch("/api/v1/admin/customers/8/ban").cookie(adminToken(ADMIN)))
+        mockMvc.perform(patch("/api/v1/admin/customers/8/active").with(json("{\"active\":false}")).cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("ระงับบัญชีสำเร็จ"));
-        assertThat(bob.isActive()).isFalse();
+        verify(auditLogService).log(eq(admin), eq("BAN_USER"), eq("User"), eq("8"),
+                eq("true"), eq("false"), anyString());
 
-        mockMvc.perform(patch("/api/v1/admin/customers/8/ban").cookie(adminToken(ADMIN)))
+        mockMvc.perform(patch("/api/v1/admin/customers/8/active").with(json("{\"active\":true}")).cookie(adminToken(ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("ปลดระงับบัญชีสำเร็จ"));
-        assertThat(bob.isActive()).isTrue();
     }
 
     @Test
-    void updateUsername_trimsAndSaves() throws Exception {
+    void setActive_withoutBody_returns400_andChangesNothing() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
-        User bob = customer(8, "bob", "USER", true, null);
-        when(userRepository.findById(8)).thenReturn(Optional.of(bob));
 
-        mockMvc.perform(patch("/api/v1/admin/customers/8/username").param("username", "  robert  ")
+        mockMvc.perform(patch("/api/v1/admin/customers/8/active").with(json("{}")).cookie(adminToken(ADMIN)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(customerService, auditLogService);
+    }
+
+    @Test
+    void updateUsername_delegatesToService() throws Exception {
+        stubUser(1, ADMIN, "ADMIN");
+
+        mockMvc.perform(patch("/api/v1/admin/customers/8/username").with(json("{\"username\":\"  robert  \"}"))
                         .cookie(adminToken(ADMIN)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("อัปเดต username สำเร็จ"));
 
-        assertThat(bob.getUsername()).isEqualTo("robert");
-        verify(userRepository).save(bob);
+        verify(customerService).updateUsername(8, "  robert  ");
     }
 
     @Test
-    void updateUsername_blank_returns400_andDoesNotSave() throws Exception {
+    void updateUsername_blank_returns400_withMessage() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
 
-        mockMvc.perform(patch("/api/v1/admin/customers/8/username").param("username", "   ")
+        mockMvc.perform(patch("/api/v1/admin/customers/8/username").with(json("{\"username\":\"   \"}"))
                         .cookie(adminToken(ADMIN)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("username ห้ามว่าง"));
 
-        verify(userRepository, never()).save(any());
-    }
-
-    @Test
-    void updateRole_unknownUser_returns404() throws Exception {
-        stubUser(1, ADMIN, "ADMIN");
-        when(userRepository.findById(999)).thenReturn(Optional.empty());
-
-        mockMvc.perform(patch("/api/v1/admin/customers/999/role").param("role", "ADMIN")
-                        .cookie(adminToken(ADMIN)))
-                .andExpect(status().isNotFound());
-
-        verify(userRepository, never()).save(any());
+        verifyNoInteractions(customerService);
     }
 }

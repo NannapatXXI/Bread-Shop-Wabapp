@@ -1,0 +1,69 @@
+# Monitoring: Loki (เก็บ log) + Alloy (ส่ง log) + Prometheus (เก็บ metrics) + Grafana (ดูทั้งหมด)
+#
+# รันคู่กับแอป:   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+# รันเฉพาะส่วนนี้: docker compose -f docker-compose.monitoring.yml up -d
+# เปิด Grafana:   http://localhost:3001  (user: admin, รหัส: GRAFANA_PASSWORD ใน .env ที่ root)
+#
+# ทุก port ผูกกับ 127.0.0.1 — เปิดดูได้จากเครื่องนี้เท่านั้น ไม่เปิดสู่ภายนอก
+
+services:
+  loki:
+    image: grafana/loki:3.4.2
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.7.1
+    command: run /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/config.alloy:/etc/alloy/config.alloy:ro
+      # อ่าน log ของ container อื่น — สิทธิ์สูง อย่าเปิด port ของ alloy สู่ภายนอก
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # log ของ backend ที่รันด้วย Maven บนเครื่อง (logback-spring.xml เขียนไว้ที่นี่)
+      - ${HOME}/.breadshop/logs:/var/log/breadshop:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d   # เก็บ metrics 30 วันเท่ากับ log
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # ให้เห็น backend ที่รันบนเครื่อง (Linux ต้องมีบรรทัดนี้)
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?ตั้ง GRAFANA_PASSWORD ใน .env ที่ root ก่อน}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"   # 3000 เป็นของ frontend
+    depends_on:
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  loki-data:
+  prometheus-data:
+  grafana-data:

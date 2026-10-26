@@ -15,15 +15,7 @@ import com.breadShop.XXI.entity.ProductCategory;
 import com.breadShop.XXI.mapper.ProductMapper;
 import com.breadShop.XXI.service.ProductService;
 
-/**
- * [Claude] ProductController — endpoints สาธารณะสำหรับ user ทั่วไป (login แล้ว)
- * path: /api/v1/products/**
- * security: ต้อง login แต่ไม่ต้องเป็น admin
- *
- * แตกต่างจาก AdminController:
- *   - ดูสินค้าได้ แต่ไม่สามารถเพิ่ม/แก้ไข/ลบ
- *   - ถ้าต้องการ endpoint ที่ต้อง admin ให้ไปที่ /api/v1/admin/products
- */
+/** /api/v1/products — ดูสินค้า (สาธารณะ ไม่ต้อง login) ส่วนเพิ่ม/แก้/ลบอยู่ที่ AdminController */
 @RestController
 @RequestMapping("/api/v1/products")
 public class ProductController {
@@ -34,43 +26,30 @@ public class ProductController {
         this.productService = productService;
     }
 
-    /**
-     * GET /api/v1/products
-     * ดึงสินค้าทั้งหมด — user ที่ login แล้วเข้าได้
-     */
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts() {
-        List<ProductResponse> responses = productService.getAllProducts().stream()
-                .map(ProductMapper::toResponse)
-                .toList();
-        return ResponseEntity.ok(ApiResponse.ok(responses));
+        return ResponseEntity.ok(ApiResponse.ok(
+                productService.getAllProducts().stream().map(ProductMapper::toResponse).toList()));
     }
 
-    /**
-     * GET /api/v1/products/get-count-Category?categoryString=BREAD
-     * นับสินค้าตาม category (ใช้ใน dashboard / ทดสอบ)
-     */
-    @GetMapping("/get-count-Category")
-    public ResponseEntity<ApiResponse<Long>> countByCategory(@RequestParam String categoryString) {
-        ProductCategory category;
-        try {
-            category = ProductCategory.valueOf(categoryString.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("ไม่พบหมวดหมู่สินค้า: " + categoryString));
+    /** ?category=BREAD หรือ ?stockAbove=10 (จำนวนสินค้าที่สต็อกมากกว่าค่านี้) — ใส่ได้ทีละตัว */
+    @GetMapping("/count")
+    public ResponseEntity<ApiResponse<Long>> count(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer stockAbove) {
+        if ((category == null) == (stockAbove == null)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("ระบุ category หรือ stockAbove อย่างใดอย่างหนึ่ง"));
         }
-        Long count = productService.countProductCategory(category);
-        return ResponseEntity.ok(ApiResponse.ok(
-                "จำนวนสินค้าประเภท " + categoryString, count));
-    }
-
-    /**
-     * GET /api/v1/products/get-count-stock?stock=5
-     * นับสินค้าที่มี stock มากกว่าค่าที่กำหนด
-     */
-    @GetMapping("/get-count-stock")
-    public ResponseEntity<ApiResponse<Long>> countByStock(@RequestParam int stock) {
-        Long count = productService.countProductsByStock(stock);
-        return ResponseEntity.ok(ApiResponse.ok(
-                "จำนวนสินค้าที่มี stock > " + stock, count));
+        if (stockAbove != null) {
+            return ResponseEntity.ok(ApiResponse.ok("จำนวนสินค้าที่มี stock > " + stockAbove,
+                    productService.countProductsByStock(stockAbove)));
+        }
+        try {
+            ProductCategory value = ProductCategory.valueOf(category.toUpperCase(Locale.ROOT));
+            return ResponseEntity.ok(ApiResponse.ok("จำนวนสินค้าประเภท " + category,
+                    productService.countProductCategory(value)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("ไม่พบหมวดหมู่สินค้า: " + category));
+        }
     }
 }

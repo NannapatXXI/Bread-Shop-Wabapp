@@ -50,16 +50,15 @@ export default function ProfilePage() {
   };
   const [form, setForm] = useState(emptyForm);
 
-  //  ดึงรายการที่อยู่ของ user จาก backend
-  const userId = user?.id;
+  //  ดึงรายการที่อยู่ของคนที่ login อยู่ (backend รู้ user จาก token)
   const fetchAddresses = useCallback(async () => {
     try {
-      const res = await api.get(`/api/users/${userId}/addresses`);
+      const res = await api.get('/api/v1/users/me/addresses');
       setAddresses(res.data);
     } catch {
       setAddressMsg('โหลดที่อยู่ไม่สำเร็จ');
     }
-  }, [userId]);
+  }, []);
 
   // ─── โหลดข้อมูลเริ่มต้น ──────────────────────────────────────
   useEffect(() => {
@@ -139,7 +138,7 @@ export default function ProfilePage() {
   // ─── แก้ไขข้อมูลส่วนตัว ──────────────────────────────────────
   const handleSaveProfile = async () => {
     try {
-      await api.put('/api/v1/auth/me', { username });
+      await api.patch('/api/v1/users/me', { username });
       setProfileMsg('บันทึกสำเร็จ');
       setEditingProfile(false);
     } catch {
@@ -190,9 +189,9 @@ export default function ProfilePage() {
   const handleSaveAddress = async () => {
     try {
       if (editingAddressId) {
-        await api.put(`/api/users/${user.id}/addresses/${editingAddressId}`, form);
+        await api.put(`/api/v1/users/me/addresses/${editingAddressId}`, form);
       } else {
-        await api.post(`/api/users/${user.id}/addresses`, form);
+        await api.post('/api/v1/users/me/addresses', form);
       }
       setAddressMsg('บันทึกที่อยู่สำเร็จ');
       setShowAddressForm(false);
@@ -208,7 +207,7 @@ export default function ProfilePage() {
   const handleDeleteAddress = async (addressId) => {
     if (!confirm('ต้องการลบที่อยู่นี้?')) return;
     try {
-      await api.delete(`/api/users/${user.id}/addresses/${addressId}`);
+      await api.delete(`/api/v1/users/me/addresses/${addressId}`);
       setAddressMsg('ลบที่อยู่สำเร็จ');
       fetchAddresses();
     } catch {
@@ -220,7 +219,7 @@ export default function ProfilePage() {
   // [ตั้ง default ที่อยู่
   const handleSetDefault = async (addressId) => {
     try {
-      await api.put(`/api/users/${user.id}/addresses/${addressId}/default`);
+      await api.put(`/api/v1/users/me/addresses/${addressId}/default`);
       fetchAddresses();
     } catch {
       setAddressMsg('ตั้งค่าไม่สำเร็จ');

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,13 +52,9 @@ class GoogleAuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        googleAuthService = new GoogleAuthService(userRepository, jwtService, refreshTokenService);
-
-        ReflectionTestUtils.setField(googleAuthService, "clientId", CLIENT_ID);
-        ReflectionTestUtils.setField(googleAuthService, "clientSecret", "secret");
-        ReflectionTestUtils.setField(googleAuthService, "redirectUri", REDIRECT_URI);
-        ReflectionTestUtils.setField(googleAuthService, "tokenUri", TOKEN_URI);
-        ReflectionTestUtils.setField(googleAuthService, "userInfoUri", USERINFO_URI);
+        googleAuthService = new GoogleAuthService(CLIENT_ID, "secret", REDIRECT_URI, TOKEN_URI, USERINFO_URI,
+                userRepository, new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(),
+                jwtService, refreshTokenService);
 
         restTemplate = mock(RestTemplate.class);
         ReflectionTestUtils.setField(googleAuthService, "restTemplate", restTemplate);
@@ -148,5 +145,23 @@ class GoogleAuthServiceTest {
         verify(jwtService).generateToken(captor.capture());
         assertThat(captor.getValue().getAuthorities()).extracting(Object::toString)
                 .containsExactly("ROLE_USER");
+    }
+
+    @Test
+    void handleGoogleCallback_bannedAccount_isRefused_withoutIssuingTokens() {
+        stubGoogleHttpCalls("banned@breadshop.com");
+        User banned = new User();
+        banned.setEmail("banned@breadshop.com");
+        banned.setUsername("banned");
+        banned.setPassword("hashed");
+        banned.setRole("USER");
+        banned.setActive(false);
+        when(userRepository.findByEmail("banned@breadshop.com")).thenReturn(Optional.of(banned));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> googleAuthService.handleGoogleCallback("auth-code"))
+                .hasMessage("ACCOUNT_DISABLED");
+
+        verify(jwtService, never()).generateToken(any(UserDetails.class));
+        verify(refreshTokenService, never()).create(any(User.class));
     }
 }

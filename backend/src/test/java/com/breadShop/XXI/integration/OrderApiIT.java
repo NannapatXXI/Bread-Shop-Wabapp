@@ -16,6 +16,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Integration Test: Order API — ทดสอบ flow สมบูรณ์
  *
  * สิ่งที่ทดสอบที่ unit test ทำไม่ได้:
- *   1. JWT cookie จาก login สามารถใช้เรียก /api/orders ได้จริง
+ *   1. JWT cookie จาก login สามารถใช้เรียก /api/v1/orders ได้จริง
  *   2. Stock ถูกหักจาก DB จริงหลังสั่งซื้อ
  *   3. ถ้า stock = 0 ต้อง reject ด้วย 400 จาก DB จริง
  *   4. User ที่ไม่ใช่เจ้าของ order ยกเลิกไม่ได้ (403 จาก DB จริง)
@@ -48,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@Import(MySqlContainerConfig.class)
 @EnabledIfSystemProperty(named = "integration", matches = "true")
 @DisplayName("Order API Integration Tests")
 class OrderApiIT {
@@ -113,7 +115,7 @@ class OrderApiIT {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  POST /api/orders — สร้าง order
+    //  POST /api/v1/orders — สร้าง order
     // ─────────────────────────────────────────────────────────────────
 
     @Test
@@ -121,7 +123,7 @@ class OrderApiIT {
     void createOrder_shouldDeductStockInDatabase() throws Exception {
         Cookie accessToken = loginAndGetAccessToken();
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .cookie(accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -132,7 +134,7 @@ class OrderApiIT {
                               ]
                             }
                         """.formatted(testAddress.getId(), testProduct.getId())))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.orderNo").isNotEmpty());
 
@@ -147,7 +149,7 @@ class OrderApiIT {
         Cookie accessToken = loginAndGetAccessToken();
 
         // ยิง API เอง: ขอส่วนลดเท่าราคาสินค้า + ค่าส่งติดลบ เพื่อให้ได้ของฟรี
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .cookie(accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -159,7 +161,7 @@ class OrderApiIT {
                               ]
                             }
                         """.formatted(testAddress.getId(), testProduct.getId())))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 // 60.00 × 2 = 120.00 เต็มราคา ส่งฟรี (ค่าส่งกำหนดโดย server)
                 .andExpect(jsonPath("$.data.subtotal").value(120.00))
                 .andExpect(jsonPath("$.data.shippingFee").value(0))
@@ -169,9 +171,9 @@ class OrderApiIT {
     }
 
     @Test
-    @DisplayName("เรียก /api/orders โดยไม่มี cookie → 401 Unauthorized")
+    @DisplayName("เรียก /api/v1/orders โดยไม่มี cookie → 401 Unauthorized")
     void createOrder_withoutAuth_shouldReturn401() throws Exception {
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                             {
@@ -188,7 +190,7 @@ class OrderApiIT {
         Cookie accessToken = loginAndGetAccessToken();
 
         // stock = 5 แต่สั่ง 99 ชิ้น
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .cookie(accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -205,7 +207,7 @@ class OrderApiIT {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  PATCH /api/orders/{id}/cancel
+    //  PATCH /api/v1/orders/{id}/cancel
     // ─────────────────────────────────────────────────────────────────
 
     @Test
@@ -214,7 +216,7 @@ class OrderApiIT {
         Cookie accessToken = loginAndGetAccessToken();
 
         // สร้าง order ก่อน
-        MvcResult createResult = mockMvc.perform(post("/api/orders")
+        MvcResult createResult = mockMvc.perform(post("/api/v1/orders")
                         .cookie(accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -223,7 +225,7 @@ class OrderApiIT {
                               "items": [{ "productId": %d, "quantity": 2 }]
                             }
                         """.formatted(testAddress.getId(), testProduct.getId())))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
 
         // ดึง orderId จาก response
@@ -235,7 +237,7 @@ class OrderApiIT {
                 .isEqualTo(3);
 
         // ยกเลิก order
-        mockMvc.perform(patch("/api/orders/" + orderId + "/cancel")
+        mockMvc.perform(patch("/api/v1/orders/" + orderId + "/cancel")
                         .cookie(accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));

@@ -1,0 +1,9 @@
+# โหลด dashboard จากไฟล์ JSON ใน monitoring/dashboards ให้อัตโนมัติ
+apiVersion: 1
+providers:
+  - name: breadshop
+    folder: BreadShop
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -52,6 +53,7 @@ import jakarta.servlet.http.Cookie;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@Import(MySqlContainerConfig.class)
 @EnabledIfSystemProperty(named = "integration", matches = "true")
 @DisplayName("Access control (IDOR) Integration Tests")
 class AccessControlIT {
@@ -106,11 +108,11 @@ class AccessControlIT {
     }
 
     private JsonNode placeOrder(Cookie token, UserAddress address) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/orders").cookie(token)
+        MvcResult result = mockMvc.perform(post("/api/v1/orders").cookie(token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"addressId\": " + address.getId()
                                 + ", \"items\": [{ \"productId\": " + product.getId() + ", \"quantity\": 1 }] }"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("data");
     }
@@ -131,13 +133,13 @@ class AccessControlIT {
         int orderId = order.get("id").asInt();
         int lineId = order.get("orderLines").get(0).get("id").asInt();
 
-        mockMvc.perform(get("/api/orders/" + orderId).cookie(aliceToken))
+        mockMvc.perform(get("/api/v1/orders/" + orderId).cookie(aliceToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(alice.getId()));
-        mockMvc.perform(get("/api/orders/" + orderId + "/lines").cookie(aliceToken))
+        mockMvc.perform(get("/api/v1/orders/" + orderId + "/lines").cookie(aliceToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1));
-        mockMvc.perform(get("/api/orders/" + orderId + "/lines/" + lineId).cookie(aliceToken))
+        mockMvc.perform(get("/api/v1/orders/" + orderId + "/lines/" + lineId).cookie(aliceToken))
                 .andExpect(status().isOk());
     }
 
@@ -146,7 +148,7 @@ class AccessControlIT {
     void owner_canUpdateOwnAddress() throws Exception {
         Cookie aliceToken = login(alice);
 
-        mockMvc.perform(put("/api/users/" + alice.getId() + "/addresses/" + aliceAddress.getId()).cookie(aliceToken)
+        mockMvc.perform(put("/api/v1/users/me/addresses/" + aliceAddress.getId()).cookie(aliceToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"name\": \"คอนโด\", \"recipientName\": \"Alice\", \"phone\": \"0811111111\", \"isDefault\": true }"))
                 .andExpect(status().isOk());
@@ -161,7 +163,7 @@ class AccessControlIT {
     void otherUser_cannotReadSomeoneElsesOrder() throws Exception {
         int aliceOrderId = placeOrder(login(alice), aliceAddress).get("id").asInt();
 
-        mockMvc.perform(get("/api/orders/" + aliceOrderId).cookie(login(bob)))
+        mockMvc.perform(get("/api/v1/orders/" + aliceOrderId).cookie(login(bob)))
                 .andExpect(deniedAccess());
     }
 
@@ -173,9 +175,9 @@ class AccessControlIT {
         int aliceLineId = aliceOrder.get("orderLines").get(0).get("id").asInt();
         Cookie bobToken = login(bob);
 
-        mockMvc.perform(get("/api/orders/" + aliceOrderId + "/lines").cookie(bobToken))
+        mockMvc.perform(get("/api/v1/orders/" + aliceOrderId + "/lines").cookie(bobToken))
                 .andExpect(deniedAccess());
-        mockMvc.perform(get("/api/orders/" + aliceOrderId + "/lines/" + aliceLineId).cookie(bobToken))
+        mockMvc.perform(get("/api/v1/orders/" + aliceOrderId + "/lines/" + aliceLineId).cookie(bobToken))
                 .andExpect(deniedAccess());
     }
 
@@ -188,7 +190,7 @@ class AccessControlIT {
         Thread.sleep(1_100);
         int bobOrderId = placeOrder(bobToken, bobAddress).get("id").asInt();
 
-        mockMvc.perform(get("/api/orders/" + bobOrderId + "/lines/" + aliceLineId).cookie(bobToken))
+        mockMvc.perform(get("/api/v1/orders/" + bobOrderId + "/lines/" + aliceLineId).cookie(bobToken))
                 .andExpect(deniedAccess());
     }
 
@@ -197,7 +199,7 @@ class AccessControlIT {
     void otherUser_cannotCancelSomeoneElsesOrder() throws Exception {
         int aliceOrderId = placeOrder(login(alice), aliceAddress).get("id").asInt();
 
-        MvcResult result = mockMvc.perform(patch("/api/orders/" + aliceOrderId + "/cancel").cookie(login(bob)))
+        MvcResult result = mockMvc.perform(patch("/api/v1/orders/" + aliceOrderId + "/cancel").cookie(login(bob)))
                 .andReturn();
 
         assertThat(result.getResponse().getStatus()).isBetween(400, 499);
@@ -207,9 +209,9 @@ class AccessControlIT {
     // ───────────── addresses ─────────────
 
     @Test
-    @DisplayName("[A01] Bob แก้ที่อยู่ของ Alice ผ่าน path ของตัวเองไม่ได้")
+    @DisplayName("[A01] Bob แก้ที่อยู่ของ Alice ไม่ได้ (ใส่ id ที่อยู่ของ Alice ใน /users/me/addresses)")
     void otherUser_cannotUpdateSomeoneElsesAddress() throws Exception {
-        mockMvc.perform(put("/api/users/" + bob.getId() + "/addresses/" + aliceAddress.getId()).cookie(login(bob))
+        mockMvc.perform(put("/api/v1/users/me/addresses/" + aliceAddress.getId()).cookie(login(bob))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"name\": \"ถูกแฮก\", \"recipientName\": \"Bob\", \"phone\": \"0899999999\" }"))
                 .andExpect(deniedAccess());
@@ -220,7 +222,7 @@ class AccessControlIT {
     @Test
     @DisplayName("[A01] Bob ลบที่อยู่ของ Alice ไม่ได้")
     void otherUser_cannotDeleteSomeoneElsesAddress() throws Exception {
-        mockMvc.perform(delete("/api/users/" + bob.getId() + "/addresses/" + aliceAddress.getId()).cookie(login(bob)))
+        mockMvc.perform(delete("/api/v1/users/me/addresses/" + aliceAddress.getId()).cookie(login(bob)))
                 .andExpect(deniedAccess());
 
         assertThat(addressRepository.findById(aliceAddress.getId())).isPresent();
@@ -229,7 +231,7 @@ class AccessControlIT {
     @Test
     @DisplayName("[A01] Bob ตั้งที่อยู่ของ Alice เป็น default ของตัวเองไม่ได้")
     void otherUser_cannotSetSomeoneElsesAddressAsDefault() throws Exception {
-        mockMvc.perform(put("/api/users/" + bob.getId() + "/addresses/" + aliceAddress.getId() + "/default")
+        mockMvc.perform(put("/api/v1/users/me/addresses/" + aliceAddress.getId() + "/default")
                         .cookie(login(bob)))
                 .andExpect(deniedAccess());
 
@@ -274,7 +276,7 @@ class AccessControlIT {
         String[] parts = real.getValue().split("\\.");
         String tampered = parts[0] + "." + parts[1] + "." + new StringBuilder(parts[2]).reverse();
 
-        mockMvc.perform(get("/api/orders").cookie(new Cookie("access_token", tampered)))
+        mockMvc.perform(get("/api/v1/orders").cookie(new Cookie("access_token", tampered)))
                 .andExpect(status().isUnauthorized());
     }
 }

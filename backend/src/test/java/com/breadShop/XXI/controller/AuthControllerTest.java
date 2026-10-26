@@ -254,67 +254,13 @@ class AuthControllerTest extends ControllerTestSupport {
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
     }
 
-    // ───────────── me / profile ─────────────
-
-    @Test
-    void me_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void me_returnsUserAndRolesFromToken() throws Exception {
-        stubUser(7, ALICE, "USER");
-
-        mockMvc.perform(get("/api/v1/auth/me").cookie(userToken(ALICE)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(7))
-                .andExpect(jsonPath("$.data.email").value(ALICE))
-                .andExpect(jsonPath("$.data.roles[0].authority").value("ROLE_USER"));
-    }
-
-    @Test
-    void me_worksForAdminToo() throws Exception {
-        stubUser(1, "admin@example.com", "ADMIN");
-
-        mockMvc.perform(get("/api/v1/auth/me").cookie(adminToken("admin@example.com")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.roles[0].authority").value("ROLE_ADMIN"));
-    }
-
-    @Test
-    void updateMe_changesUsername_savesAndLogs() throws Exception {
-        User alice = stubUser(7, ALICE, "USER");
-
-        mockMvc.perform(put("/api/v1/auth/me").cookie(userToken(ALICE))
-                        .contentType(MediaType.APPLICATION_JSON).content("{ \"username\": \"alice_new\" }"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("alice_new"));
-
-        assertThat(alice.getUsername()).isEqualTo("alice_new");
-        verify(userRepository).save(alice);
-        verify(activityLogService).logSuccess(eq(alice), eq("UPDATE_PROFILE"), anyString(), anyString(),
-                eq("เปลี่ยน username: user7 → alice_new"));
-    }
-
-    @Test
-    void updateMe_blankUsername_keepsOldName() throws Exception {
-        User alice = stubUser(7, ALICE, "USER");
-
-        mockMvc.perform(put("/api/v1/auth/me").cookie(userToken(ALICE))
-                        .contentType(MediaType.APPLICATION_JSON).content("{ \"username\": \"   \" }"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("user7"));
-
-        assertThat(alice.getUsername()).isEqualTo("user7");
-    }
-
     // ───────────── register / OTP / reset ─────────────
 
     @Test
     void register_validRequest_callsServiceWithSameData() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"username\": \"alice\", \"email\": \"alice@example.com\", \"password\": \"secret123\" }"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("สมัครสมาชิกสำเร็จ"));
 
         ArgumentCaptor<RegisterRequest> captor = ArgumentCaptor.forClass(RegisterRequest.class);
@@ -351,7 +297,7 @@ class AuthControllerTest extends ControllerTestSupport {
     void sendOtp_returnsTokenFromService() throws Exception {
         when(authService.sendResetPasswordOtp("alice@example.com")).thenReturn("otp-token");
 
-        mockMvc.perform(post("/api/v1/auth/send-OTP-mail").with(fromIp(freshIp()))
+        mockMvc.perform(post("/api/v1/auth/otp").with(fromIp(freshIp()))
                         .contentType(MediaType.APPLICATION_JSON).content("{ \"email\": \"alice@example.com\" }"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").value("otp-token"));
@@ -360,7 +306,7 @@ class AuthControllerTest extends ControllerTestSupport {
     @Test
     void sendOtp_bodyWithNestedEmailObject_returns400_notServerError() throws Exception {
         // หน้า forgot-password ของ frontend ส่ง {"email":{"email":"..."}} — ต้องได้ 400 ไม่ใช่ 500
-        mockMvc.perform(post("/api/v1/auth/send-OTP-mail").with(fromIp(freshIp()))
+        mockMvc.perform(post("/api/v1/auth/otp").with(fromIp(freshIp()))
                         .contentType(MediaType.APPLICATION_JSON).content("{ \"email\": { \"email\": \"alice@example.com\" } }"))
                 .andExpect(status().isBadRequest());
 
@@ -368,18 +314,19 @@ class AuthControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void sendOtp_unknownEmail_returns400_withThaiMessage() throws Exception {
-        when(authService.sendResetPasswordOtp("ghost@example.com")).thenThrow(new IllegalArgumentException("EMAIL_NOT_FOUND"));
+    void sendOtp_unknownEmail_respondsExactlyLikeAKnownOne() throws Exception {
+        when(authService.sendResetPasswordOtp("ghost@example.com")).thenReturn("random-token");
 
-        mockMvc.perform(post("/api/v1/auth/send-OTP-mail").with(fromIp(freshIp()))
+        mockMvc.perform(post("/api/v1/auth/otp").with(fromIp(freshIp()))
                         .contentType(MediaType.APPLICATION_JSON).content("{ \"email\": \"ghost@example.com\" }"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("ไม่พบ Email ในระบบ"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("ส่ง OTP เรียบร้อย"))
+                .andExpect(jsonPath("$.data.token").value("random-token"));
     }
 
     @Test
     void verifyOtp_requiresSixDigits() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/verify-otp").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/auth/otp/verification").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"t\", \"otp\": \"12ab\" }"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("OTP ต้องเป็นตัวเลข 6 หลัก"));
@@ -391,7 +338,7 @@ class AuthControllerTest extends ControllerTestSupport {
     void verifyOtp_expired_returns400_withThaiMessage() throws Exception {
         when(authService.verifyOtp("t", "123456")).thenThrow(new IllegalArgumentException("OTP_EXPIRED"));
 
-        mockMvc.perform(post("/api/v1/auth/verify-otp").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/auth/otp/verification").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"t\", \"otp\": \"123456\" }"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("OTP หมดเวลา"));
@@ -401,7 +348,7 @@ class AuthControllerTest extends ControllerTestSupport {
     void verifyOtp_locked_returns400_withThaiMessage_notTheRawCode() throws Exception {
         when(authService.verifyOtp("t", "123456")).thenThrow(new IllegalArgumentException("OTP_LOCKED"));
 
-        mockMvc.perform(post("/api/v1/auth/verify-otp").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/auth/otp/verification").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"t\", \"otp\": \"123456\" }"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("OTP ถูกล็อก กรุณาขอ OTP ใหม่"));
@@ -412,7 +359,7 @@ class AuthControllerTest extends ControllerTestSupport {
         when(authService.verifyOtp("t", "123456"))
                 .thenThrow(new RuntimeException("Deadlock found when trying to get lock; table email_otp"));
 
-        mockMvc.perform(post("/api/v1/auth/verify-otp").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/auth/otp/verification").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"t\", \"otp\": \"123456\" }"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("เกิดข้อผิดพลาดในระบบ"));
@@ -422,7 +369,7 @@ class AuthControllerTest extends ControllerTestSupport {
     void verifyOtp_success_returnsResetToken() throws Exception {
         when(authService.verifyOtp("t", "123456")).thenReturn("reset-token");
 
-        mockMvc.perform(post("/api/v1/auth/verify-otp").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/auth/otp/verification").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"t\", \"otp\": \"123456\" }"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").value("reset-token"));
@@ -430,7 +377,7 @@ class AuthControllerTest extends ControllerTestSupport {
 
     @Test
     void resetPassword_passesTokenAndNewPassword() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/reset-password").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/api/v1/auth/password").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"reset-token\", \"newPassword\": \"brandNew99\" }"))
                 .andExpect(status().isOk());
 
@@ -439,7 +386,7 @@ class AuthControllerTest extends ControllerTestSupport {
 
     @Test
     void resetPassword_tooShort_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/reset-password").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/api/v1/auth/password").contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"token\": \"reset-token\", \"newPassword\": \"abc\" }"))
                 .andExpect(status().isBadRequest());
 
@@ -501,6 +448,17 @@ class AuthControllerTest extends ControllerTestSupport {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(googleAuthService);
+    }
+
+    @Test
+    void googleCallback_bannedAccount_returns403_withoutSessionCookies() throws Exception {
+        when(googleAuthService.handleGoogleCallback("code-b")).thenThrow(new RuntimeException("ACCOUNT_DISABLED"));
+
+        mockMvc.perform(get("/api/v1/auth/google/callback").param("code", "code-b").param("state", "state-abc")
+                        .cookie(STATE_COOKIE))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("บัญชีนี้ถูกระงับการใช้งาน"))
+                .andExpect(header().stringValues(HttpHeaders.SET_COOKIE, not(hasItem(containsString("access_token")))));
     }
 
     @Test

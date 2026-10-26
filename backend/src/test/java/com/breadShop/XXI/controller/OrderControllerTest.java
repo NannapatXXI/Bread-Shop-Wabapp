@@ -54,7 +54,7 @@ class OrderControllerTest extends ControllerTestSupport {
 
     @Test
     void getMyOrders_withoutToken_returns401_andNeverTouchesService() throws Exception {
-        mockMvc.perform(get("/api/orders"))
+        mockMvc.perform(get("/api/v1/orders"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("กรุณาเข้าสู่ระบบ"));
@@ -64,7 +64,7 @@ class OrderControllerTest extends ControllerTestSupport {
 
     @Test
     void getMyOrders_withExpiredToken_returns401_JWT_EXPIRED() throws Exception {
-        mockMvc.perform(get("/api/orders").cookie(expiredToken(ALICE)))
+        mockMvc.perform(get("/api/v1/orders").cookie(expiredToken(ALICE)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("JWT_EXPIRED"));
 
@@ -73,7 +73,7 @@ class OrderControllerTest extends ControllerTestSupport {
 
     @Test
     void getMyOrders_withTokenSignedByAnotherKey_returns401() throws Exception {
-        mockMvc.perform(get("/api/orders").cookie(forgedAdminToken(ALICE)))
+        mockMvc.perform(get("/api/v1/orders").cookie(forgedAdminToken(ALICE)))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(orderService);
@@ -81,7 +81,7 @@ class OrderControllerTest extends ControllerTestSupport {
 
     @Test
     void getMyOrders_withMalformedToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/orders").cookie(new jakarta.servlet.http.Cookie("access_token", "abc.def")))
+        mockMvc.perform(get("/api/v1/orders").cookie(new jakarta.servlet.http.Cookie("access_token", "abc.def")))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(orderService);
@@ -91,21 +91,21 @@ class OrderControllerTest extends ControllerTestSupport {
     void getMyOrders_tokenForUserMissingFromDb_returns401() throws Exception {
         when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/orders").cookie(userToken("ghost@example.com")))
+        mockMvc.perform(get("/api/v1/orders").cookie(userToken("ghost@example.com")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("User not found"));
 
         verifyNoInteractions(orderService);
     }
 
-    // ───────────── GET /api/orders ─────────────
+    // ───────────── GET /api/v1/orders ─────────────
 
     @Test
     void getMyOrders_returnsOnlyOrdersOfTheUserInTheToken() throws Exception {
         stubUser(7, ALICE, "USER");
         when(orderService.getByUserId(7)).thenReturn(List.of(order(100, 7, OrderStatus.PENDING)));
 
-        mockMvc.perform(get("/api/orders").cookie(userToken(ALICE)))
+        mockMvc.perform(get("/api/v1/orders").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].orderNo").value("ORD-100"))
@@ -114,16 +114,16 @@ class OrderControllerTest extends ControllerTestSupport {
         verify(orderService).getByUserId(7);
     }
 
-    // ───────────── POST /api/orders ─────────────
+    // ───────────── POST /api/v1/orders ─────────────
 
     @Test
     void create_ignoresUserIdFromBody_andUsesUserFromToken() throws Exception {
         stubUser(7, ALICE, "USER");
         when(orderService.createOrder(any())).thenReturn(order(101, 7, OrderStatus.PENDING));
 
-        mockMvc.perform(post("/api/orders").cookie(userToken(ALICE))
+        mockMvc.perform(post("/api/v1/orders").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("สร้าง order สำเร็จ"))
                 .andExpect(jsonPath("$.data.id").value(101));
 
@@ -140,7 +140,7 @@ class OrderControllerTest extends ControllerTestSupport {
     void create_withoutAddress_returns400_withThaiMessage() throws Exception {
         stubUser(7, ALICE, "USER");
 
-        mockMvc.perform(post("/api/orders").cookie(userToken(ALICE))
+        mockMvc.perform(post("/api/v1/orders").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                             { "items": [{ "productId": 11, "quantity": 1 }] }
@@ -155,7 +155,7 @@ class OrderControllerTest extends ControllerTestSupport {
     void create_withEmptyCart_returns400() throws Exception {
         stubUser(7, ALICE, "USER");
 
-        mockMvc.perform(post("/api/orders").cookie(userToken(ALICE))
+        mockMvc.perform(post("/api/v1/orders").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"addressId\": 3, \"items\": [] }"))
                 .andExpect(status().isBadRequest())
@@ -168,7 +168,7 @@ class OrderControllerTest extends ControllerTestSupport {
     void create_withZeroQuantity_returns400_fromNestedValidation() throws Exception {
         stubUser(7, ALICE, "USER");
 
-        mockMvc.perform(post("/api/orders").cookie(userToken(ALICE))
+        mockMvc.perform(post("/api/v1/orders").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"addressId\": 3, \"items\": [{ \"productId\": 11, \"quantity\": 0 }] }"))
                 .andExpect(status().isBadRequest())
@@ -183,21 +183,21 @@ class OrderControllerTest extends ControllerTestSupport {
         when(orderService.createOrder(any()))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "สินค้า Donut มีไม่พอ"));
 
-        mockMvc.perform(post("/api/orders").cookie(userToken(ALICE))
+        mockMvc.perform(post("/api/v1/orders").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("สินค้า Donut มีไม่พอ"));
     }
 
-    // ───────────── PATCH /api/orders/{id}/cancel ─────────────
+    // ───────────── PATCH /api/v1/orders/{id}/cancel ─────────────
 
     @Test
     void cancel_passesOrderIdAndTokenUserIdToService() throws Exception {
         stubUser(7, ALICE, "USER");
         when(orderService.cancelOrder(55, 7)).thenReturn(order(55, 7, OrderStatus.CANCELLED));
 
-        mockMvc.perform(patch("/api/orders/55/cancel").cookie(userToken(ALICE)))
+        mockMvc.perform(patch("/api/v1/orders/55/cancel").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("ยกเลิก order สำเร็จ"))
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"));
@@ -207,17 +207,17 @@ class OrderControllerTest extends ControllerTestSupport {
 
     @Test
     void cancel_withoutToken_returns401() throws Exception {
-        mockMvc.perform(patch("/api/orders/55/cancel"))
+        mockMvc.perform(patch("/api/v1/orders/55/cancel"))
                 .andExpect(status().isUnauthorized());
 
         verify(orderService, never()).cancelOrder(anyInt(), anyInt());
     }
 
-    // ───────────── GET /api/orders/{id} ─────────────
+    // ───────────── GET /api/v1/orders/{id} ─────────────
 
     @Test
     void getById_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/orders/55"))
+        mockMvc.perform(get("/api/v1/orders/55"))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(orderService);
@@ -229,7 +229,7 @@ class OrderControllerTest extends ControllerTestSupport {
         when(orderService.getByIdForUser(404, 7))
                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
 
-        mockMvc.perform(get("/api/orders/404").cookie(userToken(ALICE)))
+        mockMvc.perform(get("/api/v1/orders/404").cookie(userToken(ALICE)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Order not found"));
     }
@@ -239,7 +239,7 @@ class OrderControllerTest extends ControllerTestSupport {
         stubUser(7, ALICE, "USER");
         when(orderService.getByIdForUser(55, 7)).thenReturn(order(55, 7, OrderStatus.PENDING));
 
-        mockMvc.perform(get("/api/orders/55").cookie(userToken(ALICE)))
+        mockMvc.perform(get("/api/v1/orders/55").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(55));
 

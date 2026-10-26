@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for PromotionService
- * ครอบคลุม: calculateDiscount, validate, create, toggle
+ * ครอบคลุม: calculateDiscount, validate, create, setActive
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PromotionService Tests")
@@ -179,12 +179,12 @@ class PromotionServiceTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  toggle
+    //  setActive
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("toggle — โปรโมชั่น active=true → เปลี่ยนเป็น false")
-    void toggle_whenActive_shouldDeactivate() {
+    @DisplayName("setActive(false) — โปรโมชั่นที่เปิดอยู่ → ปิด")
+    void setActive_false_shouldDeactivate() {
         Promotion promo = new Promotion("TOGGLE", "ทดสอบ", DiscountType.FIXED,
                 new BigDecimal("20"), LocalDateTime.now().minusDays(1),
                 LocalDateTime.now().plusDays(10));
@@ -193,14 +193,14 @@ class PromotionServiceTest {
         when(promotionRepository.findById(1)).thenReturn(Optional.of(promo));
         when(promotionRepository.save(any())).thenReturn(promo);
 
-        promotionService.toggle(1);
+        promotionService.setActive(1, false);
 
         assertThat(promo.getIsActive()).isFalse();
     }
 
     @Test
-    @DisplayName("toggle — โปรโมชั่น active=false → เปลี่ยนเป็น true")
-    void toggle_whenInactive_shouldActivate() {
+    @DisplayName("setActive(false) ซ้ำกับโปรโมชั่นที่ปิดอยู่แล้ว → ยังปิด (ไม่สลับกลับเหมือน toggle)")
+    void setActive_isIdempotent() {
         Promotion promo = new Promotion("TOGGLE2", "ทดสอบ", DiscountType.FIXED,
                 new BigDecimal("20"), LocalDateTime.now().minusDays(1),
                 LocalDateTime.now().plusDays(10));
@@ -209,17 +209,17 @@ class PromotionServiceTest {
         when(promotionRepository.findById(2)).thenReturn(Optional.of(promo));
         when(promotionRepository.save(any())).thenReturn(promo);
 
-        promotionService.toggle(2);
+        promotionService.setActive(2, false);
 
-        assertThat(promo.getIsActive()).isTrue();
+        assertThat(promo.getIsActive()).isFalse();
     }
 
     @Test
-    @DisplayName("toggle — ไม่พบ id → throw 404")
-    void toggle_whenNotFound_shouldThrow404() {
+    @DisplayName("setActive — ไม่พบ id → throw 404")
+    void setActive_whenNotFound_shouldThrow404() {
         when(promotionRepository.findById(999)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> promotionService.toggle(999))
+        assertThatThrownBy(() -> promotionService.setActive(999, true))
                 .isInstanceOf(ResponseStatusException.class);
     }
 

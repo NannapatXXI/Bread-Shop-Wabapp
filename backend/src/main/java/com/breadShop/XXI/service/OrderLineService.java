@@ -1,7 +1,6 @@
 package com.breadShop.XXI.service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -10,9 +9,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.breadShop.XXI.dto.orderline.OrderLineResponse;
 import com.breadShop.XXI.entity.OrderLine;
+import com.breadShop.XXI.mapper.OrderLineMapper;
 import com.breadShop.XXI.repository.OrderLineRepository;
 
-//สำหรับการจัดการ order line ของ order  เอาไว้จำกัดข้อมูลที่จะส่งกลับไปหา frontend  | reviewd by peak
+/** รายการสินค้าใน order — เฉพาะ order ของ user คนนั้น ของคนอื่นตอบ 404 เหมือนไม่มีอยู่ */
 @Service
 public class OrderLineService {
 
@@ -22,52 +22,25 @@ public class OrderLineService {
         this.orderLineRepository = orderLineRepository;
     }
 
-    /**
-     * ดึง order line ทั้งหมดของ order ที่ระบุ โดยเรียงลำดับจาก id ของ order line และแปลงเป็น OrderLineResponse (DTO)
-     * @param orderId รหัสของ order ที่ต้องการดึง order line
-     * @return  List ของ OrderLineResponse ที่เกี่ยวข้องกับ order
-     */
     @Transactional(readOnly = true)
     public List<OrderLineResponse> getByOrderId(Integer orderId, Integer userId) {
         List<OrderLine> lines = orderLineRepository.findByOrderId(orderId);
-        if (lines.stream().anyMatch(ol -> !isOwnedBy(ol, userId))) {
+        if (lines.stream().anyMatch(line -> !isOwnedBy(line, userId))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }
-        return lines.stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return lines.stream().map(OrderLineMapper::toResponse).toList();
     }
 
-   /**
-    * ดึง order line ที่ระบุ โดยถ้า order line นั้นมีอยู่ จะทำการแปลงเป็น OrderLineResponse (DTO) และส่งกลับไป
-    * @param id รหัสของ order line ที่ต้องการดึง
-    * @return OrderLineResponse ที่เกี่ยวข้องกับ order line
-    */
+    /** line ต้องอยู่ใน order ตาม URL และ order นั้นต้องเป็นของ user */
     @Transactional(readOnly = true)
-    public OrderLineResponse getById(Integer orderId, Integer id, Integer userId) {
-        // line ต้องอยู่ใน order ตาม path และ order นั้นต้องเป็นของ user — ไม่งั้นตอบ 404
-        OrderLine line = orderLineRepository.findById(id)
-                .filter(ol -> ol.getOrder().getId().equals(orderId) && isOwnedBy(ol, userId))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "OrderLine not found"));
-        return toResponse(line);
+    public OrderLineResponse getById(Integer orderId, Integer lineId, Integer userId) {
+        return orderLineRepository.findById(lineId)
+                .filter(line -> line.getOrder().getId().equals(orderId) && isOwnedBy(line, userId))
+                .map(OrderLineMapper::toResponse)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "OrderLine not found"));
     }
 
-    private boolean isOwnedBy(OrderLine ol, Integer userId) {
-        return ol.getOrder().getUser().getId().equals(userId);
-    }
-
-    private OrderLineResponse toResponse(OrderLine ol) {
-        return new OrderLineResponse(
-                ol.getId(),
-                ol.getProduct().getId().intValue(),
-                ol.getProductName(),
-                ol.getProductSku(),
-                ol.getProduct().getImageUrl(),
-                ol.getUnitPrice(),
-                ol.getQuantity(),
-                ol.getDiscountAmount(),
-                ol.getTotalPrice()
-        );
+    private static boolean isOwnedBy(OrderLine line, Integer userId) {
+        return line.getOrder().getUser().getId().equals(userId);
     }
 }

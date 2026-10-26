@@ -3,6 +3,7 @@ package com.breadShop.XXI.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -45,7 +46,7 @@ class UserAddressControllerTest extends ControllerTestSupport {
 
     @Test
     void getAll_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/users/7/addresses"))
+        mockMvc.perform(get("/api/v1/users/me/addresses"))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(userAddressService);
@@ -56,7 +57,7 @@ class UserAddressControllerTest extends ControllerTestSupport {
         stubUser(7, ALICE, "USER");
         when(userAddressService.getAddressesByUserId(7)).thenReturn(List.of(address(1, true), address(2, false)));
 
-        mockMvc.perform(get("/api/users/7/addresses").cookie(userToken(ALICE)))
+        mockMvc.perform(get("/api/v1/users/me/addresses").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].isDefault").value(true))
@@ -64,24 +65,13 @@ class UserAddressControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void getAll_anotherUsersId_returns403_andNeverLoadsTheirAddresses() throws Exception {
-        stubUser(7, ALICE, "USER");
-
-        mockMvc.perform(get("/api/users/8/addresses").cookie(userToken(ALICE)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("ไม่มีสิทธิ์เข้าถึงข้อมูลของ user คนอื่น"));
-
-        verifyNoInteractions(userAddressService);
-    }
-
-    @Test
-    void create_bindsEveryFieldAndUsesPathUserId() throws Exception {
+    void create_bindsEveryFieldAndUsesUserFromToken() throws Exception {
         stubUser(7, ALICE, "USER");
         when(userAddressService.createAddress(eq(7), any())).thenReturn(address(3, true));
 
-        mockMvc.perform(post("/api/users/7/addresses").cookie(userToken(ALICE))
+        mockMvc.perform(post("/api/v1/users/me/addresses").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("เพิ่มที่อยู่สำเร็จ"))
                 .andExpect(jsonPath("$.data.id").value(3));
 
@@ -96,14 +86,15 @@ class UserAddressControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void create_forAnotherUser_returns403() throws Exception {
-        stubUser(7, ALICE, "USER");
+    void userId_alwaysComesFromToken_soAnotherUserGetsOnlyTheirOwn() throws Exception {
+        stubUser(8, "bob@example.com", "USER");
+        when(userAddressService.getAddressesByUserId(8)).thenReturn(List.of());
 
-        mockMvc.perform(post("/api/users/8/addresses").cookie(userToken(ALICE))
-                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
-                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/users/me/addresses").cookie(userToken("bob@example.com")))
+                .andExpect(status().isOk());
 
-        verifyNoInteractions(userAddressService);
+        verify(userAddressService).getAddressesByUserId(8);
+        verify(userAddressService, never()).getAddressesByUserId(7);
     }
 
     @Test
@@ -111,7 +102,7 @@ class UserAddressControllerTest extends ControllerTestSupport {
         stubUser(7, ALICE, "USER");
         when(userAddressService.updateAddress(eq(7), eq(3), any())).thenReturn(address(3, true));
 
-        mockMvc.perform(put("/api/users/7/addresses/3").cookie(userToken(ALICE))
+        mockMvc.perform(put("/api/v1/users/me/addresses/3").cookie(userToken(ALICE))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("แก้ไขที่อยู่สำเร็จ"));
@@ -123,7 +114,7 @@ class UserAddressControllerTest extends ControllerTestSupport {
     void delete_ownAddress_callsService() throws Exception {
         stubUser(7, ALICE, "USER");
 
-        mockMvc.perform(delete("/api/users/7/addresses/3").cookie(userToken(ALICE)))
+        mockMvc.perform(delete("/api/v1/users/me/addresses/3").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("ลบที่อยู่สำเร็จ"));
 
@@ -131,21 +122,11 @@ class UserAddressControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void delete_viaAnotherUsersPath_returns403() throws Exception {
-        stubUser(7, ALICE, "USER");
-
-        mockMvc.perform(delete("/api/users/8/addresses/3").cookie(userToken(ALICE)))
-                .andExpect(status().isForbidden());
-
-        verifyNoInteractions(userAddressService);
-    }
-
-    @Test
     void setDefault_passesUserAndAddressIds() throws Exception {
         stubUser(7, ALICE, "USER");
         when(userAddressService.setDefault(7, 3)).thenReturn(address(3, true));
 
-        mockMvc.perform(put("/api/users/7/addresses/3/default").cookie(userToken(ALICE)))
+        mockMvc.perform(put("/api/v1/users/me/addresses/3/default").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.isDefault").value(true));
 

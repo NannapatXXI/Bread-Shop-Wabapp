@@ -5,9 +5,5 @@ public record LogSummaryResponse(
     long totalAudit,
     long loginCount,
     long registerCount,
-    long activeUsersToday,
-    long systemErrorCount,
-    long systemWarnCount,
-    long totalApiRequests,
-    long totalApiErrors
+    long activeUsersToday
 ) {}

@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -31,9 +30,7 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
-        ReflectionTestUtils.setField(jwtService, "secretKey", TEST_SECRET);
-        ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", EXPIRATION_MS);
+        jwtService = new JwtService(TEST_SECRET, EXPIRATION_MS);
     }
 
     /** สร้าง UserDetails จำลอง */
@@ -75,40 +72,27 @@ class JwtServiceTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  isTokenValid
+    //  อ่าน token ที่หมดอายุ / เซ็นด้วย key อื่น
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("isTokenValid — token ยังไม่หมดอายุ + email ตรงกัน → true")
-    void isTokenValid_withValidToken_shouldReturnTrue() {
-        UserDetails user = mockUser("admin@breadshop.com");
-        String token = jwtService.generateToken(user);
-        assertThat(jwtService.isTokenValid(token, user)).isTrue();
-    }
+    @DisplayName("token หมดอายุ → อ่านแล้วได้ ExpiredJwtException (filter ใช้ตอบ 401 JWT_EXPIRED)")
+    void readingAnExpiredToken_throwsExpiredJwtException() {
+        JwtService expiredJwtService = new JwtService(TEST_SECRET, -1000L);
+        String expiredToken = expiredJwtService.generateToken(mockUser("user@breadshop.com"));
 
-    @Test
-    @DisplayName("isTokenValid — email ไม่ตรงกับ token → false")
-    void isTokenValid_withDifferentUser_shouldReturnFalse() {
-        UserDetails owner = mockUser("owner@breadshop.com");
-        UserDetails other = mockUser("other@breadshop.com");
-        String token = jwtService.generateToken(owner);
-        assertThat(jwtService.isTokenValid(token, other)).isFalse();
-    }
-
-    @Test
-    @DisplayName("isTokenValid — token หมดอายุแล้ว → throw ExpiredJwtException")
-    void isTokenValid_withExpiredToken_shouldThrowExpiredJwtException() {
-        // สร้าง JwtService ใหม่ที่ตั้ง expiration เป็น -1000 ms (หมดอายุทันที)
-        JwtService expiredJwtService = new JwtService();
-        ReflectionTestUtils.setField(expiredJwtService, "secretKey", TEST_SECRET);
-        ReflectionTestUtils.setField(expiredJwtService, "jwtExpirationMs", -1000L);
-
-        UserDetails user = mockUser("user@breadshop.com");
-        String expiredToken = expiredJwtService.generateToken(user);
-
-        // library โยน ExpiredJwtException ก่อน isTokenValid จะ return ค่า
-        assertThatThrownBy(() -> jwtService.isTokenValid(expiredToken, user))
+        assertThatThrownBy(() -> jwtService.extractEmail(expiredToken))
                 .isInstanceOf(ExpiredJwtException.class);
+    }
+
+    @Test
+    @DisplayName("token ที่เซ็นด้วย secret อื่น → ปฏิเสธ (ปลอม token ไม่ได้)")
+    void tokenSignedWithAnotherSecret_isRejected() {
+        String otherSecret = java.util.Base64.getEncoder().encodeToString("another-secret-key-32-bytes-long!!".getBytes());
+        String forged = new JwtService(otherSecret, EXPIRATION_MS).generateToken(mockUser("admin@breadshop.com"));
+
+        assertThatThrownBy(() -> jwtService.extractEmail(forged))
+                .isInstanceOf(io.jsonwebtoken.JwtException.class);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -135,16 +119,5 @@ class JwtServiceTest {
         String token = jwtService.generateToken(user);
 
         assertThat(jwtService.extractRole(token)).isEqualTo("ROLE_USER");
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  isTokenNotExpired
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("isTokenNotExpired — token ยังไม่หมดอายุ → true")
-    void isTokenNotExpired_withValidToken_shouldReturnTrue() {
-        String token = jwtService.generateToken(mockUser("fresh@breadshop.com"));
-        assertThat(jwtService.isTokenNotExpired(token)).isTrue();
     }
 }

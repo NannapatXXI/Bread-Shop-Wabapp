@@ -45,7 +45,7 @@ class UserActivityLogServiceTest {
         User user = new User();
         user.setUsername("peak");
 
-        service.log(user, "peak", "LOGIN", "127.0.0.1", "chrome", "details", "SUCCESS");
+        service.logSuccess(user, "LOGIN", "127.0.0.1", "chrome", "details");
 
         ArgumentCaptor<UserActivityLog> captor = ArgumentCaptor.forClass(UserActivityLog.class);
         verify(repo).save(captor.capture());
@@ -57,7 +57,7 @@ class UserActivityLogServiceTest {
     void log_whenRepoThrows_shouldNotPropagateException() {
         doThrow(new RuntimeException("db down")).when(repo).save(any());
 
-        assertDoesNotThrow(() -> service.log(null, "peak", "LOGIN", "ip", "ua", "d", "SUCCESS"));
+        assertDoesNotThrow(() -> service.logSuccess(null, "LOGIN", "ip", "ua", "d"));
     }
 
     @Test
@@ -80,16 +80,6 @@ class UserActivityLogServiceTest {
         ArgumentCaptor<UserActivityLog> captor = ArgumentCaptor.forClass(UserActivityLog.class);
         verify(repo).save(captor.capture());
         assertEquals("anonymous", captor.getValue().getUsername());
-    }
-
-    @Test
-    void logFailure_shouldUseFailureStatusAndNullUser() {
-        service.logFailure("peak", "LOGIN", "127.0.0.1", "chrome", "bad password");
-
-        ArgumentCaptor<UserActivityLog> captor = ArgumentCaptor.forClass(UserActivityLog.class);
-        verify(repo).save(captor.capture());
-        assertEquals("FAILURE", captor.getValue().getStatus());
-        assertEquals("peak", captor.getValue().getUsername());
     }
 
     @Test

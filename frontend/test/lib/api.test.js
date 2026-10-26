@@ -45,7 +45,7 @@ describe('lib/api interceptors', () => {
   it('turns success=false into a rejected promise carrying the backend message', async () => {
     fakeServer(() => ({ status: 200, body: { success: false, message: 'โค้ดหมดอายุ', data: null } }));
 
-    await expect(api.get('/api/promotions/validate')).rejects.toThrow('โค้ดหมดอายุ');
+    await expect(api.get('/api/v1/promotions/discount')).rejects.toThrow('โค้ดหมดอายุ');
   });
 
   it('on 401 refreshes the session once and retries the original request', async () => {
@@ -56,13 +56,13 @@ describe('lib/api interceptors', () => {
       return ordersCalls === 1 ? { status: 401, body: { success: false, message: 'กรุณาเข้าสู่ระบบ' } } : ok(['order']);
     });
 
-    const res = await api.get('/api/orders');
+    const res = await api.get('/api/v1/orders');
 
     expect(res.data).toEqual(['order']);
     expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
-      'get /api/orders',
+      'get /api/v1/orders',
       'post /api/v1/auth/refresh',
-      'get /api/orders',
+      'get /api/v1/orders',
     ]);
   });
 
@@ -75,7 +75,7 @@ describe('lib/api interceptors', () => {
       return refreshes > 3 ? { status: 500, body: { success: false } } : ok(null);
     });
 
-    await expect(api.get('/api/orders')).rejects.toBeTruthy();
+    await expect(api.get('/api/v1/orders')).rejects.toBeTruthy();
 
     expect(calls.filter((c) => c.url === '/api/v1/auth/refresh')).toHaveLength(1);
   });
@@ -95,9 +95,9 @@ describe('lib/api interceptors', () => {
       return loggedIn ? ok(config.url) : { status: 401, body: { success: false } };
     });
 
-    const results = await Promise.all([api.get('/api/orders'), api.get('/api/v1/notifications'), api.get('/api/v1/auth/me')]);
+    const results = await Promise.all([api.get('/api/v1/orders'), api.get('/api/v1/notifications'), api.get('/api/v1/users/me')]);
 
-    expect(results.map((r) => r.data)).toEqual(['/api/orders', '/api/v1/notifications', '/api/v1/auth/me']);
+    expect(results.map((r) => r.data)).toEqual(['/api/v1/orders', '/api/v1/notifications', '/api/v1/users/me']);
     expect(calls.filter((c) => c.url === '/api/v1/auth/refresh')).toHaveLength(1);
     expect(window.location.href).toBe('http://localhost:3000/home'); // ไม่ถูกเด้งไปหน้า login
   });
@@ -109,9 +109,9 @@ describe('lib/api interceptors', () => {
       return session === 'ok' ? ok('data') : { status: 401, body: { success: false } };
     });
 
-    await api.get('/api/orders');
+    await api.get('/api/v1/orders');
     session = 'expired'; // 15 นาทีต่อมา access token หมดอีกรอบ
-    await api.get('/api/orders');
+    await api.get('/api/v1/orders');
 
     expect(calls.filter((c) => c.url === '/api/v1/auth/refresh')).toHaveLength(2);
   });
@@ -135,7 +135,7 @@ describe('lib/api interceptors', () => {
   it('sends the user to /login when refresh fails on a protected page', async () => {
     fakeServer(() => ({ status: 401, body: { success: false } }));
 
-    await expect(api.get('/api/orders')).rejects.toBeTruthy();
+    await expect(api.get('/api/v1/orders')).rejects.toBeTruthy();
 
     expect(window.location.href).toBe('/login');
   });
@@ -144,7 +144,7 @@ describe('lib/api interceptors', () => {
     window.location = { pathname: '/register', href: 'http://localhost:3000/register' };
     fakeServer(() => ({ status: 401, body: { success: false } }));
 
-    await expect(api.get('/api/v1/auth/me')).rejects.toBeTruthy();
+    await expect(api.get('/api/v1/users/me')).rejects.toBeTruthy();
 
     expect(window.location.href).toBe('http://localhost:3000/register');
   });

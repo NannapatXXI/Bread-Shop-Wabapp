@@ -3,6 +3,7 @@ package com.breadShop.XXI.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.hamcrest.Matchers.containsString;
@@ -72,7 +73,7 @@ class ProductControllerTest extends ControllerTestSupport {
     void countByCategory_acceptsLowercase_andPassesEnumToService() throws Exception {
         when(productService.countProductCategory(ProductCategory.CAKE)).thenReturn(3L);
 
-        mockMvc.perform(get("/api/v1/products/get-count-Category").param("categoryString", "cake"))
+        mockMvc.perform(get("/api/v1/products/count").param("category", "cake"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(3))
                 .andExpect(jsonPath("$.message").value("จำนวนสินค้าประเภท cake"));
@@ -82,7 +83,7 @@ class ProductControllerTest extends ControllerTestSupport {
 
     @Test
     void countByCategory_unknownCategory_returns400_withoutCallingService() throws Exception {
-        mockMvc.perform(get("/api/v1/products/get-count-Category").param("categoryString", "PIZZA"))
+        mockMvc.perform(get("/api/v1/products/count").param("category", "PIZZA"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("ไม่พบหมวดหมู่สินค้า: PIZZA"))
@@ -92,16 +93,20 @@ class ProductControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void countByCategory_missingParam_returns400() throws Exception {
-        mockMvc.perform(get("/api/v1/products/get-count-Category"))
+    void count_withNoFilter_orBothFilters_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/products/count"))
                 .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/products/count").param("category", "CAKE").param("stockAbove", "1"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(productService);
     }
 
     @Test
     void countByStock_passesThresholdToService() throws Exception {
         when(productService.countProductsByStock(10)).thenReturn(7L);
 
-        mockMvc.perform(get("/api/v1/products/get-count-stock").param("stock", "10"))
+        mockMvc.perform(get("/api/v1/products/count").param("stockAbove", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(7))
                 .andExpect(jsonPath("$.message").value("จำนวนสินค้าที่มี stock > 10"));
@@ -109,7 +114,7 @@ class ProductControllerTest extends ControllerTestSupport {
 
     @Test
     void countByStock_nonNumericParam_returns400() throws Exception {
-        mockMvc.perform(get("/api/v1/products/get-count-stock").param("stock", "ten"))
+        mockMvc.perform(get("/api/v1/products/count").param("stockAbove", "ten"))
                 .andExpect(status().isBadRequest());
     }
 }

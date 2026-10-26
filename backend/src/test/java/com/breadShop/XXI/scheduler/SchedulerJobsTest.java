@@ -21,10 +21,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.breadShop.XXI.repository.AuditLogRepository;
 import com.breadShop.XXI.repository.EmailOtpRepository;
 import com.breadShop.XXI.repository.RefreshTokenRepository;
+import com.breadShop.XXI.repository.UserActivityLogRepository;
 
 class SchedulerJobsTest {
+
+    private static DatabaseBackupScheduler scheduler(String user, String password, String mysqldumpPath) {
+        return new DatabaseBackupScheduler("jdbc:mysql://localhost:3306/breadProject", user, password, mysqldumpPath);
+    }
+
 
     // ───────────── OtpCleanupJob ─────────────
 
@@ -45,6 +52,34 @@ class SchedulerJobsTest {
     void otpCleanup_runsEveryTenMinutes() throws Exception {
         Scheduled s = OtpCleanupJob.class.getMethod("cleanExpiredOtp").getAnnotation(Scheduled.class);
         assertThat(s.fixedRate()).isEqualTo(10 * 60 * 1000L);
+    }
+
+    // ───────────── LogRetentionJob ─────────────
+
+    @Test
+    void logRetention_deletesEachTableWithItsOwnCutoff() {
+        UserActivityLogRepository activity = mock(UserActivityLogRepository.class);
+        AuditLogRepository audit = mock(AuditLogRepository.class);
+        LocalDateTime before = LocalDateTime.now();
+
+        new LogRetentionJob(activity, audit, 90, 365).purgeOldLogs();
+
+        ArgumentCaptor<LocalDateTime> activityCutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> auditCutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(activity).deleteOlderThan(activityCutoff.capture());
+        verify(audit).deleteOlderThan(auditCutoff.capture());
+        LocalDateTime after = LocalDateTime.now();
+        assertThat(activityCutoff.getValue()).isBetween(before.minusDays(90), after.minusDays(90));
+        assertThat(auditCutoff.getValue()).isBetween(before.minusDays(365), after.minusDays(365));
+    }
+
+    @Test
+    void logRetention_runsDailyAfterTheBackup() throws Exception {
+        Scheduled retention = LogRetentionJob.class.getMethod("purgeOldLogs").getAnnotation(Scheduled.class);
+        Scheduled backup = Arrays.stream(DatabaseBackupScheduler.class.getMethods())
+                .map(m -> m.getAnnotation(Scheduled.class)).filter(java.util.Objects::nonNull).findFirst().orElseThrow();
+        assertThat(retention.cron()).isEqualTo("0 0 4 * * *");
+        assertThat(backup.cron()).isEqualTo("0 0 2 * * *");
     }
 
     // ───────────── RefreshTokenCleanupJob ─────────────
@@ -88,7 +123,7 @@ class SchedulerJobsTest {
         }
         Files.writeString(dir.resolve("notes.txt"), "keep me");
 
-        ReflectionTestUtils.invokeMethod(new DatabaseBackupScheduler(), "pruneOldBackups", dir);
+        ReflectionTestUtils.invokeMethod(scheduler("root", "", "mysqldump"), "pruneOldBackups", dir);
 
         String[] left = dir.toFile().list();
         Arrays.sort(left);
@@ -103,16 +138,14 @@ class SchedulerJobsTest {
             backupFile(dir, "b" + i + ".sql", 1_700_000_000_000L + i);
         }
 
-        ReflectionTestUtils.invokeMethod(new DatabaseBackupScheduler(), "pruneOldBackups", dir);
+        ReflectionTestUtils.invokeMethod(scheduler("root", "", "mysqldump"), "pruneOldBackups", dir);
 
         assertThat(dir.toFile().list()).hasSize(7);
     }
 
     @Test
     void backupCommand_passesThePasswordViaEnvironment_notOnTheCommandLine(@TempDir Path dir) {
-        DatabaseBackupScheduler scheduler = new DatabaseBackupScheduler();
-        ReflectionTestUtils.setField(scheduler, "dbUsername", "root");
-        ReflectionTestUtils.setField(scheduler, "dbPassword", "s3cret-Pass");
+        DatabaseBackupScheduler scheduler = scheduler("root", "s3cret-Pass", "mysqldump");
 
         ProcessBuilder pb = scheduler.dumpCommand("breadProject", dir.resolve("out.sql"));
 
@@ -122,6 +155,43 @@ class SchedulerJobsTest {
                 "mysqldump", "-u", "root", "--single-transaction", "--routines", "--triggers", "breadProject");
         assertThat(pb.environment()).containsEntry("MYSQL_PWD", "s3cret-Pass");
         assertThat(pb.redirectOutput().file()).isEqualTo(dir.resolve("out.sql").toFile());
+    }
+
+    @Test
+    void backupCommand_usesTheConfiguredMysqldumpPath(@TempDir Path dir) {
+        DatabaseBackupScheduler scheduler = scheduler("root", "", "/opt/homebrew/bin/mysqldump");
+
+        assertThat(scheduler.dumpCommand("breadProject", dir.resolve("out.sql")).command().get(0))
+                .isEqualTo("/opt/homebrew/bin/mysqldump");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "jdbc:mysql://localhost:3306/breadProject,                                   breadProject",
+        "jdbc:mysql://db:3306/breadProject?useSSL=false&serverTimezone=Asia/Bangkok,  breadProject",
+        "jdbc:mysql://localhost/shop_2026,                                            shop_2026",
+    })
+    void databaseName_readsTheNameAfterTheLastSlash_ignoringQuery(String url, String expected) {
+        assertThat(DatabaseBackupScheduler.databaseName(url)).isEqualTo(expected);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+        "jdbc:mysql://localhost:3306/", "jdbc:mysql://localhost:3306/bread;drop", "jdbc:mysql://h/--all-databases"
+    })
+    void databaseName_rejectsAnythingThatIsNotAPlainName(String url) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> DatabaseBackupScheduler.databaseName(url))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void databaseName_handlesVeryLongInputQuickly() {
+        String hostile = "jdbc:mysql://" + "a/".repeat(50_000) + "x".repeat(50_000) + "?";
+        long start = System.nanoTime();
+
+        DatabaseBackupScheduler.databaseName(hostile);
+
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - start)).isLessThan(java.time.Duration.ofSeconds(1));
     }
 
     @Test

@@ -5,48 +5,63 @@ import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.breadShop.XXI.Util.RequestInfo;
 import com.breadShop.XXI.dto.ApiResponse;
+import com.breadShop.XXI.dto.customer.UsernameRequest;
 import com.breadShop.XXI.entity.User;
-import com.breadShop.XXI.repository.UserRepository;
+import com.breadShop.XXI.service.CustomerService;
+import com.breadShop.XXI.service.UserActivityLogService;
 
-/**
- * [Claude] UserController — ข้อมูล user ทั่วไป
- * path: /api/v1/users/**
- *
- * หมายเหตุ: endpoint /me ที่นี่ซ้ำกับ AuthController.me()
- * TODO: ควร consolidate ให้เหลือแค่ที่เดียว (AuthController /api/v1/auth/me)
- * เก็บไว้ก่อนเพื่อไม่ให้ frontend พัง
- */
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+
+/** /api/v1/users/me — ข้อมูลของคนที่ login อยู่ (ลูกค้าและ admin) */
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/api/v1/users/me")
 public class UserController {
 
-    private final UserRepository userRepository;
+    private final CurrentUser            currentUser;
+    private final CustomerService        customerService;
+    private final UserActivityLogService activityLogService;
 
-    public UserController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public UserController(CurrentUser currentUser, CustomerService customerService,
+                          UserActivityLogService activityLogService) {
+        this.currentUser        = currentUser;
+        this.customerService    = customerService;
+        this.activityLogService = activityLogService;
     }
 
-    /**
-     * GET /api/v1/users/me
-     * คืนข้อมูล user ปัจจุบัน — ดึงจาก JWT token
-     */
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> me(
-            @AuthenticationPrincipal String email) {
+    @GetMapping
+    public ResponseEntity<ApiResponse<Map<String, Object>>> me(@AuthenticationPrincipal String email) {
+        return ResponseEntity.ok(ApiResponse.ok(toBody(currentUser.get(email))));
+    }
 
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    /** แก้ username ของตัวเอง */
+    @PatchMapping
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateMe(
+            @AuthenticationPrincipal String email, @Valid @RequestBody UsernameRequest request,
+            HttpServletRequest httpRequest) {
+        User user = currentUser.get(email);
+        String oldUsername = user.getUsername();
+        customerService.updateUsername(user.getId(), request.username());
+        user.setUsername(request.username().trim());
 
-        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+        activityLogService.logSuccess(user, "UPDATE_PROFILE",
+                RequestInfo.clientIp(httpRequest), RequestInfo.userAgent(httpRequest),
+                "เปลี่ยน username: " + oldUsername + " → " + user.getUsername());
+        return ResponseEntity.ok(ApiResponse.ok("บันทึกสำเร็จ", toBody(user)));
+    }
+
+    private static Map<String, Object> toBody(User user) {
+        return Map.of(
                 "id",       user.getId(),
                 "email",    user.getEmail(),
                 "username", user.getUsername(),
-                "role",     user.getRole()
-        )));
+                "role",     user.getRole());
     }
 }

@@ -16,21 +16,6 @@ jobs:
     name: Build Backend (Java 21)
     runs-on: ubuntu-latest
 
-    # spin up MySQL 8 ให้พร้อมก่อนรัน steps
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ci_test_pass
-          MYSQL_DATABASE: breadProject
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,18 +29,18 @@ jobs:
 
       - name: Build, Test & Static analysis (PMD + SpotBugs)
         working-directory: backend
-        # -Dintegration=true เปิด XxiApplicationTests (contextLoads)
-        # verify = package + pmd:check + spotbugs:check — เจอปัญหาใหม่ CI ไม่ผ่าน
+        # -Dintegration=true เปิด integration test (*IT + contextLoads)
+        #   ใช้ MySQL ใน Testcontainers (Docker มีอยู่แล้วบน ubuntu-latest) — migrate V1 ขึ้นไปบน DB เปล่าทุกครั้ง
+        # verify = unit test + integration test (Failsafe) + pmd:check + spotbugs:check — อะไรพังก็ไม่ผ่าน
         run: ./mvnw clean verify -Dintegration=true
         env:
-          DB_PASSWORD: ci_test_pass
+          # ค่าหลอกให้ ${DB_PASSWORD} ใน application.properties resolve ได้ — test ต่อ container ด้วย user/pass ของ container เอง
+          DB_PASSWORD: unused
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-          # override Flyway สำหรับ DB ใหม่เปล่า — ให้รัน V1 ตั้งแต่ต้น
-          SPRING_FLYWAY_BASELINE_ON_MIGRATE: "false"
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4

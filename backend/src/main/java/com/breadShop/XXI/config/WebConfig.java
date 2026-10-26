@@ -11,13 +11,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    private final ApiLoggingInterceptor apiLoggingInterceptor;
-    private final RateLimitInterceptor  rateLimitInterceptor;
+    private final RateLimitInterceptor rateLimitInterceptor;
 
-    public WebConfig(ApiLoggingInterceptor apiLoggingInterceptor,
-                     RateLimitInterceptor rateLimitInterceptor) {
-        this.apiLoggingInterceptor = apiLoggingInterceptor;
-        this.rateLimitInterceptor  = rateLimitInterceptor;
+    public WebConfig(RateLimitInterceptor rateLimitInterceptor) {
+        this.rateLimitInterceptor = rateLimitInterceptor;
     }
 
     @Override
@@ -30,14 +27,6 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/api/v1/auth/login", "/api/v1/auth/send-OTP-mail");
-
-        registry.addInterceptor(apiLoggingInterceptor)
-                // ไม่ log /logs/** เพื่อกัน recursive และ /auth/refresh ที่เรียกบ่อยมาก
-                .excludePathPatterns(
-                    "/api/v1/admin/logs/**",
-                    "/api/v1/auth/refresh",
-                    "/uploads/**"
-                );
+                .addPathPatterns("/api/v1/auth/login", "/api/v1/auth/otp");
     }
 }

@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { adminGetPromotions, adminCreatePromotion, adminTogglePromotion, adminDeletePromotion } from '@/services/auth.service';
+import { adminGetPromotions, adminCreatePromotion, adminSetPromotionActive, adminDeletePromotion } from '@/services/auth.service';
 import { exportCSV } from '@/lib/exportCSV';
 import Spinner from '@/app/components/Spinner';
 import { SkeletonRows } from '@/app/components/Skeleton';
@@ -34,11 +34,12 @@ export default function AdminPromotionsPage() {
     finally  { setLoading(false); }
   };
 
-  const handleToggle = async (id) => {
+  const handleToggle = async (promo) => {
+    const active = !promo.isActive;
     try {
-      await adminTogglePromotion(id);
+      await adminSetPromotionActive(promo.id, active);
       setPromos(prev => prev.map(p =>
-        p.id === id ? { ...p, isActive: !p.isActive } : p
+        p.id === promo.id ? { ...p, isActive: active } : p
       ));
     } catch { toast.error('อัปเดตไม่สำเร็จ'); }
   };
@@ -161,7 +162,7 @@ export default function AdminPromotionsPage() {
                         {expired && <span className="sub" style={{ color: 'var(--red)' }}>หมดอายุแล้ว</span>}
                       </td>
                       <td>
-                        <button className={`switch${p.isActive ? ' on' : ''}`} onClick={() => handleToggle(p.id)}
+                        <button className={`switch${p.isActive ? ' on' : ''}`} onClick={() => handleToggle(p)}
                           aria-label={`เปิดใช้โค้ด ${p.code}`} aria-pressed={!!p.isActive} />
                       </td>
                       <td>

@@ -58,11 +58,11 @@ class NotificationControllerTest extends ControllerTestSupport {
     }
 
     @Test
-    void getAll_tokenUserMissingFromDb_returns404() throws Exception {
+    void getAll_tokenUserMissingFromDb_returns401_likeEveryOtherEndpoint() throws Exception {
         when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/notifications").cookie(userToken("ghost@example.com")))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("User not found"));
     }
 

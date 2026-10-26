@@ -50,4 +50,14 @@
         <Class name="com.breadShop.XXI.service.AuditLogService"/>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
     </Match>
+
+    <!--
+      JwtService: constructor โยน exception ถ้า app.jwtSecret ไม่ใช่ Base64 หรือสั้นเกิน
+      ตั้งใจให้แอปล้มตั้งแต่ตอน start (fail fast) ดีกว่าไปพังตอนออก token ครั้งแรก
+      เป็น Spring singleton ที่ Spring สร้างเอง ไม่มีใคร subclass เพื่อทำ finalizer attack ได้
+    -->
+    <Match>
+        <Class name="com.breadShop.XXI.service.JwtService"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
 </FindBugsFilter>

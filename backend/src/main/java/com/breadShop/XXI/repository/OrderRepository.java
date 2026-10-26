@@ -17,10 +17,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
     List<Order> findAllByOrderByCreatedAtDesc();
 
-    long countByUserId(Integer userId);
-
-    List<Order> findByStatus(Order.OrderStatus status);
-
     // ── aggregate queries for DashboardService (ไม่โหลดทั้ง table) ──
 
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o " +
@@ -35,7 +31,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status = :status")
     long countByStatus(@Param("status") Order.OrderStatus status);
 
-    // คืน [userId, orderCount] per user — ใช้แทน countByUserId() ใน loop (N+1)
+    // [userId, จำนวน order] ของทุกคนใน query เดียว (หน้าลูกค้าของ admin)
     @Query("SELECT o.user.id, COUNT(o) FROM Order o GROUP BY o.user.id")
     List<Object[]> countOrdersGroupByUser();
 

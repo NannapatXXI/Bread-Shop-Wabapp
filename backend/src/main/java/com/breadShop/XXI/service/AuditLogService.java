@@ -13,7 +13,7 @@ import com.breadShop.XXI.entity.AuditLog;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.AuditLogRepository;
 
-//สำหรับการบันทึกและค้นหาประวัติการกระทำของผู้ใช้หรือระบบ reviewd by peak
+/** admin แก้อะไร (ค่าเก่า → ค่าใหม่) — บันทึกพลาดแค่ log ไว้ ไม่ทำให้งานหลักล้ม */
 @Service
 public class AuditLogService {
 

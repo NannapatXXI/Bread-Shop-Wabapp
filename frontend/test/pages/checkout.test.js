@@ -50,7 +50,7 @@ describe('Checkout page', () => {
 
     expect(await screen.findByRole('radio', { name: /ที่ทำงาน/ })).toBeChecked();
     expect(screen.getByRole('radio', { name: /บ้าน/ })).not.toBeChecked();
-    expect(calls[0].url).toBe('/api/users/7/addresses');
+    expect(calls[0].url).toBe('/api/v1/users/me/addresses');
   });
 
   it('without any address the confirm button is disabled and points to the profile page', async () => {
@@ -65,7 +65,7 @@ describe('Checkout page', () => {
 
   it('applies a promo code: sends code + cart total, shows the discount and lowers the total', async () => {
     const calls = fakeApi((config) =>
-      config.url.includes('/promotions/validate')
+      config.url.includes('/promotions/discount')
         ? ok({ code: 'BREAD50', name: 'ลด 50', discountAmount: 50 })
         : ok([home]));
     render(<CheckoutPage />);
@@ -77,14 +77,14 @@ describe('Checkout page', () => {
 
     expect(await screen.findByText('ส่วนลด (BREAD50)')).toBeInTheDocument();
     expect(summaryTotal()).toBe('฿70');
-    const promoCall = calls.find((c) => c.url.includes('/promotions/validate'));
+    const promoCall = calls.find((c) => c.url.includes('/promotions/discount'));
     expect(promoCall.params).toEqual({ code: 'BREAD50', amount: 120 });
   });
 
   it('never shows a negative total when the discount is larger than the cart', async () => {
     setCart([{ product: donut, quantity: 1 }]);
     fakeApi((config) =>
-      config.url.includes('/promotions/validate')
+      config.url.includes('/promotions/discount')
         ? ok({ code: 'BIG', name: 'ลดเยอะ', discountAmount: 500 })
         : ok([home]));
     render(<CheckoutPage />);
@@ -99,7 +99,7 @@ describe('Checkout page', () => {
 
   it('invalid promo shows the backend reason and keeps the total', async () => {
     fakeApi((config) =>
-      config.url.includes('/promotions/validate') ? fail(400, 'โค้ดหมดอายุแล้ว') : ok([home]));
+      config.url.includes('/promotions/discount') ? fail(400, 'โค้ดหมดอายุแล้ว') : ok([home]));
     render(<CheckoutPage />);
     await screen.findByRole('radio', { name: /บ้าน/ });
 
@@ -112,8 +112,8 @@ describe('Checkout page', () => {
 
   it('submits the selected address, promo, trimmed note and every cart line, then clears the cart', async () => {
     const calls = fakeApi((config) => {
-      if (config.url.includes('/promotions/validate')) return ok({ code: 'BREAD50', name: 'ลด 50', discountAmount: 50 });
-      if (config.url === '/api/orders') return ok({ orderNo: 'ORD-1', totalAmount: 70 }, 'สร้าง order สำเร็จ');
+      if (config.url.includes('/promotions/discount')) return ok({ code: 'BREAD50', name: 'ลด 50', discountAmount: 50 });
+      if (config.url === '/api/v1/orders') return ok({ orderNo: 'ORD-1', totalAmount: 70 }, 'สร้าง order สำเร็จ');
       return ok([home, office]);
     });
     render(<CheckoutPage />);
@@ -127,7 +127,7 @@ describe('Checkout page', () => {
 
     expect(await screen.findByText('สั่งซื้อสำเร็จ!')).toBeInTheDocument();
     expect(screen.getByText('ORD-1')).toBeInTheDocument();
-    const order = calls.find((c) => c.url === '/api/orders');
+    const order = calls.find((c) => c.url === '/api/v1/orders');
     expect(order.body).toEqual({
       userId: 7, addressId: 3, promotionCode: 'BREAD50', note: 'โทรก่อนส่ง',
       items: [{ productId: 11, quantity: 2 }, { productId: 12, quantity: 1 }],
@@ -136,7 +136,7 @@ describe('Checkout page', () => {
   });
 
   it('when the order fails the cart is kept', async () => {
-    fakeApi((config) => (config.url === '/api/orders' ? fail(400, 'สินค้า Donut มีไม่พอ') : ok([home])));
+    fakeApi((config) => (config.url === '/api/v1/orders' ? fail(400, 'สินค้า Donut มีไม่พอ') : ok([home])));
     render(<CheckoutPage />);
     await screen.findByRole('radio', { name: /บ้าน/ });
 

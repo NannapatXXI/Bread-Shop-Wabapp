@@ -9,8 +9,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -27,7 +25,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import com.breadShop.XXI.repository.UserRepository;
 
 @Configuration
-//@EnableMethodSecurity
 public class SecurityConfig {
 
     private final UserRepository userRepository;
@@ -36,32 +33,23 @@ public class SecurityConfig {
         this.userRepository = userRepository;
     }
 
-    // โหลด user จาก DB
+    // โหลด user จาก DB — ที่นี่แค่หา user ไม่ตัดสินเรื่องถูกแบน
+    // เช็คแบนทำใน AuthService หลังรหัสผ่านถูกแล้ว: คนที่ไม่รู้รหัสจะเห็นแค่ "รหัสผิด"
+    // เดาไม่ได้ว่าบัญชีนี้มีจริงหรือถูกแบน (user enumeration)
     @Bean
     public UserDetailsService userDetailsService() {
         return login -> userRepository.findByUsername(login)
                 .or(() -> userRepository.findByEmail(login))
-                .map(user -> {
-                    if (!user.isActive()) {
-                        throw new UsernameNotFoundException("บัญชีนี้ถูกระงับการใช้งาน");
-                    }
-                    return org.springframework.security.core.userdetails.User
-                            .withUsername(user.getEmail())
-                            .password(user.getPassword())
-                            .roles(user.getRole().toUpperCase(Locale.ROOT))
-                            .build();
-                })
+                .map(user -> org.springframework.security.core.userdetails.User
+                        .withUsername(user.getEmail())
+                        .password(user.getPassword())
+                        .roles(user.getRole().toUpperCase(Locale.ROOT))
+                        .build())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
-    // Authentication Provider
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
-        provider.setPasswordEncoder(passwordEncoder());
-        return provider;
-    }
-
+    // ไม่ต้องสร้าง AuthenticationProvider เอง — Spring สร้าง DaoAuthenticationProvider
+    // จาก UserDetailsService + PasswordEncoder ด้านล่างให้อัตโนมัติ
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {
@@ -73,7 +61,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // CORS
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         return request -> {
@@ -91,7 +78,6 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthFilter
     ) throws Exception {
-    
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -111,7 +97,7 @@ public class SecurityConfig {
 
             // preflight
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-        
+
             // ---------- Public ----------
             .requestMatchers(
                 "/api/v1/auth/login",
@@ -119,45 +105,36 @@ public class SecurityConfig {
                 "/api/v1/auth/register",
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/google/**",
-                "/api/v1/auth/send-OTP-mail",
-                "/api/v1/auth/verify-otp",
-                "/api/v1/auth/reset-password",
-                "/api/v1/products",     
-                "/api/v1/products/**" ,
+                "/api/v1/auth/otp",
+                "/api/v1/auth/otp/verification",
+                "/api/v1/auth/password",
+                "/api/v1/products/**",   // ** รวม /api/v1/products ด้วย
                 "/uploads/**"
             ).permitAll()
-        
-            // ---------- Auth required ----------
-            .requestMatchers(
-                "/api/v1/auth/me",
-                "/api/v1/auth/profile"
-            ).authenticated()
-        
-            // ---------- User ----------
-            .requestMatchers("/api/v1/users/**").hasRole("USER")
+
+            // ---------- Monitoring ----------
+            // อยู่บน management port (8081) เท่านั้น — port 8080 ไม่มี /actuator ให้เรียก
+            .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+
+            // ---------- User (ข้อมูลของตัวเอง — ทั้งลูกค้าและ admin) ----------
+            .requestMatchers("/api/v1/users/me/**").authenticated()
 
             // ---------- Notifications ----------
             .requestMatchers("/api/v1/notifications/**").authenticated()
 
             // ---------- Promotions ----------
-            .requestMatchers(HttpMethod.GET, "/api/promotions/validate").authenticated()
-            .requestMatchers(HttpMethod.GET, "/api/promotions").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.POST, "/api/promotions").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.PATCH, "/api/promotions/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.DELETE, "/api/promotions/**").hasRole("ADMIN")
+            // ลูกค้าดูส่วนลดของโค้ดได้ ที่เหลือ (ดู/สร้าง/เปิดปิด/ลบ) admin เท่านั้น — /discount ต้องมาก่อน
+            .requestMatchers(HttpMethod.GET, "/api/v1/promotions/discount").authenticated()
+            .requestMatchers("/api/v1/promotions/**").hasRole("ADMIN")
 
             // ---------- Admin ----------
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-        
+
             // ---------- Others ----------
             .anyRequest().authenticated()
         )
-            .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-    
+
         return http.build();
     }
-    
-    
-
 }

@@ -13,8 +13,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
 
     List<Notification> findByUserIdOrderByCreatedAtDesc(Integer userId);
 
-    long countByUserIdAndIsReadFalse(Integer userId);
-
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.user.id = :userId")
     int markAllReadByUserId(Integer userId);

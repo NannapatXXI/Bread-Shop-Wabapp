@@ -161,7 +161,7 @@ describe('Forgot password page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'ส่งรหัส OTP' }));
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toEqual({ method: 'post', url: '/api/v1/auth/send-OTP-mail', body: { email: 'alice@example.com' } });
+    expect(calls[0]).toEqual({ method: 'post', url: '/api/v1/auth/otp', body: { email: 'alice@example.com' } });
   });
 
   it('goes to the OTP page with token and encoded email', async () => {
@@ -219,7 +219,7 @@ describe('Verify OTP page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'ยืนยันรหัส' }));
 
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/reset-password?token=reset-token'));
-    expect(calls[0]).toEqual({ method: 'post', url: '/api/v1/auth/verify-otp', body: { token: 'otp-token', otp: '482913' } });
+    expect(calls[0]).toEqual({ method: 'post', url: '/api/v1/auth/otp/verification', body: { token: 'otp-token', otp: '482913' } });
   });
 
   it('resend sends the email as a plain string and resets the boxes', async () => {
@@ -261,6 +261,6 @@ describe('Reset password page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'บันทึกรหัสผ่านใหม่' }));
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toEqual({ method: 'post', url: '/api/v1/auth/reset-password', body: { token: 'reset-token', newPassword: 'brandNew99' } });
+    expect(calls[0]).toEqual({ method: 'put', url: '/api/v1/auth/password', body: { token: 'reset-token', newPassword: 'brandNew99' } });
   });
 });

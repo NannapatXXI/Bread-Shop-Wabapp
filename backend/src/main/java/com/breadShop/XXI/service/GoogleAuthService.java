@@ -1,18 +1,19 @@
 package com.breadShop.XXI.service;
 
-import java.time.LocalDateTime; // 1. Import เพิ่ม
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -22,123 +23,108 @@ import com.breadShop.XXI.dto.AuthenticationResponse;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.UserRepository;
 
-
-
-//สำหรับการสมัครใน google reviewed by peak
+/**
+ * Login ด้วย Google (OAuth 2.0 authorization code)
+ *   1. getGoogleLoginUrl → ผู้ใช้ไปเลือกบัญชีที่ Google
+ *   2. Google ส่ง code กลับมา → handleGoogleCallback แลกเป็นอีเมล → สมัครให้ถ้ายังไม่มีบัญชี → ออก token ของเรา
+ */
 @Service
 public class GoogleAuthService {
 
-    @Value("${google.clientId}")
-    private String clientId;
-
-    @Value("${google.clientSecret}")
-    private String clientSecret;
-
-    @Value("${google.redirectUri}")
-    private String redirectUri;
-
-    @Value("${google.tokenUri}")
-    private String tokenUri;
-
-    @Value("${google.userInfoUri}")
-    private String userInfoUri;
+    private final String clientId;
+    private final String clientSecret;
+    private final String redirectUri;
+    private final String tokenUri;
+    private final String userInfoUri;
 
     private final RestTemplate restTemplate = new RestTemplate();
-    private final UserRepository userRepository;
-    private final JwtService jwtService;
+    private final UserRepository      userRepository;
+    private final PasswordEncoder     passwordEncoder;
+    private final JwtService          jwtService;
     private final RefreshTokenService refreshTokenService;
 
-    public GoogleAuthService(UserRepository userRepository, JwtService jwtService,
-                             RefreshTokenService refreshTokenService) {
+    public GoogleAuthService(@Value("${google.clientId}") String clientId,
+                             @Value("${google.clientSecret}") String clientSecret,
+                             @Value("${google.redirectUri}") String redirectUri,
+                             @Value("${google.tokenUri}") String tokenUri,
+                             @Value("${google.userInfoUri}") String userInfoUri,
+                             UserRepository userRepository, PasswordEncoder passwordEncoder,
+                             JwtService jwtService, RefreshTokenService refreshTokenService) {
+        this.clientId            = clientId;
+        this.clientSecret        = clientSecret;
+        this.redirectUri         = redirectUri;
+        this.tokenUri            = tokenUri;
+        this.userInfoUri         = userInfoUri;
         this.userRepository      = userRepository;
+        this.passwordEncoder     = passwordEncoder;
         this.jwtService          = jwtService;
         this.refreshTokenService = refreshTokenService;
     }
 
-    /**
-     * สร้าง URL สำหรับให้ผู้ใช้คลิกเพื่อเข้าสู่ระบบด้วย Google
-     * @return URL ที่มีพารามิเตอร์ client_id, redirect_uri, response_type, scope และ prompt
-     */ 
+    /** @param state ค่าสุ่มที่ต้องกลับมาตรงกันตอน callback (กัน login CSRF — ดู AuthController) */
     public String getGoogleLoginUrl(String state) {
-        return "https://accounts.google.com/o/oauth2/auth?client_id="
-                + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
-                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
-                + "&response_type=code&scope=email%20profile"
-                + "&prompt=select_account"
-                // state ต้องกลับมาตรงกับ cookie ใน callback — กันคนร้ายส่งลิงก์ callback ที่มี code ของตัวเอง
-                + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8);
+        return "https://accounts.google.com/o/oauth2/auth"
+                + "?client_id="    + encode(clientId)
+                + "&redirect_uri=" + encode(redirectUri)
+                + "&response_type=code&scope=email%20profile&prompt=select_account"
+                + "&state="        + encode(state);
     }
 
-    /**
-     * ขั้นตอนการทำงาน: 
-     * 1. รับ code จาก Google callback
-     * 2. ขอ access token จาก Google
-     * 3. ดึงข้อมูล user profile จาก Google
-     * 4. สมัคร user ใหม่ในระบบถ้ายังไม่มี หรือดึง user เดิมมา
-     * 5. สร้าง JWT access token + refresh token ให้กับ user
-     * หมายเหตุ: ในขั้นตอนที่ 4 เราจะเก็บ BCrypt hash ของ random UUID เป็น password เพื่อป้องกัน warning และ leak
-     * @param code - authorization code ที่ได้จาก Google callback
-     * @return AuthenticationResponse ที่มี access token, refresh token, username และ email ของ user
-     */
     public AuthenticationResponse handleGoogleCallback(String code) {
-        // 1. ขอ access token
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("code", code);
-        params.add("client_id", clientId);
-        params.add("client_secret", clientSecret);
-        params.add("redirect_uri", redirectUri);
-        params.add("grant_type", "authorization_code");
+        String email = fetchGoogleEmail(code);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> tokenResponse = restTemplate.postForObject(tokenUri, params, Map.class);
+        User user = userRepository.findByEmail(email).orElseGet(() -> registerGoogleUser(email));
 
-        String googleAccessToken = (String) Objects.requireNonNull(tokenResponse, "Google token response is empty").get("access_token");
+        // บัญชีที่ admin แบนไว้ login ผ่าน Google ไม่ได้เช่นกัน
+        if (!user.isActive()) {
+            throw new RuntimeException("ACCOUNT_DISABLED");
+        }
 
-        // 2. ดึงข้อมูล user
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(googleAccessToken);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> userInfo = restTemplate.exchange(userInfoUri, HttpMethod.GET, entity, Map.class).getBody();
-        String email = (String) Objects.requireNonNull(userInfo, "Google userinfo response is empty").get("email");
-
-        // 3. สมัคร user ใหม่ถ้ายังไม่มี หรือดึง user เดิมมา
-        User user = userRepository.findByEmail(email)
-                .orElseGet(() -> {
-                    User newUser = new User();
-                    newUser.setEmail(email);
-                    newUser.setUsername(email);
-                    // เก็บ BCrypt hash ของ random UUID — ไม่มีใครรู้ password นี้
-                    // ป้องกัน BCryptPasswordEncoder warning และ plain-text leak
-                    newUser.setPassword(new BCryptPasswordEncoder().encode(
-                            java.util.UUID.randomUUID().toString()));
-                    newUser.setProvider("google");
-                    newUser.setRole("USER");
-                    return userRepository.save(newUser);
-                });
-
-        // --- ส่วนที่เพิ่ม: บันทึกเวลา Login ---
-        user.setLastLoginAt(LocalDateTime.now()); // อัปเดตเวลาปัจจุบัน
-        userRepository.save(user);                // บันทึกลง Database
-        // ---------------------------------
-
-        // 4. แปลงเป็น UserDetails สำหรับ JWT
         UserDetails userDetails = org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
                 .roles(user.getRole().toUpperCase(Locale.ROOT))
                 .build();
 
-        // 5. สร้าง access token + refresh token (เหมือน login ปกติ)
-        String accessToken = jwtService.generateToken(userDetails);
-        String refreshToken = refreshTokenService.create(user);
+        return new AuthenticationResponse(jwtService.generateToken(userDetails), refreshTokenService.create(user),
+                user.getUsername(), user.getEmail());
+    }
 
-        return new AuthenticationResponse(
-                accessToken,
-                refreshToken,
-                user.getUsername(),
-                user.getEmail()
-        );
+    /** code → access token ของ Google → อีเมลของผู้ใช้ */
+    @SuppressWarnings("unchecked")
+    private String fetchGoogleEmail(String code) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("code", code);
+        form.add("client_id", clientId);
+        form.add("client_secret", clientSecret);
+        form.add("redirect_uri", redirectUri);
+        form.add("grant_type", "authorization_code");
+
+        Map<String, Object> token = restTemplate.postForObject(tokenUri, form, Map.class);
+        String googleAccessToken = (String) Objects.requireNonNull(token, "Google token response is empty").get("access_token");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(googleAccessToken);
+        Map<String, Object> userInfo = restTemplate
+                .exchange(userInfoUri, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
+        return (String) Objects.requireNonNull(userInfo, "Google userinfo response is empty").get("email");
+    }
+
+    private User registerGoogleUser(String email) {
+        User user = new User();
+        user.setEmail(email);
+        user.setUsername(email);
+        // บัญชี Google ไม่ใช้รหัสผ่าน — ใส่ hash ของค่าสุ่มที่ไม่มีใครรู้ (login ด้วยรหัสผ่านไม่ได้)
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        user.setProvider("google");
+        user.setRole("USER");
+        return userRepository.save(user);
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

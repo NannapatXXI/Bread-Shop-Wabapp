@@ -9,6 +9,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@Import(MySqlContainerConfig.class)
 @EnabledIfSystemProperty(named = "integration", matches = "true")
 @DisplayName("Auth API Integration Tests")
 class AuthApiIT {
@@ -65,7 +67,7 @@ class AuthApiIT {
                               "password": "pass1234"
                             }
                         """))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true));
 
         // ตรวจว่า user บันทึกลง MySQL จริง — นี่คือสิ่งที่ unit test ทำไม่ได้
@@ -84,7 +86,7 @@ class AuthApiIT {
                               "password": "myPlainPassword"
                             }
                         """))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
 
         User saved = userRepository.findByEmail("it_user@breadshop.test").orElseThrow();
         // password ในDB ต้องไม่ใช่ plaintext
@@ -172,5 +174,47 @@ class AuthApiIT {
                             }
                         """))
                 .andExpect(status().is4xxClientError());
+    }
+
+    // ───────────── บัญชีที่ถูกแบน ─────────────
+
+    private String loginBody(String email, String password) {
+        return "{ \"usernameOrEmail\": \"" + email + "\", \"password\": \"" + password + "\" }";
+    }
+
+    private void saveBannedUser() {
+        User banned = new User("banned_user", "banned@breadshop.test", passwordEncoder.encode("correct_pass"));
+        banned.setActive(false);
+        userRepository.save(banned);
+    }
+
+    @Test
+    @DisplayName("บัญชีถูกแบน + รหัสถูก → 401 บอกว่าถูกระงับ และไม่ได้ cookie")
+    void login_bannedAccount_withCorrectPassword_isToldItIsSuspended() throws Exception {
+        saveBannedUser();
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content(loginBody("banned@breadshop.test", "correct_pass")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("บัญชีนี้ถูกระงับการใช้งาน"))
+                .andExpect(cookie().doesNotExist("access_token"))
+                .andExpect(cookie().doesNotExist("refresh_token"));
+    }
+
+    @Test
+    @DisplayName("บัญชีถูกแบน + รหัสผิด → ตอบเหมือนบัญชีที่ไม่มีอยู่ทุกอย่าง (ไม่รั่วว่าบัญชีมีจริง/ถูกแบน)")
+    void login_bannedAccount_withWrongPassword_looksExactlyLikeAnUnknownAccount() throws Exception {
+        saveBannedUser();
+
+        String banned = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content(loginBody("banned@breadshop.test", "guess")))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getContentAsString();
+        String unknown = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content(loginBody("nobody@breadshop.test", "guess")))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(banned).isEqualTo(unknown);
     }
 }

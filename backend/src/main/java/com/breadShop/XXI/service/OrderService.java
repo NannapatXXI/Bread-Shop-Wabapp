@@ -1,22 +1,21 @@
 package com.breadShop.XXI.service;
 
-import java.util.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.breadShop.XXI.Util.RequestInfo;
 import com.breadShop.XXI.dto.order.OrderRequest;
 import com.breadShop.XXI.dto.order.OrderResponse;
+import com.breadShop.XXI.dto.orderline.OrderLineRequest;
 import com.breadShop.XXI.dto.orderline.OrderLineResponse;
 import com.breadShop.XXI.entity.Order;
 import com.breadShop.XXI.entity.Order.OrderStatus;
@@ -25,310 +24,189 @@ import com.breadShop.XXI.entity.Product;
 import com.breadShop.XXI.entity.Promotion;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.entity.UserAddress;
+import com.breadShop.XXI.mapper.OrderLineMapper;
 import com.breadShop.XXI.repository.OrderRepository;
 import com.breadShop.XXI.repository.ProductRepository;
 import com.breadShop.XXI.repository.PromotionRepository;
 import com.breadShop.XXI.repository.UserAddressRepository;
 import com.breadShop.XXI.repository.UserRepository;
 
-// Service สำหรับจัดการ order ทั้งหมด ตั้งแต่การสร้าง order, ดึง order ของ user, ดึง order เดี่ยว, อัปเดตสถานะ และดึง order ทั้งหมด (สำหรับ admin) | reviewed by peak
+/**
+ * สร้าง / ดู / เปลี่ยนสถานะ / ยกเลิก order
+ * ราคา ส่วนลด และค่าส่ง คิดที่ server ทั้งหมด — ไม่เชื่อตัวเลขเงินจาก client
+ */
 @Service
 public class OrderService {
 
-    /** ค่าส่ง — ตอนนี้ส่งฟรี ถ้าจะคิดค่าส่งให้คิดที่ server ตรงนี้ ห้ามรับจาก client */
+    /** ค่าส่ง — ตอนนี้ส่งฟรี ถ้าจะคิดค่าส่งให้คิดที่นี่ ห้ามรับจาก client */
     static final BigDecimal SHIPPING_FEE = BigDecimal.ZERO;
 
-    private final OrderRepository         orderRepository;
-    private final UserRepository          userRepository;
-    private final UserAddressRepository   userAddressRepository;
-    private final ProductRepository       productRepository;
-    private final PromotionRepository     promotionRepository;
-    private final PromotionService        promotionService;
-    private final NotificationService     notificationService;
-    private final OrderLogService         orderLogService;
-    private final UserActivityLogService  activityLogService;
+    private static final DateTimeFormatter ORDER_NO_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    public OrderService(OrderRepository orderRepository,
-                        UserRepository userRepository,
-                        UserAddressRepository userAddressRepository,
-                        ProductRepository productRepository,
-                        PromotionRepository promotionRepository,
-                        PromotionService promotionService,
-                        NotificationService notificationService,
-                        OrderLogService orderLogService,
+    private final OrderRepository        orderRepository;
+    private final UserRepository         userRepository;
+    private final UserAddressRepository  userAddressRepository;
+    private final ProductRepository      productRepository;
+    private final PromotionRepository    promotionRepository;
+    private final PromotionService       promotionService;
+    private final NotificationService    notificationService;
+    private final OrderLogService        orderLogService;
+    private final UserActivityLogService activityLogService;
+
+    public OrderService(OrderRepository orderRepository, UserRepository userRepository,
+                        UserAddressRepository userAddressRepository, ProductRepository productRepository,
+                        PromotionRepository promotionRepository, PromotionService promotionService,
+                        NotificationService notificationService, OrderLogService orderLogService,
                         UserActivityLogService activityLogService) {
-        this.orderRepository      = orderRepository;
-        this.userRepository       = userRepository;
+        this.orderRepository       = orderRepository;
+        this.userRepository        = userRepository;
         this.userAddressRepository = userAddressRepository;
-        this.productRepository    = productRepository;
-        this.promotionRepository  = promotionRepository;
-        this.promotionService     = promotionService;
-        this.notificationService  = notificationService;
-        this.orderLogService      = orderLogService;
-        this.activityLogService   = activityLogService;
+        this.productRepository     = productRepository;
+        this.promotionRepository   = promotionRepository;
+        this.promotionService      = promotionService;
+        this.notificationService   = notificationService;
+        this.orderLogService       = orderLogService;
+        this.activityLogService    = activityLogService;
     }
 
-    /**
-     * ดึง IP ของ client จาก request header "X-Forwarded-For" หรือจาก remote address ของ request ถ้าไม่พบจะส่งกลับเป็น empty string
-     * @return IP ของ client หรือ empty string
-     */ 
-    private String getClientIp() {
-        try {
-            var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null) return "";
-            var req = attrs.getRequest();
-            String xff = req.getHeader("X-Forwarded-For");
-            return (xff != null && !xff.isBlank()) ? xff.split(",")[0].trim() : req.getRemoteAddr();
-        } catch (Exception e) { return ""; }
-    }
-    /**
-     * ดึง order ทั้งหมดของ user ที่ระบุ โดยเรียงลำดับจากวันที่สร้างล่าสุดไปยังเก่าสุด และแปลงเป็น OrderResponse (DTO)
-     * @param userId รหัสผู้ใช้ที่ต้องการดึง order
-     * @return List ของ OrderResponse ที่เกี่ยวข้องกับผู้ใช้
-     */
+    // ─── อ่าน ──────────────────────────────────────────────────────────
+
+    /** order ของ user ใหม่สุดก่อน */
     @Transactional(readOnly = true)
     public List<OrderResponse> getByUserId(Integer userId) {
-        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream().map(this::toResponse).toList();
     }
 
-    
-    /**
-     * ดึง order ที่ระบุ โดยถ้า order นั้นมีอยู่ จะทำการแปลงเป็น OrderResponse (DTO) และส่งกลับไป
-     * @param id รหัสของ order ที่ต้องการดึง
-     * @return OrderResponse ที่เกี่ยวข้องกับ order
-     */
+    /** ทุก order ใหม่สุดก่อน (admin) */
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getAll() {
+        return orderRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toResponse).toList();
+    }
+
+    /** order ใดก็ได้ (admin) */
     @Transactional(readOnly = true)
     public OrderResponse getById(Integer id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Order not found"));
-        return toResponse(order);
+        return toResponse(findOrder(id));
     }
 
-    /**
-     * ดึง order ของ user คนนี้เท่านั้น — order ของคนอื่นตอบ 404 เหมือนไม่มีอยู่
-     */
+    /** เฉพาะ order ของ user คนนี้ — ของคนอื่นตอบ 404 เหมือนไม่มีอยู่ */
     @Transactional(readOnly = true)
     public OrderResponse getByIdForUser(Integer id, Integer userId) {
         Order order = orderRepository.findById(id)
                 .filter(o -> o.getUser().getId().equals(userId))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Order not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
         return toResponse(order);
     }
 
-    // สร้าง order
+    // ─── สร้าง order ───────────────────────────────────────────────────
+
     /**
-     * ขั้นตอนการสร้าง order: ที่ละขั้นตอนจะมีการตรวจสอบข้อมูลและคำนวณราคาต่างๆ ดังนี้
-     * 1. ดึง user จากฐานข้อมูลโดยใช้ userId ที่ได้รับมาใน request หากไม่พบจะโยนข้อผิดพลาด 404 Not Found
-     * 2. ดึงที่อยู่ที่เลือกจากฐานข้อมูลโดยใช้ addressId ที่ได้รับมาใน request หากไม่พบจะโยนข้อผิดพลาด 404 Not Found
-     * 3. สร้าง order ใหม่และ snapshot ที่อยู่จากข้อมูลที่ดึงมา
-     * 4. สำหรับแต่ละ item ใน order request:
-     *   - ดึง product จากฐานข้อมูลโดยใช้ productId หากไม่พบจะโยนข้อผิดพลาด 404 Not Found
-     *  - เช็ค stock ของ product หากไม่พอจะโยนข้อผิดพลาด 400 Bad Request
-     *  - คำนวณ line total โดยใช้ราคาสินค้า คูณกับจำนวน และหักส่วนลด (ถ้ามี)
-     * - สร้าง order line ใหม่และเพิ่มเข้าไปใน order
-     *  - ลด stock ของ product และบันทึกการเปลี่ยนแปลง
-     * 5. คำนวณ subtotal ของ order โดยรวมราคาของทุก order line
-     * 6. ถ้ามี promotion code ให้ตรวจสอบความถูกต้องและคำนวณส่วนลดโปรโมชั่น จากนั้นเพิ่มข้อมูลโปรโมชั่นเข้าไปใน order
-     * 7. คำนวณ total ของ order โดยใช้สูตร: total = subtotal - discount + shipping fee (ถ้าส่วนลดมากกว่ายอดสินค้าให้ตีเป็น 0)
-     * 8. บันทึก order ลงในฐานข้อมูลและส่งกลับข้อมูล order ในรูปแบบ OrderResponse
-     * 
-     * @param request
-     * @return
+     * total = ราคาสินค้า (จาก DB) − ส่วนลดโค้ดโปรโมชั่น + ค่าส่ง (ไม่ติดลบ)
+     * ตัดสต็อกพร้อมกันในขั้นนี้ — ถ้าขั้นไหนพัง transaction rollback ทั้งหมด
      */
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
-
-        // 1. ดึง user
         User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-        // 2. ดึงที่อยู่ที่เลือก + ตรวจว่าเป็นของ user คนนี้ (B-5 address ownership)
         UserAddress address = userAddressRepository.findById(request.getAddressId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Address not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found"));
         if (!address.getUser().getId().equals(user.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ที่อยู่นี้ไม่ใช่ของคุณ");
         }
 
-        // 3. สร้าง order + snapshot ที่อยู่
-        Order order = new Order(user, generateOrderNo(), address);
-        order.setShippingFee(SHIPPING_FEE);
+        Order order = new Order(user, newOrderNo(), address);   // snapshot ที่อยู่ไว้ใน order
         order.setNote(request.getNote());
+        order.setShippingFee(SHIPPING_FEE);
 
-        // 4. สร้าง order lines + คำนวณ subtotal
         BigDecimal subtotal = BigDecimal.ZERO;
-
-        for (var item : request.getItems()) {
-            // Pessimistic write lock — ป้องกัน race condition ตอน 2 คำสั่งซื้อพร้อมกัน (B-4)
-            Product product = productRepository.findByIdWithLock(item.getProductId().longValue())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND, "Product not found: " + item.getProductId()));
-
-            // เช็ค stock
-            if (product.getStock() < item.getQuantity()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Insufficient stock for: " + product.getName());
-            }
-
-            // ราคาจากฐานข้อมูลเท่านั้น — ส่วนลดมีทางเดียวคือโค้ดโปรโมชั่น (ข้อ 5 ด้านล่าง)
-            BigDecimal lineTotal = product.getPrice()
-                    .multiply(BigDecimal.valueOf(item.getQuantity()));
-
-            OrderLine line = new OrderLine(
-                    order,
-                    product,
-                    product.getName(),        // snapshot
-                    product.getPrice(),       // snapshot
-                    item.getQuantity(),
-                    lineTotal
-            );
-            line.setDiscountAmount(BigDecimal.ZERO);
-            order.getOrderLines().add(line);
-
-            subtotal = subtotal.add(lineTotal);
-
-            // ลด stock
-            product.setStock(product.getStock() - item.getQuantity());
-            productRepository.save(product);
+        for (OrderLineRequest item : request.getItems()) {
+            subtotal = subtotal.add(addLine(order, item));
         }
-
         order.setSubtotal(subtotal);
 
-        // 5. คำนวณส่วนลดโปรโมชั่น
-        BigDecimal discountAmount = BigDecimal.ZERO;
-        if (request.getPromotionCode() != null && !request.getPromotionCode().isBlank()) {
-            Promotion promotion = promotionRepository
-                    .findByCodeAndIsActiveTrueAndExpiredAtAfter(
-                            request.getPromotionCode(), LocalDateTime.now())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST, "Invalid promotion code"));
-
-            discountAmount = promotionService.calculateDiscount(promotion, subtotal);
-            order.setPromotion(promotion);
-            order.setPromotionCode(promotion.getCode());
-            promotionService.incrementUsedCount(promotion.getId());
-        }
-
-        order.setDiscountAmount(discountAmount);
-
-        // 6. คำนวณ total — ถ้าส่วนลดมากกว่ายอดสินค้าให้ตีเป็น 0 (ห้ามติดลบ)
-        BigDecimal total = subtotal
-                .subtract(discountAmount)
-                .add(order.getShippingFee())
-                .max(BigDecimal.ZERO);
-        order.setTotalAmount(total);
+        BigDecimal discount = applyPromotion(order, request.getPromotionCode(), subtotal);
+        order.setDiscountAmount(discount);
+        order.setTotalAmount(subtotal.subtract(discount).add(SHIPPING_FEE).max(BigDecimal.ZERO));
 
         Order saved = orderRepository.save(order);
-        activityLogService.logSuccess(user, "CHECKOUT", getClientIp(), "",
+        activityLogService.logSuccess(user, "CHECKOUT", RequestInfo.currentClientIp(), "",
                 "สั่งซื้อ order " + saved.getOrderNo() + " ยอด ฿" + saved.getTotalAmount());
         return toResponse(saved);
     }
 
-    // อัปเดตสถานะ
-    /**
-     * เอาไว้อัปเดตสถานะของ order โดยรับ id ของ order ที่ต้องการอัปเดต, สถานะใหม่ และหมายเลขติดตาม (ถ้ามี)
-     * @param id
-     * @param status
-     * @param trackingNo
-     * @return ข้อมูล order หลังจากอัปเดตในรูปแบบ OrderResponse
-     */
+    /** เพิ่มสินค้า 1 รายการ + ตัดสต็อก @return ยอดของรายการนี้ */
+    private BigDecimal addLine(Order order, OrderLineRequest item) {
+        // ล็อกแถวสินค้า — 2 คำสั่งซื้อพร้อมกันจะไม่ขายเกินสต็อก
+        Product product = productRepository.findByIdWithLock(item.getProductId().longValue())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + item.getProductId()));
+
+        if (product.getStock() < item.getQuantity()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient stock for: " + product.getName());
+        }
+
+        BigDecimal lineTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+        // เก็บชื่อและราคาตอนสั่งไว้ใน line — แก้ราคาสินค้าทีหลังไม่กระทบ order เก่า
+        OrderLine line = new OrderLine(order, product, product.getName(), product.getPrice(), item.getQuantity(), lineTotal);
+        line.setDiscountAmount(BigDecimal.ZERO);
+        order.getOrderLines().add(line);
+
+        product.setStock(product.getStock() - item.getQuantity());
+        productRepository.save(product);
+        return lineTotal;
+    }
+
+    /** @return ส่วนลดจากโค้ด (0 ถ้าไม่ได้ใส่โค้ด) — โค้ดผิด/หมดอายุ → 400 */
+    private BigDecimal applyPromotion(Order order, String code, BigDecimal subtotal) {
+        if (code == null || code.isBlank()) {
+            return BigDecimal.ZERO;
+        }
+        Promotion promotion = promotionRepository.findByCodeAndIsActiveTrueAndExpiredAtAfter(code, LocalDateTime.now())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid promotion code"));
+
+        order.setPromotion(promotion);
+        order.setPromotionCode(promotion.getCode());
+        promotionService.incrementUsedCount(promotion.getId());
+        return promotionService.calculateDiscount(promotion, subtotal);
+    }
+
+    /** ORD-<เวลา>-<สุ่ม 6 ตัว> — สุ่มต่อท้ายให้หลายคนสั่งในวินาทีเดียวกันได้ไม่ชน UNIQUE */
+    private String newOrderNo() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
+        return "ORD-" + LocalDateTime.now().format(ORDER_NO_TIME) + "-" + suffix;
+    }
+
+    // ─── เปลี่ยนสถานะ ──────────────────────────────────────────────────
+
+    /** admin เปลี่ยนสถานะ → แจ้งเตือนลูกค้า + บันทึกประวัติ */
     @Transactional
     public OrderResponse updateStatus(Integer id, OrderStatus status, String trackingNo) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Order not found"));
+        Order order = findOrder(id);
         String oldStatus = order.getStatus().name();
         order.setStatus(status);
-        if (trackingNo != null) order.setTrackingNo(trackingNo);
+        if (trackingNo != null) {
+            order.setTrackingNo(trackingNo);
+        }
         Order saved = orderRepository.save(order);
+
         notificationService.createAndPush(saved, status);
         orderLogService.log(saved, oldStatus, status.name(), null, trackingNo, null);
         return toResponse(saved);
     }
 
-    // generate order number
-    /**
-     * เอาไว้สร้างเลข order แบบง่ายๆ โดยใช้ timestamp ปัจจุบันในรูปแบบ "yyyyMMddHHmmss" 
-     * แล้วต่อด้วย prefix "ORD-" เพื่อให้ดูเป็นเลข order ที่ไม่ซ้ำกันและมีความหมาย
-     * @return
-     */
-    private String generateOrderNo() {
-        String timestamp = LocalDateTime.now()
-                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        // ต่อท้ายด้วยสุ่ม 6 ตัว — ลูกค้าหลายคนสั่งในวินาทีเดียวกันได้โดยไม่ชน UNIQUE
-        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
-        return "ORD-" + timestamp + "-" + suffix;
-    }
-
-
-    /**
-     * แปลง OrderLine Entity เป็น OrderLineResponse DTO โดยดึงข้อมูลที่จำเป็นจาก OrderLine และ Product ที่เกี่ยวข้อง
-     * @param ol
-     * @return ข้อมูล OrderLineResponse ที่ประกอบด้วย id, productId, productName, productSku, imageUrl, unitPrice, quantity, discountAmount และ totalPrice
-     */
-    private OrderLineResponse toLineResponse(OrderLine ol) {
-        return new OrderLineResponse(
-                ol.getId(),
-                ol.getProduct().getId().intValue(),
-                ol.getProductName(),
-                ol.getProductSku(),
-                ol.getProduct().getImageUrl(),
-                ol.getUnitPrice(),
-                ol.getQuantity(),
-                ol.getDiscountAmount(),
-                ol.getTotalPrice()
-        );
-    }
-
-    /**
-     * แปลง Order Entity เป็น OrderResponse DTO โดยดึงข้อมูลที่จำเป็นจาก Order และ OrderLine ที่เกี่ยวข้อง
-     * @param o         
-     * @return ข้อมูล OrderResponse ที่ประกอบด้วย id, orderNo, userId, shippingName, shippingPhone, shippingAddress, shippingProvince, shippingDistrict, shippingSubdistrict, shippingPostcode, subtotal, discountAmount, shippingFee, totalAmount, promotionCode, status, trackingNo, note, list ของ OrderLineResponse และ createdAt
-     */
-    private OrderResponse toResponse(Order o) {
-        List<OrderLineResponse> lines = o.getOrderLines()
-                .stream()
-                .map(this::toLineResponse)
-                .collect(Collectors.toList());
-
-        return new OrderResponse(
-                o.getId(), o.getOrderNo(),
-                o.getUser().getId(),
-                o.getShippingName(), o.getShippingPhone(),
-                o.getShippingAddress(), o.getShippingProvince(),
-                o.getShippingDistrict(), o.getShippingSubdistrict(),
-                o.getShippingPostcode(),
-                o.getSubtotal(), o.getDiscountAmount(),
-                o.getShippingFee(), o.getTotalAmount(),
-                o.getPromotionCode(), o.getStatus(),
-                o.getTrackingNo(), o.getNote(),
-                lines, o.getCreatedAt()
-        );
-    }
-
-
-    // ยกเลิก order — ได้เฉพาะ PENDING และเป็น order ของ user คนนั้น
+    /** ลูกค้ายกเลิกได้เฉพาะ order ของตัวเองที่ยัง PENDING — คืนสต็อกให้ */
     @Transactional
     public OrderResponse cancelOrder(Integer orderId, Integer userId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        Order order = findOrder(orderId);
 
         if (!order.getUser().getId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ไม่มีสิทธิ์ยกเลิก order นี้");
         }
-
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "ไม่สามารถยกเลิกได้ เนื่องจากออเดอร์อยู่ในสถานะ \"" + order.getStatus().name() + "\" แล้ว");
         }
 
-        // คืน stock
         for (OrderLine line : order.getOrderLines()) {
             Product product = line.getProduct();
             product.setStock(product.getStock() + line.getQuantity());
@@ -338,17 +216,27 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order saved = orderRepository.save(order);
         orderLogService.log(saved, OrderStatus.PENDING.name(), OrderStatus.CANCELLED.name(), null, null, "ยกเลิกโดยลูกค้า");
-        activityLogService.logSuccess(order.getUser(), "CANCEL_ORDER", getClientIp(), "",
+        activityLogService.logSuccess(order.getUser(), "CANCEL_ORDER", RequestInfo.currentClientIp(), "",
                 "ยกเลิก order " + order.getOrderNo());
         return toResponse(saved);
     }
 
-    // ดึง order ทั้งหมด (admin) — ใหม่สุดก่อน
-    @Transactional(readOnly = true)
-    public List<OrderResponse> getAll() {
-        return orderRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+    // ─── helpers ───────────────────────────────────────────────────────
+
+    private Order findOrder(Integer id) {
+        return orderRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+    }
+
+    private OrderResponse toResponse(Order o) {
+        List<OrderLineResponse> lines = o.getOrderLines().stream().map(OrderLineMapper::toResponse).toList();
+
+        return new OrderResponse(
+                o.getId(), o.getOrderNo(), o.getUser().getId(),
+                o.getShippingName(), o.getShippingPhone(), o.getShippingAddress(), o.getShippingProvince(),
+                o.getShippingDistrict(), o.getShippingSubdistrict(), o.getShippingPostcode(),
+                o.getSubtotal(), o.getDiscountAmount(), o.getShippingFee(), o.getTotalAmount(),
+                o.getPromotionCode(), o.getStatus(), o.getTrackingNo(), o.getNote(),
+                lines, o.getCreatedAt());
     }
 }

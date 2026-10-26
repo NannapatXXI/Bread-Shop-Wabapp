@@ -1,12 +1,12 @@
 package com.breadShop.XXI.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,169 +18,98 @@ import com.breadShop.XXI.entity.Product;
 import com.breadShop.XXI.entity.ProductCategory;
 import com.breadShop.XXI.repository.ProductRepository;
 
-
-/// บริการสำหรับจัดการข้อมูลสินค้า เช่น สร้าง, อ่าน, อัปเดต, ลบ และนับจำนวนสินค้าตามเงื่อนไขต่างๆ | reviewed by peak
+/** สินค้า + รูปสินค้า (เก็บไฟล์ในโฟลเดอร์ uploads, DB เก็บแค่ path) */
 @Service
 public class ProductService {
 
     private static final Logger log = LoggerFactory.getLogger(ProductService.class);
+    private static final Path UPLOAD_DIR = UploadPaths.dir();
 
     private final ProductRepository productRepository;
 
-    private static final Path UPLOAD_DIR = UploadPaths.dir();
-
-
-   
     public ProductService(ProductRepository productRepository) {
         this.productRepository = productRepository;
     }
 
-   /**
-    * สร้างสินค้าใหม่พร้อมบันทึกรูปภาพที่อัปโหลดไปยังโฟลเดอร์ uploads และเก็บ URL ของรูปในฐานข้อมูล
-    * @param request ข้อมูลสินค้าใหม่ที่รับมาจาก client รวมถึงไฟล์รูปภาพ
-    * @return ข้อมูลสินค้าใหม่ที่ถูกบันทึกในฐานข้อมูลพร้อม URL ของรูปภาพ
-    * @throws IOException หากเกิดข้อผิดพลาดในการบันทึกรูปภาพ
-    */
-   public Product createProduct(ProductRequest request) throws IOException {
+    public List<Product> getAllProducts() {
+        return productRepository.findAll();
+    }
 
-    MultipartFile image = request.getImage();
-    String imageUrl = (image != null && !image.isEmpty()) ? saveImage(image) : null;
+    public Product getProductById(Long id) {
+        return findProduct(id);
+    }
 
-    Product product = new Product();
-    product.setName(request.getName());
-    product.setPrice(request.getPrice());
-    product.setStock(request.getStock());
-    product.setDescription(request.getDescription());
-    product.setCategory(request.getCategory());
-    product.setExpiryDate(request.getExpiryDate());
-    product.setImageUrl(imageUrl);
+    public Product createProduct(ProductRequest request) throws IOException {
+        Product product = new Product();
+        copyFields(request, product);
+        product.setImageUrl(hasImage(request) ? saveImage(request.getImage()) : null);
+        return productRepository.save(product);
+    }
 
-    return productRepository.save(product);
-}
+    /** แก้ทุกช่อง — ถ้าส่งรูปใหม่มา จะลบรูปเก่าทิ้ง */
+    public Product updateProduct(Long id, ProductRequest request) throws IOException {
+        Product product = findProduct(id);
+        copyFields(request, product);
 
-    /** บันทึกรูปด้วยชื่อที่ server สร้างเอง (ไม่ใช้ชื่อไฟล์จาก client) แล้วคืน imageUrl */
+        if (hasImage(request)) {
+            String newImageUrl = saveImage(request.getImage());   // เช็คชนิดไฟล์ผ่านก่อน ค่อยลบรูปเดิม
+            deleteImage(product.getImageUrl());
+            product.setImageUrl(newImageUrl);
+        }
+        return productRepository.save(product);
+    }
+
+    public void deleteProduct(Long id) {
+        Product product = findProduct(id);
+        deleteImage(product.getImageUrl());
+        productRepository.delete(product);
+    }
+
+    public Long countProductCategory(ProductCategory category) {
+        return productRepository.countByCategory(category);
+    }
+
+    /** จำนวนสินค้าที่สต็อกมากกว่า stock */
+    public Long countProductsByStock(int stock) {
+        return productRepository.countByStockGreaterThan(stock);
+    }
+
+    // ─── helpers ───────────────────────────────────────────────────────
+
+    private Product findProduct(Long id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+    }
+
+    private static void copyFields(ProductRequest from, Product to) {
+        to.setName(from.getName());
+        to.setPrice(from.getPrice());
+        to.setStock(from.getStock());
+        to.setDescription(from.getDescription());
+        to.setCategory(from.getCategory());
+        to.setExpiryDate(from.getExpiryDate());
+    }
+
+    private static boolean hasImage(ProductRequest request) {
+        return request.getImage() != null && !request.getImage().isEmpty();
+    }
+
+    /** บันทึกรูปด้วยชื่อที่ server สร้างเอง (ไม่ใช้ชื่อไฟล์จาก client) @return path ที่เก็บใน DB */
     private String saveImage(MultipartFile image) throws IOException {
         String fileName = UploadPaths.newFileName(image.getOriginalFilename());
         image.transferTo(UploadPaths.resolveInside(UPLOAD_DIR, fileName).toFile());
         return "uploads/" + fileName;
     }
 
-    /** ลบรูปเดิม — path ต้องอยู่ในโฟลเดอร์ uploads เท่านั้น */
+    /** ลบไม่สำเร็จแค่ log ไว้ — ไม่ควรทำให้การลบ/แก้สินค้าล้ม */
     private void deleteImage(String imageUrl) {
+        if (imageUrl == null) {
+            return;
+        }
         try {
             Files.deleteIfExists(UploadPaths.resolveInside(UPLOAD_DIR, imageUrl));
         } catch (IOException | IllegalArgumentException e) {
             log.warn("Delete image failed: {}", e.getMessage());
         }
     }
-
-    /**
-     * ดึงข้อมูลสินค้าทั้งหมดจากฐานข้อมูล
-     * @return รายการสินค้าทั้งหมดในรูปแบบ List<Product>
-     */
-    public List<Product> getAllProducts() {
-        return productRepository.findAll();
-    }
-
-
-
-    /**
-     * ค้นหาสินค้าตาม ID หากไม่พบจะโยนข้อผิดพลาด 404 Not Found
-     * @param id ID ของสินค้าที่ต้องการค้นหา
-     * @return ข้อมูลสินค้าในรูปแบบ Product Entity หากพบ, หรือโยนข้อผิดพลาดหากไม่พบ
-     */
-    public Product getProductById(Long id) {
-        return productRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not Found Product ID")); 
-    }
-
-
-
-    /**
-     * อัปเดตข้อมูลสินค้าโดย ID หากไม่พบจะโยนข้อผิดพลาด 404 Not Found และหากมีรูปใหม่ส่งมา จะลบรูปเก่าแล้วบันทึกรูปใหม่แทน
-     * @param id ID ของสินค้าที่ต้องการอัปเดต
-     * @param request ข้อมูลสินค้าใหม่ที่รับมาจาก client รวมถึงไฟล์รูปภาพ (ถ้ามี)
-     * @return ข้อมูลสินค้าใหม่ที่ถูกอัปเดตในฐานข้อมูลพร้อม URL ของรูปภาพ (ถ้ามี)
-     * @throws IOException หากเกิดข้อผิดพลาดในการบันทึกรูปภาพใหม่หรือการลบรูปภาพเก่า
-     */
-    public Product updateProduct(Long id, ProductRequest request) throws IOException {
-
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
-
-        product.setName(request.getName());
-        product.setPrice(request.getPrice());
-        product.setStock(request.getStock());
-        product.setDescription(request.getDescription());
-        product.setCategory(request.getCategory());
-        product.setExpiryDate(request.getExpiryDate());
-
-        // ถ้ามีรูปใหม่ส่งมา → ลบรูปเก่า แล้ว save รูปใหม่
-        if (request.getImage() != null && !request.getImage().isEmpty()) {
-            String newImageUrl = saveImage(request.getImage()); // เช็คชนิดไฟล์ก่อนลบรูปเดิม
-            if (product.getImageUrl() != null) {
-                deleteImage(product.getImageUrl());
-            }
-            product.setImageUrl(newImageUrl);
-        }
-
-        return productRepository.save(product);
-    }
-
-    /**
-     * ลบสินค้าตาม ID หากไม่พบจะโยนข้อผิดพลาด 404 Not Found และหากสินค้ามีรูปภาพที่เก็บไว้ จะลบรูปภาพนั้นด้วย
-     * @param id ID ของสินค้าที่ต้องการลบ
-     */
-    public void deleteProduct(Long id) {
-
-        Product product = productRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
-    
-        if (product.getImageUrl() != null) {
-            deleteImage(product.getImageUrl());
-        }
-    
-        productRepository.delete(product);
-    }
-   /**
-    * นับจำนวนสินค้าตามหมวดหมู่ที่กำหนด
-    * @param category ประเภทของสินค้าที่ต้องการนับ
-    * @return  จำนวนสินค้าที่อยู่ในหมวดหมู่ที่กำหนด
-    */
-    public Long countProductCategory(ProductCategory  category) {
-        Long count = productRepository.countByCategory(category);
-        return  count;
-       
-    }
-    /**
-     * นับจำนวนสินค้าทั้งหมดในฐานข้อมูล
-     * @return จำนวนสินค้าทั้งหมดในฐานข้อมูล
-     */
-    public Long countAllProducts() {
-        Long count = productRepository.count();
-        return  count;
-       
-    }
-
-    /**
-     * นับจำนวนสินค้าที่หมดอายุแล้ว (expiryDate ก่อนวันที่ปัจจุบัน)
-     * @return จำนวนสินค้าที่หมดอายุแล้วในฐานข้อมูล
-     */
-    public Long countProductsByExpiryDate() {
-        Long count = productRepository.countByExpiryDateBefore(java.time.LocalDate.now());
-        return  count;
-       
-    }
-    /**
-     * นับจำนวนสินค้าที่มีจำนวนในสต็อกมากกว่า stock ที่กำหนด
-     * @param stock จำนวนสินค้าที่ต้องการตรวจสอบ (นับสินค้าที่มี stock มากกว่า จำนวนนี้)
-     * @return จำนวนสินค้าที่มีจำนวนในสต็อกมากกว่า stock ที่กำหนด
-     */
-    public Long countProductsByStock(int stock) {
-        Long count = productRepository.countByStockGreaterThan(stock);
-        return  count;
-       
-    }
-
-  
 }

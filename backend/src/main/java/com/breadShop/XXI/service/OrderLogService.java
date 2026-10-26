@@ -14,7 +14,7 @@ import com.breadShop.XXI.entity.OrderLog;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.OrderLogRepository;
 
-//เอาไว้เก็บ log ของ order | reviewd by peak
+/** ประวัติสถานะของแต่ละ order — บันทึกพลาดแค่ log ไว้ ไม่ทำให้งานหลักล้ม */
 @Service
 public class OrderLogService {
 

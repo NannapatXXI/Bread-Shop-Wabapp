@@ -52,7 +52,7 @@ export default function HistoryPage() {
   // [Claude] ดึง order ทั้งหมดของ user จาก backend — userId มาจาก JWT ฝั่ง server
   const fetchOrders = async () => {
     try {
-      const res = await api.get(`/api/orders`);
+      const res = await api.get('/api/v1/orders');
       // เรียงล่าสุดก่อน
       const sorted = res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(sorted);

@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { adminGetCustomers, adminUpdateUserRole, adminToggleBan, adminUpdateUsername, getMyOrders } from '@/services/auth.service';
+import { adminGetCustomers, adminUpdateUserRole, adminSetCustomerActive, adminUpdateUsername, getMyOrders } from '@/services/auth.service';
 import { exportCSV } from '@/lib/exportCSV';
 import Spinner from '@/app/components/Spinner';
 import { SkeletonRows } from '@/app/components/Skeleton';
@@ -83,8 +83,8 @@ export default function AdminCustomersPage() {
   const handleToggleBan = async () => {
     setSaving(true);
     try {
-      await adminToggleBan(selectedUser.id);
       const newActive = !selectedUser.isActive;
+      await adminSetCustomerActive(selectedUser.id, newActive);
       setCustomers(prev => prev.map(c =>
         c.id === selectedUser.id ? { ...c, isActive: newActive } : c
       ));

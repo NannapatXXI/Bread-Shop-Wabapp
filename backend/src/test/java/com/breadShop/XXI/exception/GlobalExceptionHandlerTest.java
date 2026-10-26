@@ -57,13 +57,11 @@ class GlobalExceptionHandlerTest {
     @ParameterizedTest
     @CsvSource({
         "USER_NOT_FOUND,    ไม่พบผู้ใช้ในระบบ",
-        "EMAIL_NOT_FOUND,   ไม่พบ Email ในระบบ",
         "USERNAME_EXISTS,   มีชื่อผู้ใช้นี้ในระบบแล้ว",
         "EMAIL_EXISTS,      มี Email นี้ในระบบแล้ว",
         "OTP_NOT_FOUND,     OTP ไม่ถูกต้อง",
         "OTP_EXPIRED,       OTP หมดเวลา",
         "OTP_INVALID,       OTP ไม่ถูกต้อง",
-        "Product not found, ไม่พบสินค้า",
     })
     void illegalArgument_knownCodes_areTranslated(String code, String thai) {
         assertError(handler.handleIllegalArgument(new IllegalArgumentException(code)), HttpStatus.BAD_REQUEST, thai);
@@ -79,15 +77,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void illegalArgument_otpLocked_hasThaiMessage() {
-        assertError(handler.handleIllegalArgument(new IllegalArgumentException("OTP_LOCKED")),
-                HttpStatus.BAD_REQUEST, "OTP ถูกล็อก กรุณาขอ OTP ใหม่");
+    void unknownPath_is404_notServerError() {
+        var res = handler.handleNotFound(new org.springframework.web.servlet.resource.NoResourceFoundException(
+                org.springframework.http.HttpMethod.GET, "does-not-exist"));
+
+        assertError(res, HttpStatus.NOT_FOUND, "ไม่พบหน้าที่ต้องการ");
     }
 
     @Test
-    void illegalArgument_emailRequired_hasThaiMessage() {
-        assertError(handler.handleIllegalArgument(new IllegalArgumentException("EMAIL_REQUIRED")),
-                HttpStatus.BAD_REQUEST, "กรุณากรอก Email");
+    void illegalArgument_otpLocked_hasThaiMessage() {
+        assertError(handler.handleIllegalArgument(new IllegalArgumentException("OTP_LOCKED")),
+                HttpStatus.BAD_REQUEST, "OTP ถูกล็อก กรุณาขอ OTP ใหม่");
     }
 
     @Test
@@ -107,7 +107,6 @@ class GlobalExceptionHandlerTest {
         "INVALID_REFRESH_TOKEN, Token ไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่",
         "REFRESH_TOKEN_EXPIRED, Token หมดอายุ กรุณาเข้าสู่ระบบใหม่",
         "NO_REFRESH_TOKEN,      ไม่พบ token กรุณาเข้าสู่ระบบใหม่",
-        "OTP_LOCKED,            OTP ถูกล็อก กรุณาขอ OTP ใหม่",
         "OTP_NOT_VERIFIED,      กรุณายืนยัน OTP ก่อน",
         "TOKEN_INVALID,         Token ไม่ถูกต้อง",
         "TOKEN_EXPIRED,         Token หมดอายุ",

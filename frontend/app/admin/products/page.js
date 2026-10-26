@@ -186,7 +186,7 @@ export default function ProductPage() {
   // [Claude] ยืนยันลบจริง — เรียก API แล้วปิด modal
   const confirmDelete = async () => {
     try {
-      await api.delete(`/api/v1/admin/${deleteModal.productId}`);
+      await api.delete(`/api/v1/admin/products/${deleteModal.productId}`);
       setProducts(prev => prev.filter(p => p.id !== deleteModal.productId));
       toast.success('ลบสินค้าสำเร็จ');
     } catch {

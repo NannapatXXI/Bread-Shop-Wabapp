@@ -10,6 +10,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@Import(MySqlContainerConfig.class)
 @EnabledIfSystemProperty(named = "integration", matches = "true")
 @DisplayName("Product API Integration Tests")
 class ProductApiIT {
@@ -85,27 +87,27 @@ class ProductApiIT {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  GET /api/v1/products/get-count-Category
+    //  GET /api/v1/products/count?category=
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("GET /products/get-count-Category?categoryString=BREAD → ต้องนับ product จาก DB จริง")
+    @DisplayName("GET /products/count?category=BREAD → ต้องนับ product จาก DB จริง")
     void countByCategory_shouldCountFromRealDatabase() throws Exception {
         // @BeforeEach insert BREAD ไปแล้ว 1 ชิ้น ค่านี้จึงรวมสินค้าทดสอบไว้แล้ว
         long expected = productRepository.countByCategory(ProductCategory.BREAD);
 
-        mockMvc.perform(get("/api/v1/products/get-count-Category")
-                        .param("categoryString", "BREAD"))
+        mockMvc.perform(get("/api/v1/products/count")
+                        .param("category", "BREAD"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(expected));
     }
 
     @Test
-    @DisplayName("GET /products/get-count-Category?categoryString=INVALID → ควรคืน 4xx")
+    @DisplayName("GET /products/count?category=INVALID → ควรคืน 4xx")
     void countByCategory_withInvalidCategory_shouldReturn4xx() throws Exception {
-        mockMvc.perform(get("/api/v1/products/get-count-Category")
-                        .param("categoryString", "PIZZA"))
+        mockMvc.perform(get("/api/v1/products/count")
+                        .param("category", "PIZZA"))
                 .andExpect(status().is4xxClientError());
     }
 }

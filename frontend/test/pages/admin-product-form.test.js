@@ -62,7 +62,7 @@ describe('Admin: add product', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'ยืนยัน' }));
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ method: 'post', url: '/api/v1/admin/add-products' });
+    expect(calls[0]).toMatchObject({ method: 'post', url: '/api/v1/admin/products' });
     expect(fields(calls[0].body)).toEqual({
       name: 'ครัวซองต์เนย', price: '45', stock: '12', description: '', category: 'CAKE', expiryDate: '',
     });
@@ -91,7 +91,7 @@ describe('Admin: edit product', () => {
     render(<EditProductPage />);
 
     const nameInput = await screen.findByDisplayValue('Croissant');
-    expect(calls[0].url).toBe('/api/v1/admin/get-product-by-id/30');
+    expect(calls[0].url).toBe('/api/v1/admin/products/30');
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, 'Croissant XL');
 

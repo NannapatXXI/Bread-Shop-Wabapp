@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
     setError("");
     try {
       const res = await sendOTPEmail(trimmed);
-      toast.success("ส่งอีเมลสำเร็จ");
+      toast.success("ถ้าอีเมลนี้มีบัญชี เราได้ส่งรหัส OTP ไปแล้ว");
       router.push(`/verify-email?token=${res.data.token}&email=${encodeURIComponent(trimmed)}`);
     } catch (err) {
       setError(err?.response?.data?.message ?? err?.message ?? "เกิดข้อผิดพลาดในระบบ");

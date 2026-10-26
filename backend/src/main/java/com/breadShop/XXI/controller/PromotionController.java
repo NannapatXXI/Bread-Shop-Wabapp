@@ -3,6 +3,7 @@ package com.breadShop.XXI.controller;
 import java.math.BigDecimal;
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.breadShop.XXI.dto.ActiveRequest;
 import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.promotion.PromotionRequest;
 import com.breadShop.XXI.dto.promotion.PromotionResponse;
@@ -23,15 +25,11 @@ import jakarta.validation.Valid;
 import com.breadShop.XXI.service.PromotionService;
 
 /**
- * [Claude] PromotionController — จัดการโปรโมชั่น/คูปองส่วนลด
- * path: /api/promotions/**
- *
- * DiscountType มี 2 แบบ:
- *   FIXED   — ลดคงที่ เช่น ลด 50 บาท
- *   PERCENT — ลดเป็น % เช่น ลด 10% (ถ้ามี maxDiscount จะไม่เกินค่านั้น)
+ * /api/v1/promotions — โค้ดส่วนลด
+ * ลูกค้าเรียกได้แค่ GET /discount ที่เหลือ admin เท่านั้น (กำหนดใน SecurityConfig)
  */
 @RestController
-@RequestMapping("/api/promotions")
+@RequestMapping("/api/v1/promotions")
 public class PromotionController {
 
     private final PromotionService promotionService;
@@ -40,51 +38,33 @@ public class PromotionController {
         this.promotionService = promotionService;
     }
 
-    /**
-     * GET /api/promotions
-     * ดึงโปรโมชั่นทั้งหมด
-     */
     @GetMapping
     public ResponseEntity<ApiResponse<List<PromotionResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.ok(promotionService.getAll()));
     }
 
-    /**
-     * POST /api/promotions
-     * สร้างโปรโมชั่นใหม่ — ควร ROLE_ADMIN เท่านั้น
-     */
     @PostMapping
     public ResponseEntity<ApiResponse<PromotionResponse>> create(@Valid @RequestBody PromotionRequest request) {
-        return ResponseEntity.ok(ApiResponse.ok("สร้างโปรโมชั่นสำเร็จ", promotionService.create(request)));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("สร้างโปรโมชั่นสำเร็จ", promotionService.create(request)));
     }
 
-    /**
-     * GET /api/promotions/validate?code=SALE50&amount=500
-     * ตรวจสอบว่า code ใช้ได้ไหม และคำนวณส่วนลดตามยอดที่ส่งมา
-     * ใช้ตอน checkout ก่อน user กด confirm order
-     */
-    @GetMapping("/validate")
+    /** ?code=SALE50&amount=500 — ส่วนลดที่จะได้จากโค้ดนี้ (ตอน checkout) โค้ดใช้ไม่ได้ → 400 */
+    @GetMapping("/discount")
     public ResponseEntity<ApiResponse<PromotionValidateResponse>> validate(
-            @RequestParam String code,
-            @RequestParam BigDecimal amount) {
+            @RequestParam String code, @RequestParam BigDecimal amount) {
         return ResponseEntity.ok(ApiResponse.ok(promotionService.validate(code, amount)));
     }
 
-    /**
-     * PATCH /api/promotions/{id}/toggle
-     * เปิด/ปิดโปรโมชั่น (toggle isActive)
-     * Admin ใช้ตอนต้องการหยุดโปรโมชั่นชั่วคราว
-     */
-    @PatchMapping("/{id}/toggle")
-    public ResponseEntity<ApiResponse<PromotionResponse>> toggle(@PathVariable Integer id) {
+    /** เปิด/ปิดโค้ดชั่วคราว { "active": false } */
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<PromotionResponse>> setActive(
+            @PathVariable Integer id, @Valid @RequestBody ActiveRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("อัปเดตสถานะโปรโมชั่นสำเร็จ",
-                promotionService.toggle(id)));
+                promotionService.setActive(id, request.active())));
     }
 
-    /**
-     * DELETE /api/promotions/{id}
-     * ลบโปรโมชั่น — FK orders.promotion_id จะถูก SET NULL อัตโนมัติ
-     */
+    /** order ที่เคยใช้โค้ดนี้ยังอยู่ (orders.promotion_id ถูกตั้งเป็น NULL) */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Integer id) {
         promotionService.delete(id);

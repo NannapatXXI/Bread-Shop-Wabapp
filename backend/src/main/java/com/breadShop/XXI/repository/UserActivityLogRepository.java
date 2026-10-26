@@ -1,13 +1,14 @@
 package com.breadShop.XXI.repository;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.breadShop.XXI.entity.UserActivityLog;
 
@@ -36,9 +37,12 @@ public interface UserActivityLogRepository extends JpaRepository<UserActivityLog
 
     long countByAction(String action);
 
-    @Query("SELECT l.action, COUNT(l) FROM UserActivityLog l GROUP BY l.action")
-    List<Object[]> countByActionGroup();
-
     @Query("SELECT COUNT(DISTINCT l.user.id) FROM UserActivityLog l WHERE l.createdAt >= :since")
     long countActiveUsersSince(@Param("since") LocalDateTime since);
+
+    /** ใช้โดย LogRetentionJob — ลบ log ที่เก่ากว่า cutoff */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM UserActivityLog l WHERE l.createdAt < :cutoff")
+    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }

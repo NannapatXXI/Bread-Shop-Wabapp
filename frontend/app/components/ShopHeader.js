@@ -15,7 +15,7 @@ const NAV = [
   ['/history', 'ประวัติการสั่งซื้อ'],
 ];
 
-export const isAdmin = (user) => user?.roles?.some(r => r.authority === 'ROLE_ADMIN');
+export const isAdmin = (user) => user?.role === 'ADMIN';
 
 function AccountMenu({ user, logout, active }) {
   const [open, setOpen] = useState(false);

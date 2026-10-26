@@ -2,8 +2,6 @@ package com.breadShop.XXI.service;
 
 import com.breadShop.XXI.dto.AuthenticationResponse;
 import com.breadShop.XXI.entity.RefreshToken;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import com.breadShop.XXI.dto.LoginRequest;
 import com.breadShop.XXI.dto.RegisterRequest;
 import com.breadShop.XXI.entity.User;
@@ -33,7 +31,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for AuthService
- * ทดสอบ register, login, checkEmail, resetPassword, sendOTP, verifyOTP
+ * ทดสอบ register, login, resetPassword, sendOTP, verifyOTP
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthService Tests")
@@ -136,31 +134,22 @@ class AuthServiceTest {
         assertThat(response.email()).isEqualTo("nannapat@breadshop.com");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  checkEmail
-    // ─────────────────────────────────────────────────────────────────────────
-
     @Test
-    @DisplayName("checkEmail — email มีอยู่ในระบบ → ไม่ throw exception")
-    void checkEmail_whenEmailExists_shouldNotThrow() {
-        when(userRepository.findByEmail("nannapat@breadshop.com"))
-                .thenReturn(Optional.of(sampleUser));
+    @DisplayName("loginUser — รหัสถูกแต่บัญชีถูกแบน → ACCOUNT_DISABLED และไม่ออก token")
+    void loginUser_bannedAccountWithCorrectPassword_getsNoTokens() {
+        UserDetails userDetails = mock(UserDetails.class);
+        when(userDetails.getUsername()).thenReturn("nannapat@breadshop.com");
+        Authentication auth = mock(Authentication.class);
+        when(auth.getPrincipal()).thenReturn(userDetails);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
+        when(userRepository.findByEmail("nannapat@breadshop.com")).thenReturn(Optional.of(sampleUser));
+        sampleUser.setActive(false);
 
-        assertThatCode(() -> authService.checkEmail(
-                new com.breadShop.XXI.dto.CheckEmailRequest("nannapat@breadshop.com")))
-                .doesNotThrowAnyException();
-    }
+        assertThatThrownBy(() -> authService.loginUser(new LoginRequest("nannapat@breadshop.com", "pass1234")))
+                .hasMessage("ACCOUNT_DISABLED");
 
-    @Test
-    @DisplayName("checkEmail — email ไม่มีในระบบ → throw IllegalArgumentException")
-    void checkEmail_whenEmailNotFound_shouldThrow() {
-        when(userRepository.findByEmail("ghost@breadshop.com"))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> authService.checkEmail(
-                new com.breadShop.XXI.dto.CheckEmailRequest("ghost@breadshop.com")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("EMAIL_NOT_FOUND"); // code ที่ GlobalExceptionHandler แปลเป็นภาษาไทย
+        verify(jwtService, never()).generateToken(any());
+        verify(refreshTokenService, never()).create(any());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -265,13 +254,12 @@ class AuthServiceTest {
 
     @Test
     @ExtendWith(OutputCaptureExtension.class)
-    @DisplayName("checkEmail / resetPassword — ไม่พิมพ์อีเมลผู้ใช้ลง log")
+    @DisplayName("resetPassword — ไม่พิมพ์อีเมลผู้ใช้ลง log")
     void emailIsNotWrittenToTheLog(CapturedOutput output) {
         User user = new User("ghost", "private.person@example.com", "hash");
         when(userRepository.findByEmail("private.person@example.com")).thenReturn(Optional.of(user));
         when(otpService.validateResetToken("reset-t")).thenReturn("private.person@example.com");
 
-        authService.checkEmail(new com.breadShop.XXI.dto.CheckEmailRequest("private.person@example.com"));
         authService.resetPassword("reset-t", "newPassw0rd!");
 
         assertThat(output.getAll()).doesNotContain("private.person@example.com");
@@ -337,14 +325,14 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordOtp — ไม่พบ email → throw IllegalArgumentException")
-    void sendResetPasswordOtp_whenEmailNotFound_shouldThrow() {
+    @DisplayName("sendResetPasswordOtp — ไม่พบ email → ตอบเหมือนปกติ (ได้ token) แต่ไม่สร้าง OTP และไม่ส่งเมล")
+    void sendResetPasswordOtp_whenEmailNotFound_looksTheSameButDoesNothing() {
         when(userRepository.findByEmail("ghost@breadshop.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.sendResetPasswordOtp("ghost@breadshop.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("EMAIL_NOT_FOUND");
+        String token = authService.sendResetPasswordOtp("ghost@breadshop.com");
 
+        assertThat(token).matches("[0-9a-f-]{36}"); // รูปแบบเดียวกับ token จริง (UUID)
+        verifyNoInteractions(otpService, otpRepository);
         verify(mailService, never()).sendOtpEmail(any(), any());
     }
 
@@ -355,10 +343,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("refreshAccessToken — ไม่มี refresh_token cookie → throw RuntimeException(NO_REFRESH_TOKEN)")
     void refreshAccessToken_withNoCookie_shouldThrow() {
-        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
-        when(servletRequest.getCookies()).thenReturn(null);
-
-        assertThatThrownBy(() -> authService.refreshAccessToken(servletRequest))
+        assertThatThrownBy(() -> authService.refreshAccessToken(null))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("NO_REFRESH_TOKEN");
     }
@@ -366,9 +351,6 @@ class AuthServiceTest {
     @Test
     @DisplayName("refreshAccessToken — มี cookie ถูกต้อง → rotate token และคืน AuthenticationResponse ใหม่")
     void refreshAccessToken_withValidCookie_shouldRotateAndReturnNewTokens() {
-        Cookie cookie = new Cookie("refresh_token", "old_plain_token");
-        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
-        when(servletRequest.getCookies()).thenReturn(new Cookie[]{cookie});
 
         RefreshToken oldRt = mock(RefreshToken.class);
         when(oldRt.getUser()).thenReturn(sampleUser);
@@ -380,7 +362,7 @@ class AuthServiceTest {
         when(refreshTokenService.rotate(oldRt)).thenReturn("new_plain_token");
         when(jwtService.generateToken(userDetails)).thenReturn("new_access_token");
 
-        AuthenticationResponse response = authService.refreshAccessToken(servletRequest);
+        AuthenticationResponse response = authService.refreshAccessToken("old_plain_token");
 
         assertThat(response.accessToken()).isEqualTo("new_access_token");
         assertThat(response.refreshToken()).isEqualTo("new_plain_token");
@@ -391,15 +373,12 @@ class AuthServiceTest {
     @Test
     @DisplayName("refreshAccessToken — ผู้ใช้ถูกแบนหลัง login → ACCOUNT_DISABLED, ไม่ออก token ใหม่, ทิ้ง refresh token")
     void refreshAccessToken_bannedUser_isRefusedAndLoggedOutEverywhere() {
-        Cookie cookie = new Cookie("refresh_token", "old_plain_token");
-        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
-        when(servletRequest.getCookies()).thenReturn(new Cookie[]{cookie});
         RefreshToken oldRt = mock(RefreshToken.class);
         when(oldRt.getUser()).thenReturn(sampleUser);
         when(refreshTokenService.validate("old_plain_token")).thenReturn(oldRt);
         sampleUser.setActive(false);
 
-        assertThatThrownBy(() -> authService.refreshAccessToken(servletRequest))
+        assertThatThrownBy(() -> authService.refreshAccessToken("old_plain_token"))
                 .hasMessage("ACCOUNT_DISABLED");
 
         verify(refreshTokenService).revokeAll(sampleUser);

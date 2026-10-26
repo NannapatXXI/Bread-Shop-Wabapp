@@ -82,7 +82,7 @@ function VerificationForm() {
         <Icon name="left" size="sm" />กลับไปหน้าเข้าสู่ระบบ
       </button>
       <h1>กรอกรหัส OTP</h1>
-      <p>เราส่งรหัส 6 หลักไปที่ <b style={{ color: 'var(--ink)' }}>{email}</b></p>
+      <p>ถ้า <b style={{ color: 'var(--ink)' }}>{email}</b> มีบัญชีอยู่ เราได้ส่งรหัส 6 หลักไปแล้ว</p>
       <form onSubmit={e => { e.preventDefault(); handleVerify(); }}>
         <div className="otp" aria-label="รหัส OTP 6 หลัก">
           {otp.map((digit, index) => (

@@ -470,9 +470,10 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("createOrder — มี X-Forwarded-For header → ใช้ IP จาก header นั้น")
-    void createOrder_withForwardedForHeader_shouldLogClientIpFromHeader() {
+    @DisplayName("createOrder — X-Forwarded-For ที่ client ส่งมาเองถูกเมิน (ปลอมได้) ใช้ IP ของ connection")
+    void createOrder_ignoresSpoofableForwardedForHeader_andLogsTheConnectionIp() {
         MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+        mockRequest.setRemoteAddr("192.168.1.100");
         mockRequest.addHeader("X-Forwarded-For", "203.0.113.5, 70.41.3.18");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(mockRequest));
 
@@ -493,7 +494,7 @@ class OrderServiceTest {
 
         orderService.createOrder(request);
 
-        verify(activityLogService).logSuccess(eq(sampleUser), eq("CHECKOUT"), eq("203.0.113.5"), any(), any());
+        verify(activityLogService).logSuccess(eq(sampleUser), eq("CHECKOUT"), eq("192.168.1.100"), any(), any());
     }
 
     @Test

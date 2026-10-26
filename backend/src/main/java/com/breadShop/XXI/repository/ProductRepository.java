@@ -1,6 +1,5 @@
 package com.breadShop.XXI.repository;
 
-import java.time.LocalDate;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,7 +17,6 @@ import jakarta.persistence.LockModeType;
 public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByCategory(ProductCategory category);
     long countByStockGreaterThan(int stock);
-    long countByExpiryDateBefore(LocalDate date);
 
     // Pessimistic write lock — ป้องกัน race condition ตอนหักสต็อก
     @Lock(LockModeType.PESSIMISTIC_WRITE)
