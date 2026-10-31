@@ -13,6 +13,7 @@ const NAV = [
   ['/admin/orders',     'receipt', 'ออเดอร์',    'ออเดอร์'],
   ['/admin/products',   'box',     'สินค้า',     'สินค้า'],
   ['/admin/promotions', 'tag',     'โปรโมชั่น',  'โปรฯ'],
+  ['/admin/storefront', 'store',   'หน้าร้าน',   'หน้าร้าน'],
   ['/admin/customers',  'users',   'ลูกค้า',     'ลูกค้า'],
   ['/admin/logs',       'shield',  'Logs',      'Logs'],
 ];

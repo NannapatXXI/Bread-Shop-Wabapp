@@ -25,28 +25,24 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/users/me")
 public class UserController {
 
-    private final CurrentUser            currentUser;
     private final CustomerService        customerService;
     private final UserActivityLogService activityLogService;
 
-    public UserController(CurrentUser currentUser, CustomerService customerService,
+    public UserController(CustomerService customerService,
                           UserActivityLogService activityLogService) {
-        this.currentUser        = currentUser;
         this.customerService    = customerService;
         this.activityLogService = activityLogService;
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> me(@AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(ApiResponse.ok(toBody(currentUser.get(email))));
+        return ResponseEntity.ok(ApiResponse.ok(toBody(customerService.getByEmail(email))));
     }
 
-    /** แก้ username ของตัวเอง */
+    
     @PatchMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> updateMe(
-            @AuthenticationPrincipal String email, @Valid @RequestBody UsernameRequest request,
-            HttpServletRequest httpRequest) {
-        User user = currentUser.get(email);
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateMe(@AuthenticationPrincipal String email, @Valid @RequestBody UsernameRequest request,HttpServletRequest httpRequest) {
+        User user = customerService.getByEmail(email);
         String oldUsername = user.getUsername();
         customerService.updateUsername(user.getId(), request.username());
         user.setUsername(request.username().trim());

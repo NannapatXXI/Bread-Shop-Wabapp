@@ -3,7 +3,7 @@
 ## Backend
 
 - Java 21
-- Spring Boot 3
+- Spring Boot 4
 - MySQL 8
 
 ## Architecture

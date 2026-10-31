@@ -13,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.stream.Stream;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,6 +34,22 @@ class SchedulerJobsTest {
         return new DatabaseBackupScheduler("jdbc:mysql://localhost:3306/breadProject", user, password, mysqldumpPath);
     }
 
+
+    // ───────────── ทุก job ─────────────
+
+    /** งานที่ระบุเวลาบนนาฬิกา (cron) ต้องใช้เวลาไทย — ไม่งั้นบนเซิร์ฟเวอร์ UTC "ตี 2" จะกลายเป็น 9 โมงเช้า */
+    @Test
+    void everyCronJob_runsOnBangkokTime() {
+        List<Scheduled> cronJobs = Stream.of(OtpCleanupJob.class, RefreshTokenCleanupJob.class,
+                        LogRetentionJob.class, DatabaseBackupScheduler.class)
+                .flatMap(c -> Arrays.stream(c.getDeclaredMethods()))
+                .map(m -> m.getAnnotation(Scheduled.class))
+                .filter(s -> s != null && !s.cron().isEmpty())
+                .toList();
+
+        assertThat(cronJobs).hasSize(3);
+        assertThat(cronJobs).allSatisfy(s -> assertThat(s.zone()).isEqualTo("Asia/Bangkok"));
+    }
 
     // ───────────── OtpCleanupJob ─────────────
 

@@ -15,5 +15,11 @@ export default defineConfig({
     include: ['test/**/*.test.{js,jsx}'],
     env: { NEXT_PUBLIC_API_URL: 'http://api.test' },
     restoreMocks: true,
+    // npm run test:coverage → รายงานใน coverage/ (เปิด coverage/index.html ดูทีละบรรทัด)
+    coverage: {
+      provider: 'v8',
+      include: ['app/**/*.js', 'lib/**/*.js', 'services/**/*.js'],
+      reporter: ['text-summary', 'text', 'html'],
+    },
   },
 });

@@ -109,6 +109,7 @@ public class SecurityConfig {
                 "/api/v1/auth/otp/verification",
                 "/api/v1/auth/password",
                 "/api/v1/products/**",   // ** รวม /api/v1/products ด้วย
+                "/api/v1/storefront",    // รูปปก + สินค้าแนะนำ (หน้าแรกเปิดได้โดยไม่ login)
                 "/uploads/**"
             ).permitAll()
 

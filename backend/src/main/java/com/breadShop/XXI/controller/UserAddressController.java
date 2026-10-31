@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.useraddress.UserAddressRequest;
 import com.breadShop.XXI.dto.useraddress.UserAddressResponse;
+import com.breadShop.XXI.service.CustomerService;
 import com.breadShop.XXI.service.UserAddressService;
 
 /** /api/v1/users/me/addresses — ที่อยู่ของคนที่ login อยู่ (userId มาจาก token ไม่ต้องส่งมาและปลอมไม่ได้) */
@@ -25,11 +26,11 @@ import com.breadShop.XXI.service.UserAddressService;
 public class UserAddressController {
 
     private final UserAddressService userAddressService;
-    private final CurrentUser        currentUser;
+    private final CustomerService    customerService;
 
-    public UserAddressController(UserAddressService userAddressService, CurrentUser currentUser) {
+    public UserAddressController(UserAddressService userAddressService, CustomerService customerService) {
         this.userAddressService = userAddressService;
-        this.currentUser        = currentUser;
+        this.customerService    = customerService;
     }
 
     @GetMapping
@@ -38,16 +39,13 @@ public class UserAddressController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<UserAddressResponse>> create(
-            @AuthenticationPrincipal String email, @RequestBody UserAddressRequest request) {
+    public ResponseEntity<ApiResponse<UserAddressResponse>> create(@AuthenticationPrincipal String email, @RequestBody UserAddressRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("เพิ่มที่อยู่สำเร็จ", userAddressService.createAddress(userId(email), request)));
     }
 
     @PutMapping("/{addressId}")
-    public ResponseEntity<ApiResponse<UserAddressResponse>> update(
-            @PathVariable Integer addressId, @AuthenticationPrincipal String email,
-            @RequestBody UserAddressRequest request) {
+    public ResponseEntity<ApiResponse<UserAddressResponse>> update(@PathVariable Integer addressId, @AuthenticationPrincipal String email,@RequestBody UserAddressRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("แก้ไขที่อยู่สำเร็จ",
                 userAddressService.updateAddress(userId(email), addressId, request)));
     }
@@ -66,6 +64,6 @@ public class UserAddressController {
     }
 
     private Integer userId(String email) {
-        return currentUser.get(email).getId();
+        return customerService.getByEmail(email).getId();
     }
 }

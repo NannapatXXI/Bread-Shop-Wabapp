@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.breadShop.XXI.dto.customer.UserOrderCount;
 import com.breadShop.XXI.entity.Order;
 
 // Repository สำหรับจัดการข้อมูล Order โดยใช้ Spring Data JPA | reviewed by peak
@@ -31,9 +32,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status = :status")
     long countByStatus(@Param("status") Order.OrderStatus status);
 
-    // [userId, จำนวน order] ของทุกคนใน query เดียว (หน้าลูกค้าของ admin)
-    @Query("SELECT o.user.id, COUNT(o) FROM Order o GROUP BY o.user.id")
-    List<Object[]> countOrdersGroupByUser();
+    // จำนวน order ของทุกคนใน query เดียว (หน้าลูกค้าของ admin)
+    @Query("SELECT new com.breadShop.XXI.dto.customer.UserOrderCount(o.user.id, COUNT(o)) FROM Order o GROUP BY o.user.id")
+    List<UserOrderCount> countOrdersGroupByUser();
 
     // ดึงเฉพาะ order ในช่วงเวลา + กรอง status — ใช้ใน getSalesChart() แทน findAll()
     @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :start AND :end AND o.status NOT IN :excluded")

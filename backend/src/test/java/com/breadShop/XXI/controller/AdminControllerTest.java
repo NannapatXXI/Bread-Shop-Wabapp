@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,7 +23,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
@@ -120,6 +121,24 @@ class AdminControllerTest extends ControllerTestSupport {
     }
 
     @Test
+    void createProduct_bindsOnlyAllowedFields_nestedOrUnknownPathsAreIgnored() throws Exception {
+        stubUser(1, ADMIN, "ADMIN");
+        when(productService.createProduct(any())).thenReturn(product(31, "Bagel"));
+
+        // stock.x / class.module = property path ที่ไม่ใช่ field ของฟอร์ม (CVE-2026-59282) — ต้องไม่ถูก bind
+        mockMvc.perform(multipart("/api/v1/admin/products")
+                        .param("name", "Bagel").param("price", "30").param("stock", "4")
+                        .param("stock.x", "1").param("class.module.classLoader", "x")
+                        .cookie(adminToken(ADMIN)))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<ProductRequest> captor = ArgumentCaptor.forClass(ProductRequest.class);
+        verify(productService).createProduct(captor.capture());
+        assertThat(captor.getValue().getName()).isEqualTo("Bagel");
+        assertThat(captor.getValue().getStock()).isEqualTo(4);
+    }
+
+    @Test
     void createProduct_asUser_isRejectedBeforeServiceRuns() throws Exception {
         stubUser(7, ALICE, "USER");
 
@@ -170,6 +189,47 @@ class AdminControllerTest extends ControllerTestSupport {
     }
 
     @Test
+    void closeSale_patchesActiveFalse_returnsProduct_andAudits() throws Exception {
+        User admin = stubUser(1, ADMIN, "ADMIN");
+        Product closed = product(30, "Croissant");
+        closed.setActive(false);
+        when(productService.setActive(30L, false)).thenReturn(closed);
+
+        mockMvc.perform(patch("/api/v1/admin/products/30/active").with(json("{\"active\":false}"))
+                        .cookie(adminToken(ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("ปิดการขายแล้ว"))
+                .andExpect(jsonPath("$.data.isActive").value(false));
+
+        verify(auditLogService).log(eq(admin), eq("CLOSE_SALE"), eq("Product"), eq("30"),
+                isNull(), eq("false"), eq("Close sale: Croissant"));
+    }
+
+    @Test
+    void closeSale_asUser_isForbidden() throws Exception {
+        stubUser(7, ALICE, "USER");
+
+        mockMvc.perform(patch("/api/v1/admin/products/30/active").with(json("{\"active\":false}"))
+                        .cookie(userToken(ALICE)))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    void deleteProduct_alreadyOrdered_returns409_withHintToCloseSale() throws Exception {
+        stubUser(1, ADMIN, "ADMIN");
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "สินค้านี้มีในออเดอร์แล้ว ลบไม่ได้ — ใช้ \"ปิดการขาย\" แทน"))
+                .when(productService).deleteProduct(30L);
+
+        mockMvc.perform(delete("/api/v1/admin/products/30").cookie(adminToken(ADMIN)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("ปิดการขาย")));
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
     void getProductById_returnsMappedProduct() throws Exception {
         stubUser(1, ADMIN, "ADMIN");
         when(productService.getProductById(30L)).thenReturn(product(30, "Croissant"));
@@ -195,7 +255,7 @@ class AdminControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.trackingNo").value("TH123"));
 
         verify(auditLogService).log(eq(admin), eq("CHANGE_ORDER_STATUS"), eq("Order"), eq("55"),
-                isNull(), eq("SHIPPED"), eq("Order #ORD-55 → SHIPPED"));
+                isNull(), eq("SHIPPED"), eq("Order #ORD-55 > SHIPPED"));
     }
 
     @Test
@@ -231,6 +291,28 @@ class AdminControllerTest extends ControllerTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].username").value("alice"))
                 .andExpect(jsonPath("$.data[0].orderCount").value(3));
+    }
+
+    @Test
+    void customerOrders_returnsThatCustomersOrders() throws Exception {
+        stubUser(1, ADMIN, "ADMIN");
+        when(orderService.getByUserId(7)).thenReturn(List.of(order(55, OrderStatus.DELIVERED, null)));
+
+        mockMvc.perform(get("/api/v1/admin/customers/7/orders").cookie(adminToken(ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].orderNo").value("ORD-55"));
+
+        verify(orderService).getByUserId(7);
+    }
+
+    @Test
+    void customerOrders_asUser_isForbidden() throws Exception {
+        stubUser(7, ALICE, "USER");
+
+        mockMvc.perform(get("/api/v1/admin/customers/8/orders").cookie(userToken(ALICE)))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(orderService);
     }
 
     @Test

@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'; // (เราจะใช้ toast แจ�
 import Icon from '../../components/Icon';
 import { CATEGORY_LABEL } from '../../components/ProductCard';
 
-import { getproduct,addproduct } from "@/services/auth.service";
+import { getproduct, addproduct, adminSetProductActive } from "@/services/auth.service";
 import api from "@/lib/api"; // [Claude] ใช้เรียก delete API
 import { boyerMooreContains } from "@/lib/boyerMoore"; // [Claude] Boyer-Moore search
 import Cropper from "react-easy-crop";
@@ -52,13 +52,14 @@ export default function ProductPage() {
   const [, setCountMediumProduct] = useState(0); // นับไว้ แต่หน้านี้ยังไม่แสดง
   const [countLowProduct , setCountLowProduct] = useState(0);
   const [countOutofstockProduct , setCountOutofstockProduct] = useState(0);
+  const [countInactiveProduct, setCountInactiveProduct] = useState(0);
 
  
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 5;
   const LOW_STOCK_THRESHOLD = 5;
-  // [Claude] 'all' | 'lowstock' (1-5) | 'outofstock' (0)
+  // [Claude] 'all' | 'lowstock' (1-5) | 'outofstock' (0) | 'inactive' (ปิดการขาย)
   const [stockFilter, setStockFilter] = useState('all');
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -83,6 +84,7 @@ export default function ProductPage() {
       let countMediumProduct = 0;
       let countLowProduct = 0;
       let countOutofstockProduct = 0;
+      let countInactiveProduct = 0;
 
 
       const res = await getproduct();
@@ -90,7 +92,9 @@ export default function ProductPage() {
        
         countAProduct++;
 
-        if(p.stock >= 10){
+        if (p.isActive === false) {
+          countInactiveProduct++;   // ปิดการขาย — ไม่นับรวมกับสถานะสต็อก
+        } else if(p.stock >= 10){
           countReadyProduct++;
         } else if(p.stock >= 5){
           countMediumProduct++;
@@ -106,6 +110,7 @@ export default function ProductPage() {
       setCountLowProduct(countLowProduct);
       setCountOutofstockProduct(countOutofstockProduct);
       setCountAllProduct(countAProduct);
+      setCountInactiveProduct(countInactiveProduct);
       setProducts(res.data);
   
     } catch (err) {
@@ -119,8 +124,9 @@ export default function ProductPage() {
     const matchCategory  = categoryFilter === "ALL" || p.category === categoryFilter;
     const matchSearch    = boyerMooreContains(p.name ?? '', search);
     const matchStock =
-      stockFilter === 'lowstock'    ? p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD :
-      stockFilter === 'outofstock'  ? p.stock === 0 :
+      stockFilter === 'lowstock'    ? p.isActive !== false && p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD :
+      stockFilter === 'outofstock'  ? p.isActive !== false && p.stock === 0 :
+      stockFilter === 'inactive'    ? p.isActive === false :
       true;
     return matchCategory && matchSearch && matchStock;
   });
@@ -189,8 +195,9 @@ export default function ProductPage() {
       await api.delete(`/api/v1/admin/products/${deleteModal.productId}`);
       setProducts(prev => prev.filter(p => p.id !== deleteModal.productId));
       toast.success('ลบสินค้าสำเร็จ');
-    } catch {
-      toast.error('ลบสินค้าไม่สำเร็จ');
+    } catch (err) {
+      // 409 = เคยมีคนสั่งแล้ว ลบไม่ได้ — backend บอกให้ใช้ "ปิดการขาย" แทน
+      toast.error(err?.message ?? 'ลบสินค้าไม่สำเร็จ');
     } finally {
       setDeleteModal({ open: false, productId: null, productName: '' });
     }
@@ -198,6 +205,29 @@ export default function ProductPage() {
 
 
   
+  // เปิด/ปิดการขาย — ปิดแทนการลบ: ลูกค้าไม่เห็น/สั่งไม่ได้ แต่ข้อมูลและประวัติออเดอร์ยังอยู่
+  const handleToggleActive = async (product) => {
+    const active = product.isActive === false;
+    try {
+      await adminSetProductActive(product.id, active);
+      setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, isActive: active } : p)));
+      setCountInactiveProduct(c => c + (active ? -1 : 1));
+      toast.success(active ? `เปิดขาย ${product.name} แล้ว` : `ปิดการขาย ${product.name} แล้ว`);
+      return true;
+    } catch (err) {
+      toast.error(err?.message ?? 'อัปเดตไม่สำเร็จ');
+      return false;
+    }
+  };
+
+  // ใน modal ลบ: ปิดการขายแทน
+  const closeSaleInstead = async () => {
+    const product = products.find(p => p.id === deleteModal.productId);
+    if (product && await handleToggleActive(product)) {
+      setDeleteModal({ open: false, productId: null, productName: '' });
+    }
+  };
+
   const getCroppedImg = (imageSrc, crop) => {
     return new Promise((resolve) => {
       const image = new Image();
@@ -236,7 +266,8 @@ export default function ProductPage() {
 
 
 
-  const stockBadge = (stock) =>
+  const stockBadge = (stock, isActive = true) =>
+    !isActive   ? ['', 'ปิดการขาย'] :
     stock === 0 ? ['b-red', 'หมดสต็อก'] :
     stock <= 5  ? ['b-amber', 'ใกล้หมด'] :
     stock <= 9  ? ['b-blue', 'เหลือปานกลาง'] :
@@ -271,7 +302,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <div className="stats">
+      <div className="stats five">
         <button className={`stat button${stockFilter === 'all' ? ' on' : ''}`} onClick={() => handleStockFilter('all')}>
           <div className="k">ทั้งหมด</div><div className="v">{countAllProduct}</div>
         </button>
@@ -284,16 +315,20 @@ export default function ProductPage() {
         <button className={`stat button${stockFilter === 'outofstock' ? ' on' : ''}`} onClick={() => handleStockFilter('outofstock')}>
           <div className="k">หมดสต็อก <span className="badge b-red plain">●</span></div><div className="v">{countOutofstockProduct}</div>
         </button>
+        <button className={`stat button${stockFilter === 'inactive' ? ' on' : ''}`} onClick={() => handleStockFilter('inactive')}>
+          <div className="k">ปิดการขาย <span className="badge plain">●</span></div><div className="v">{countInactiveProduct}</div>
+        </button>
       </div>
 
       {stockFilter !== 'all' && (
         <div className="alert-error" role="status"
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16,
-            ...(stockFilter === 'lowstock' ? { background: 'var(--amber-soft)', color: 'var(--amber)' } : {}) }}>
+            ...(stockFilter === 'lowstock' ? { background: 'var(--amber-soft)', color: 'var(--amber)' } : {}),
+            ...(stockFilter === 'inactive' ? { background: 'var(--bg)', color: 'var(--ink)' } : {}) }}>
           <span style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}>
             <Icon name="alert" size="sm" />
-            {stockFilter === 'outofstock'
-              ? `กำลังแสดงเฉพาะสินค้าหมดสต็อก (stock = 0)`
+            {stockFilter === 'outofstock' ? `กำลังแสดงเฉพาะสินค้าหมดสต็อก (stock = 0)`
+              : stockFilter === 'inactive' ? 'กำลังแสดงเฉพาะสินค้าที่ปิดการขาย — ลูกค้าไม่เห็นและสั่งไม่ได้'
               : `กำลังแสดงเฉพาะสินค้าใกล้หมด (stock 1–${LOW_STOCK_THRESHOLD} ชิ้น)`}
           </span>
           <button className="btn btn-ghost sm" style={{ color: 'inherit' }} onClick={() => handleStockFilter(stockFilter)}>ล้างตัวกรอง</button>
@@ -320,16 +355,17 @@ export default function ProductPage() {
             <thead>
               <tr>
                 <th>สินค้า</th><th className="hide-m">หมวด</th><th className="right">ราคา</th>
-                <th className="right hide-m">คงเหลือ</th><th className="hide-m">ปิดรับออเดอร์</th><th>สถานะ</th><th></th>
+                <th className="right hide-m">คงเหลือ</th><th className="hide-m">ปิดรับออเดอร์</th><th>สถานะ</th><th>เปิดขาย</th><th></th>
               </tr>
             </thead>
             <tbody>
               {pagedProducts.length === 0 ? (
-                <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 48 }}>ไม่มีข้อมูลสินค้า</td></tr>
+                <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 48 }}>ไม่มีข้อมูลสินค้า</td></tr>
               ) : pagedProducts.map((product) => {
-                const [badgeClass, badgeLabel] = stockBadge(product.stock);
+                const active = product.isActive !== false;
+                const [badgeClass, badgeLabel] = stockBadge(product.stock, active);
                 return (
-                  <tr key={product.id}>
+                  <tr key={product.id} style={active ? undefined : { color: 'var(--muted)' }}>
                     <td>
                       <div className="prod-cell">
                         {product.imageUrl
@@ -348,6 +384,11 @@ export default function ProductPage() {
                       {product.expiryDate ? new Date(product.expiryDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '—'}
                     </td>
                     <td><span className={`badge ${badgeClass}`}>{badgeLabel}</span></td>
+                    <td>
+                      <button className={`switch${active ? ' on' : ''}`} onClick={() => handleToggleActive(product)}
+                        aria-label={`เปิดขาย ${product.name}`} aria-pressed={active}
+                        title={active ? 'ปิดการขาย (ลูกค้าไม่เห็น แต่ข้อมูลยังอยู่)' : 'เปิดขายอีกครั้ง'} />
+                    </td>
                     <td>
                       <div className="row-actions">
                         <button className="icon-btn sm hide-m" aria-label={`ดูรายละเอียด ${product.name}`} title="ดูรายละเอียด"
@@ -432,7 +473,7 @@ export default function ProductPage() {
       {/* [Claude] Modal ยืนยันการลบสินค้า */}
       {deleteModal.open && (
         <div className="modal-scrim" onClick={() => setDeleteModal({ open: false, productId: null, productName: '' })}>
-          <div className="modal" role="alertdialog" aria-label="ลบสินค้า" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" role="alertdialog" aria-label="ลบสินค้า" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div className="modal-body" style={{ textAlign: 'center', paddingTop: 28 }}>
               <div className="empty" style={{ border: 0, padding: 0, background: 'none' }}>
                 <div className="ic" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}><Icon name="trash" /></div>
@@ -441,9 +482,16 @@ export default function ProductPage() {
               <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>
                 คุณต้องการลบ <b style={{ color: 'var(--ink)' }}>{deleteModal.productName}</b> ใช่หรือไม่?
               </p>
+              <p style={{ margin: '12px 0 0', fontSize: 13, padding: '10px 12px', borderRadius: 'var(--r-md)', background: 'var(--bg)', textAlign: 'left' }}>
+                จะกลับมาขายเมนูนี้อีก? ใช้ <b>ปิดการขาย</b> แทน — ลูกค้าไม่เห็น แต่ข้อมูลและรูปยังอยู่ เปิดขายใหม่ได้ทันที
+                (สินค้าที่เคยมีคนสั่งแล้วลบไม่ได้)
+              </p>
             </div>
             <div className="modal-foot">
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setDeleteModal({ open: false, productId: null, productName: '' })}>ยกเลิก</button>
+              {products.find(p => p.id === deleteModal.productId)?.isActive !== false && (
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={closeSaleInstead}>ปิดการขายแทน</button>
+              )}
               <button className="btn btn-danger" style={{ flex: 1 }} onClick={confirmDelete}>ลบ</button>
             </div>
           </div>

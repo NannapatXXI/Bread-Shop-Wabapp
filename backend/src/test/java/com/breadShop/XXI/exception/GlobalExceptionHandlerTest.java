@@ -79,7 +79,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void unknownPath_is404_notServerError() {
         var res = handler.handleNotFound(new org.springframework.web.servlet.resource.NoResourceFoundException(
-                org.springframework.http.HttpMethod.GET, "does-not-exist"));
+                org.springframework.http.HttpMethod.GET, "/does-not-exist", "does-not-exist"));
 
         assertError(res, HttpStatus.NOT_FOUND, "ไม่พบหน้าที่ต้องการ");
     }

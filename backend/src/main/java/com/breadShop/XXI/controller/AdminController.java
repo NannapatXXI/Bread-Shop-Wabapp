@@ -7,8 +7,10 @@ import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,7 +41,7 @@ import com.breadShop.XXI.service.ProductService;
 import jakarta.validation.Valid;
 
 /**
- * Controller สำหรับ admin (ผู้ดูแลระบบ) — ต้อง login ด้วย role ADMIN 
+ * Controller สำหรับ admin  — ต้อง login ด้วย role ADMIN 
  */
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -49,18 +51,26 @@ public class AdminController {
     private final OrderService    orderService;
     private final CustomerService customerService;
     private final AuditLogService auditLogService;
-    private final CurrentUser     currentUser;
 
     public AdminController(ProductService productService, OrderService orderService, CustomerService customerService,
-                           AuditLogService auditLogService, CurrentUser currentUser) {
+                           AuditLogService auditLogService) {
         this.productService  = productService;
         this.orderService    = orderService;
         this.customerService = customerService;
         this.auditLogService = auditLogService;
-        this.currentUser     = currentUser;
     }
 
     // ─── สินค้า ────────────────────────────────────────────────────────
+
+    /**
+     * ฟอร์มสินค้า (@ModelAttribute) bind ได้เฉพาะ field ตรงตัวเหล่านี้ — ชื่ออื่นหรือ nested path (เช่น stock.x)
+     * ถูกเมิน — กัน mass assignment / property path แปลก ๆ (เดิมใส่ไว้เลี่ยง CVE-2026-59282 ของ Spring 6.2.19;
+     * Spring 7 แก้แล้ว แต่ยังเก็บไว้เป็น allowlist)
+     */
+    @InitBinder("productRequest")
+    void limitProductFields(WebDataBinder binder) {
+        binder.setAllowedFields("name", "price", "stock", "description", "category", "expiryDate", "image");
+    }
 
     @GetMapping("/products")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts() {
@@ -86,6 +96,17 @@ public class AdminController {
         Product product = productService.updateProduct(id, request);
         audit("UPDATE", "Product", id, null, product.getName(), "Update product: " + product.getName());
         return ResponseEntity.ok(ApiResponse.ok("แก้ไขสินค้าสำเร็จ", ProductMapper.toResponse(product)));
+    }
+
+    /** { "active": false } = ปิดการขาย (ลูกค้าไม่เห็น/สั่งไม่ได้) — ใช้แทนการลบเมนูที่จะกลับมาขายอีก */
+    @PatchMapping("/products/{id}/active")
+    public ResponseEntity<ApiResponse<ProductResponse>> setProductActive(
+            @PathVariable Long id, @Valid @RequestBody ActiveRequest request) {
+        Product product = productService.setActive(id, request.active());
+        audit(request.active() ? "OPEN_SALE" : "CLOSE_SALE", "Product", id, null, String.valueOf(request.active()),
+                (request.active() ? "Open sale: " : "Close sale: ") + product.getName());
+        return ResponseEntity.ok(ApiResponse.ok(request.active() ? "เปิดขายแล้ว" : "ปิดการขายแล้ว",
+                ProductMapper.toResponse(product)));
     }
 
     @DeleteMapping("/products/{id}")
@@ -119,6 +140,12 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getAll()));
     }
 
+    /** ประวัติออเดอร์ของลูกค้าคนนี้ (หน้าจัดการลูกค้า) — ใหม่สุดก่อน */
+    @GetMapping("/customers/{id}/orders")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getCustomerOrders(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getByUserId(id)));
+    }
+
     @PatchMapping("/customers/{id}/role")
     public ResponseEntity<ApiResponse<Void>> updateUserRole(@PathVariable Integer id, @Valid @RequestBody RoleRequest request) {
         String oldRole = customerService.updateRole(id, request.role());
@@ -145,7 +172,7 @@ public class AdminController {
 
     /** บันทึก audit log ในนามของ admin ที่ login อยู่ */
     private void audit(String action, String entityType, Object entityId, String oldValue, String newValue, String details) {
-        User admin = currentUser.get(SecurityContextHolder.getContext().getAuthentication().getName());
+        User admin = customerService.getByEmail(SecurityContextHolder.getContext().getAuthentication().getName());
         auditLogService.log(admin, action, entityType, String.valueOf(entityId), oldValue, newValue, details);
     }
 }

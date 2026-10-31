@@ -11,13 +11,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.breadShop.XXI.dto.dashboard.CategorySalesResponse;
+import com.breadShop.XXI.dto.dashboard.CategoryRevenue;
 import com.breadShop.XXI.dto.dashboard.CategorySalesResponse.CategoryData;
 import com.breadShop.XXI.dto.dashboard.DashboardSummaryResponse;
 import com.breadShop.XXI.dto.dashboard.SalesChartResponse;
 import com.breadShop.XXI.dto.dashboard.TopProductResponse;
+import com.breadShop.XXI.dto.dashboard.TopProductStat;
 import com.breadShop.XXI.entity.Order;
 import com.breadShop.XXI.entity.Order.OrderStatus;
+import com.breadShop.XXI.entity.ProductCategory;
 import com.breadShop.XXI.repository.OrderLineRepository;
 import com.breadShop.XXI.repository.OrderRepository;
 import com.breadShop.XXI.repository.UserRepository;
@@ -133,28 +135,25 @@ class DashboardServiceTest {
     }
 
     @Test
-    void getCategorySales_shouldMapThaiNamesAndFallbackToOther() {
-        List<Object[]> rows = List.of(
-                new Object[]{"BREAD", BigDecimal.valueOf(300)},
-                new Object[]{null, BigDecimal.valueOf(50)},
-                new Object[]{"UNKNOWN_CAT", BigDecimal.valueOf(20)}
-        );
+    void getCategorySales_shouldMapEveryCategoryToThai_andKeepRevenue() {
+        List<CategoryRevenue> rows = List.of(
+                new CategoryRevenue(ProductCategory.BREAD, BigDecimal.valueOf(300)),
+                new CategoryRevenue(ProductCategory.CAKE, BigDecimal.valueOf(50)),
+                new CategoryRevenue(ProductCategory.COOKIE, BigDecimal.valueOf(20)),
+                new CategoryRevenue(ProductCategory.DRINK, BigDecimal.valueOf(5)));
         when(orderLineRepository.sumRevenueByCategory(any(), any(), anyList())).thenReturn(rows);
 
-        CategorySalesResponse response = dashboardService.getCategorySales();
+        List<CategoryData> data = dashboardService.getCategorySales().getData();
 
-        List<CategoryData> data = response.getData();
-        assertThat(data).hasSize(3);
-        assertEquals("ขนมปัง", data.get(0).getName());
-        assertEquals("OTHER", data.get(1).getName());
-        assertEquals("UNKNOWN_CAT", data.get(2).getName());
+        assertThat(data).extracting(CategoryData::getName).containsExactly("ขนมปัง", "เค้ก", "คุกกี้", "เครื่องดื่ม");
+        assertEquals(BigDecimal.valueOf(300), data.get(0).getValue());
     }
 
     @Test
     void getTopProducts_shouldLimitToSevenAndMapFields() {
-        List<Object[]> rows = new java.util.ArrayList<>();
+        List<TopProductStat> rows = new java.util.ArrayList<>();
         for (int i = 1; i <= 10; i++) {
-            rows.add(new Object[]{i, "Product " + i, (long) i, BigDecimal.valueOf(i * 10), "img" + i + ".png"});
+            rows.add(new TopProductStat((long) i, "Product " + i, (long) i, BigDecimal.valueOf(i * 10L), "img" + i + ".png"));
         }
         when(orderLineRepository.getTopProductStats(any(), any(), anyList())).thenReturn(rows);
 
@@ -164,6 +163,8 @@ class DashboardServiceTest {
         assertEquals(1, result.get(0).getProductId());
         assertEquals("Product 1", result.get(0).getProductName());
         assertEquals("img1.png", result.get(0).getImageUrl());
+        assertEquals(1L, result.get(0).getTotalQty());
+        assertEquals(BigDecimal.valueOf(10), result.get(0).getTotalRevenue());
     }
 
     @Test
@@ -185,23 +186,4 @@ class DashboardServiceTest {
         assertEquals(0.0, summary.getMonthRevenueChangePercent());
     }
 
-    @Test
-    void getCategorySales_whenRevenueIsNotBigDecimal_shouldFallbackToZero() {
-        List<Object[]> rows = List.<Object[]>of(new Object[]{"CAKE", 999L});
-        when(orderLineRepository.sumRevenueByCategory(any(), any(), anyList())).thenReturn(rows);
-
-        CategorySalesResponse response = dashboardService.getCategorySales();
-
-        assertEquals(BigDecimal.ZERO, response.getData().get(0).getValue());
-    }
-
-    @Test
-    void getTopProducts_whenRevenueIsNotBigDecimal_shouldFallbackToZero() {
-        List<Object[]> rows = List.<Object[]>of(new Object[]{1, "Bagel", 3L, "not-a-bigdecimal", "img.png"});
-        when(orderLineRepository.getTopProductStats(any(), any(), anyList())).thenReturn(rows);
-
-        List<TopProductResponse> result = dashboardService.getTopProducts();
-
-        assertEquals(BigDecimal.ZERO, result.get(0).getTotalRevenue());
-    }
 }

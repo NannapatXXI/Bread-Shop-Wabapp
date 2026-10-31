@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.order.OrderRequest;
 import com.breadShop.XXI.dto.order.OrderResponse;
+import com.breadShop.XXI.service.CustomerService;
 import com.breadShop.XXI.service.OrderService;
 
 import jakarta.validation.Valid;
@@ -25,37 +26,34 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/orders")
 public class OrderController {
 
-    private final OrderService orderService;
-    private final CurrentUser  currentUser;
+    private final OrderService    orderService;
+    private final CustomerService customerService;
 
-    public OrderController(OrderService orderService, CurrentUser currentUser) {
-        this.orderService = orderService;
-        this.currentUser  = currentUser;
+    public OrderController(OrderService orderService, CustomerService customerService) {
+        this.orderService    = orderService;
+        this.customerService = customerService;
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(@AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(ApiResponse.ok(orderService.getByUserId(currentUser.get(email).getId())));
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getByUserId(customerService.getByEmail(email).getId())));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<OrderResponse>> getById(
-            @PathVariable Integer id, @AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(ApiResponse.ok(orderService.getByIdForUser(id, currentUser.get(email).getId())));
+    public ResponseEntity<ApiResponse<OrderResponse>> getById( @PathVariable Integer id, @AuthenticationPrincipal String email) {
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getByIdForUser(id, customerService.getByEmail(email).getId())));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<OrderResponse>> create(
-            @AuthenticationPrincipal String email, @Valid @RequestBody OrderRequest request) {
-        request.setUserId(currentUser.get(email).getId());
+    public ResponseEntity<ApiResponse<OrderResponse>> create(@AuthenticationPrincipal String email, @Valid @RequestBody OrderRequest request) {
+        request.setUserId(customerService.getByEmail(email).getId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("สร้าง order สำเร็จ", orderService.createOrder(request)));
     }
 
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<ApiResponse<OrderResponse>> cancel(
-            @PathVariable Integer id, @AuthenticationPrincipal String email) {
+    public ResponseEntity<ApiResponse<OrderResponse>> cancel(@PathVariable Integer id, @AuthenticationPrincipal String email) {
         return ResponseEntity.ok(ApiResponse.ok("ยกเลิก order สำเร็จ",
-                orderService.cancelOrder(id, currentUser.get(email).getId())));
+                orderService.cancelOrder(id, customerService.getByEmail(email).getId())));
     }
 }

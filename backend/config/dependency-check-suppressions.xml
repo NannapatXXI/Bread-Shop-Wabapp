@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP dependency-check — ข้อที่ตรวจแล้วว่า "ไม่กระทบแอปนี้" พร้อมเหตุผล
+  ใช้: dependency-check ... -suppression backend/config/dependency-check-suppressions.xml
+
+  กติกา: ใส่เฉพาะที่ (1) เป็น false positive หรือ (2) ช่องโหว่อยู่ในฟีเจอร์ที่แอปไม่ได้ใช้
+  ทบทวนทุกครั้งที่อัปเกรด Spring Boot — ถ้ามีเวอร์ชันที่แก้แล้ว ให้อัปเกรดแล้วลบข้อนั้นออก
+  ตรวจเมื่อ: 2026-10-28 หลังอัปเกรดเป็น Spring Boot 4.1.2 — เหลือแค่ false positive
+  (CVE ของ Spring Framework 6.2.19 / Spring Data JPA 3.5.13 หายไปเมื่ออัปเป็น Spring 7 / Data JPA 4.1)
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <!-- ───────────── false positive: CPE จับผิดตัว ───────────── -->
+
+  <suppress>
+    <notes><![CDATA[
+      micrometer-registry-prometheus คือ client library (Java) ที่ส่งออก metrics ไม่ใช่ Prometheus server (Go)
+      CPE cpe:2.3:a:prometheus:prometheus จับผิด — CVE-2026-42154 (remote read endpoint) / CVE-2019-3826 (XSS ใน UI ของ server)
+      เป็นของตัว server ที่รันใน docker-compose.monitoring.yml ไม่ใช่ใน jar นี้
+    ]]></notes>
+    <filePath regex="true">.*micrometer-registry-prometheus-[\d.]+\.jar$</filePath>
+    <cpe>cpe:/a:prometheus:prometheus</cpe>
+  </suppress>
+
+  <suppress>
+    <notes><![CDATA[
+      CVE-2018-1258 กระทบเฉพาะ Spring Framework 5.0.5 + Spring Security — แอปนี้ใช้ Spring Framework 7.0.x
+    ]]></notes>
+    <filePath regex="true">.*spring-security-[a-z0-9-]+-[\d.]+\.jar$</filePath>
+    <cve>CVE-2018-1258</cve>
+  </suppress>
+
+  <suppress>
+    <notes><![CDATA[
+      jquery 1.11.2 ใน apache-maven-fluido (skin ของรายงาน Maven site / PMD / JaCoCo ใน target/) — ไม่ได้อยู่ใน jar ที่ deploy
+    ]]></notes>
+    <filePath regex="true">.*fluido.*\.js$</filePath>
+    <vulnerabilityName regex="true">.*</vulnerabilityName>  <!-- ทุกช่องโหว่ของไฟล์นี้ -->
+  </suppress>
+
+</suppressions>

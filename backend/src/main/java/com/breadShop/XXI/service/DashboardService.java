@@ -34,7 +34,7 @@ import com.breadShop.XXI.repository.UserRepository;
 public class DashboardService {
 
     /** ไม่นับเป็นยอดขาย */
-    private static final List<OrderStatus> EXCLUDED = List.of(OrderStatus.CANCELLED, OrderStatus.REFUNDED);
+    static final List<OrderStatus> EXCLUDED = List.of(OrderStatus.CANCELLED, OrderStatus.REFUNDED);
     private static final Locale THAI = Locale.of("th");
     private static final int TOP_PRODUCTS = 7;
     private static final Map<String, String> CATEGORY_TH = Map.of(
@@ -106,11 +106,8 @@ public class DashboardService {
     public CategorySalesResponse getCategorySales() {
         LocalDateTime now = LocalDateTime.now();
         List<CategoryData> data = orderLineRepository.sumRevenueByCategory(now.minusDays(30), now, EXCLUDED).stream()
-                .map(row -> {
-                    String category = row[0] != null ? row[0].toString() : "OTHER";
-                    BigDecimal revenue = row[1] instanceof BigDecimal bd ? bd : BigDecimal.ZERO;
-                    return new CategoryData(CATEGORY_TH.getOrDefault(category, category), revenue);
-                })
+                .map(row -> new CategoryData(
+                        CATEGORY_TH.getOrDefault(row.category().name(), row.category().name()), row.revenue()))
                 .toList();
         return new CategorySalesResponse(data);
     }
@@ -122,11 +119,7 @@ public class DashboardService {
         return orderLineRepository.getTopProductStats(now.minusDays(30), now, EXCLUDED).stream()
                 .limit(TOP_PRODUCTS)
                 .map(row -> new TopProductResponse(
-                        ((Number) row[0]).intValue(),
-                        (String) row[1],
-                        ((Number) row[2]).longValue(),
-                        row[3] instanceof BigDecimal bd ? bd : BigDecimal.ZERO,
-                        (String) row[4]))
+                        row.productId().intValue(), row.productName(), row.totalQty(), row.totalRevenue(), row.imageUrl()))
                 .toList();
     }
 

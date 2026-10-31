@@ -11,8 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcBuilderCustomizer;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcBuilderCustomizer;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -27,11 +28,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.breadShop.XXI.config.SecurityConfig;
 import com.breadShop.XXI.entity.User;
+import com.breadShop.XXI.repository.OrderRepository;
 import com.breadShop.XXI.repository.UserRepository;
+import com.breadShop.XXI.service.CustomerService;
 import com.breadShop.XXI.service.JwtService;
 
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
@@ -41,7 +43,7 @@ import jakarta.servlet.http.Cookie;
  * (กฎสิทธิ์ชุดเดียวกับ production) แล้ว mock เฉพาะ service/repository ด้านหลัง
  * token ในเทสเซ็นด้วย secret ที่สุ่มใหม่ทุกครั้ง — ไม่ใช้ secret จริงของระบบ
  */
-@Import({ SecurityConfig.class, JwtService.class, CurrentUser.class, ControllerTestSupport.ProductionLikeServletPath.class })
+@Import({ SecurityConfig.class, JwtService.class, CustomerService.class, ControllerTestSupport.ProductionLikeServletPath.class })
 abstract class ControllerTestSupport {
 
     private static final String TEST_JWT_SECRET = randomBase64Key();
@@ -62,6 +64,14 @@ abstract class ControllerTestSupport {
 
     @MockitoBean
     protected UserRepository userRepository;
+
+    // CustomerService ตัวจริงต้องใช้ — ไม่ได้ใช้ในเทสส่วนใหญ่
+    @MockitoBean
+    protected OrderRepository orderRepository;
+
+    // ตัวจริง (หา user จาก userRepository ที่ mock ไว้) หรือ mock ถ้าเทสลูกประกาศ @MockitoBean CustomerService
+    @Autowired
+    private CustomerService customerService;
 
     protected Cookie tokenFor(String email, String role) {
         UserDetails details = org.springframework.security.core.userdetails.User
@@ -98,11 +108,11 @@ abstract class ControllerTestSupport {
 
     private static String signedToken(String email, String base64Key, Date expiresAt) {
         return Jwts.builder()
-                .setClaims(Map.of("roles", List.of(Map.of("authority", "ROLE_ADMIN"))))
-                .setSubject(email)
-                .setIssuedAt(new Date(expiresAt.getTime() - 120_000))
-                .setExpiration(expiresAt)
-                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(base64Key)), SignatureAlgorithm.HS256)
+                .claims(Map.of("roles", List.of(Map.of("authority", "ROLE_ADMIN"))))
+                .subject(email)
+                .issuedAt(new Date(expiresAt.getTime() - 120_000))
+                .expiration(expiresAt)
+                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(base64Key)), Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -111,6 +121,9 @@ abstract class ControllerTestSupport {
         User user = new User("user" + id, email, "hashed", role);
         ReflectionTestUtils.setField(user, "id", id);
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        if (Mockito.mockingDetails(customerService).isMock()) {
+            when(customerService.getByEmail(email)).thenReturn(user);
+        }
         return user;
     }
 

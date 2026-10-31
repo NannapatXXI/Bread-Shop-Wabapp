@@ -20,13 +20,14 @@ import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.promotion.PromotionRequest;
 import com.breadShop.XXI.dto.promotion.PromotionResponse;
 import com.breadShop.XXI.dto.promotion.PromotionValidateResponse;
+import com.breadShop.XXI.service.PromotionService;
 
 import jakarta.validation.Valid;
-import com.breadShop.XXI.service.PromotionService;
 
 /**
  * /api/v1/promotions — โค้ดส่วนลด
  * ลูกค้าเรียกได้แค่ GET /discount ที่เหลือ admin เท่านั้น (กำหนดใน SecurityConfig)
+ * 
  */
 @RestController
 @RequestMapping("/api/v1/promotions")

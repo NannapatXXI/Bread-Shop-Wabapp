@@ -55,6 +55,13 @@ api.interceptors.response.use(
     const originalRequest = err.config;
     const status = err.response?.status;
 
+    // 4xx/5xx: axios ตั้ง message เป็น "Request failed with status code 409" — ใช้เหตุผลจาก backend แทน
+    // หน้าเว็บจะได้แสดง err.message ตรง ๆ ได้ (เช่น "สินค้า X ปิดการขายอยู่")
+    const backendMessage = err.response?.data?.message;
+    if (backendMessage) {
+      err.message = backendMessage;
+    }
+
     // 403 = ไม่มีสิทธิ์ (เช่น user เรียก admin API) — ไม่ refresh, ไม่เปลี่ยน session
     if (status === 403) {
       return Promise.reject(err);

@@ -4,6 +4,7 @@ package com.breadShop.XXI.dto.order;
 import java.util.List;
 
 import com.breadShop.XXI.dto.orderline.OrderLineRequest;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +13,7 @@ import jakarta.validation.constraints.NotNull;
 public class OrderRequest {
 
     private Integer userId;
+
 
     @NotNull(message = "กรุณาเลือกที่อยู่จัดส่ง")
     private Integer addressId;

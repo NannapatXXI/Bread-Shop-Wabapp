@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import api from "@/lib/api";
 
@@ -47,8 +47,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /** หลังแก้ข้อมูลตัวเอง (เช่น username) — ทุกที่ที่แสดง user (header, หน้าโปรไฟล์) เห็นค่าใหม่ทันที */
+  const updateUser = useCallback((patch) => {
+    setUser(prev => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading , logout}}>
+    <AuthContext.Provider value={{ user, loading, logout, updateUser }}>
       { children}
     </AuthContext.Provider>
   );

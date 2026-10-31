@@ -14,7 +14,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.breadShop.XXI.Util.RequestInfo;
 import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.AuthenticationResponse;
 import com.breadShop.XXI.dto.CheckEmailRequest;
@@ -32,13 +30,9 @@ import com.breadShop.XXI.dto.LoginRequest;
 import com.breadShop.XXI.dto.RegisterRequest;
 import com.breadShop.XXI.dto.ResetPasswordRequest;
 import com.breadShop.XXI.dto.VerifyOtpRequest;
-import com.breadShop.XXI.repository.UserRepository;
 import com.breadShop.XXI.service.AuthService;
 import com.breadShop.XXI.service.GoogleAuthService;
-import com.breadShop.XXI.service.RefreshTokenService;
-import com.breadShop.XXI.service.UserActivityLogService;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /**
@@ -62,26 +56,18 @@ public class AuthController {
     private static final int STATE_MAX_AGE   = 10 * 60;   // ต้องกลับจาก Google ภายใน 10 นาที
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final AuthService            authService;
-    private final GoogleAuthService      googleAuthService;
-    private final UserRepository         userRepository;
-    private final RefreshTokenService    refreshTokenService;
-    private final UserActivityLogService activityLogService;
-    private final boolean secureCookie;
-    private final String  frontendUrl;
+    private final AuthService       authService;
+    private final GoogleAuthService googleAuthService;
+    private final boolean           secureCookie;
+    private final String            frontendUrl;
 
     public AuthController(AuthService authService, GoogleAuthService googleAuthService,
-                          UserRepository userRepository, RefreshTokenService refreshTokenService,
-                          UserActivityLogService activityLogService,
                           @Value("${app.secure-cookie:false}") boolean secureCookie,
                           @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl) {
-        this.authService         = authService;
-        this.googleAuthService   = googleAuthService;
-        this.userRepository      = userRepository;
-        this.refreshTokenService = refreshTokenService;
-        this.activityLogService  = activityLogService;
-        this.secureCookie        = secureCookie;
-        this.frontendUrl         = frontendUrl;
+        this.authService       = authService;
+        this.googleAuthService = googleAuthService;
+        this.secureCookie      = secureCookie;
+        this.frontendUrl       = frontendUrl;
     }
 
     // ─── Login / Logout / Refresh ─────────────────────────────────────
@@ -94,25 +80,14 @@ public class AuthController {
                 .body(ApiResponse.ok("เข้าสู่ระบบสำเร็จ"));
     }
 
+    /**
+     * ผ่านเสมอ (200) ไม่ว่าจะ login อยู่ไหม — JWT filter ไม่ตรวจ path นี้ access token หมดอายุก็ logout ได้
+     * user ดูจาก refresh token แล้วล้าง cookie ทั้งคู่
+     */
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal String email,
-            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken,
-            HttpServletRequest request) {
-
-        if (refreshToken != null) {
-            try {
-                refreshTokenService.revoke(refreshTokenService.validate(refreshToken));
-            } catch (RuntimeException e) {
-                // token หมดอายุหรือไม่มีอยู่แล้ว — logout ต่อได้ตามปกติ
-                log.debug("Logout with invalid refresh token: {}", e.getMessage());
-            }
-        }
-
-        if (email != null) {
-            userRepository.findByEmail(email).ifPresent(user -> activityLogService.logSuccess(user, "LOGOUT",
-                    RequestInfo.clientIp(request), RequestInfo.userAgent(request), "ออกจากระบบ"));
-        }
+            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
+        authService.logout(refreshToken);
 
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.SET_COOKIE, cookie(ACCESS_COOKIE, "", "/", 0));
@@ -122,8 +97,7 @@ public class AuthController {
 
     /** ใช้ refresh_token แลก token คู่ใหม่ (ตัวเก่าใช้ไม่ได้อีก — token rotation) */
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<Void>> refresh(
-            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
+    public ResponseEntity<ApiResponse<Void>> refresh(@CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
         var tokens = authService.refreshAccessToken(refreshToken);
         return ResponseEntity.ok()
                 .headers(sessionCookies(tokens))
@@ -176,7 +150,7 @@ public class AuthController {
                 .body(ApiResponse.ok(Map.of("url", googleAuthService.getGoogleLoginUrl(state))));
     }
 
-    /** Google ส่งกลับมาพร้อม code → แลกเป็น token ของเรา → set cookie แล้ว redirect ไปหน้า home */
+    /** Google ส่งกลับมาพร้อม code  แลกเป็น token ของเรา  set cookie แล้ว redirect ไปหน้า home */
     @GetMapping("/google/callback")
     public ResponseEntity<?> callback(
             @RequestParam("code") String code,

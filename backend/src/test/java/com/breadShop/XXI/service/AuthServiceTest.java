@@ -385,4 +385,40 @@ class AuthServiceTest {
         verify(refreshTokenService, never()).rotate(any());
         verify(jwtService, never()).generateToken(any());
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  logout — รู้ตัวคนจาก refresh token (access token อาจหมดอายุไปแล้ว)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("logout — refresh token ใช้ได้ → revoke และบันทึก LOGOUT ในนามเจ้าของ token")
+    void logout_withValidRefreshToken_revokesAndLogsAsTokenOwner() {
+        RefreshToken stored = new RefreshToken();
+        stored.setUser(sampleUser);
+        when(refreshTokenService.validate("REFRESH-1")).thenReturn(stored);
+
+        authService.logout("REFRESH-1");
+
+        verify(refreshTokenService).revoke(stored);
+        verify(activityLogService).logSuccess(eq(sampleUser), eq("LOGOUT"), any(), any(), eq("ออกจากระบบ"));
+    }
+
+    @Test
+    @DisplayName("logout — refresh token หมดอายุ/ถูก revoke แล้ว → ไม่ throw ไม่ revoke ซ้ำ ไม่บันทึก log")
+    void logout_withInvalidRefreshToken_doesNothing() {
+        when(refreshTokenService.validate("stale")).thenThrow(new RuntimeException("INVALID_REFRESH_TOKEN"));
+
+        assertThatCode(() -> authService.logout("stale")).doesNotThrowAnyException();
+
+        verify(refreshTokenService, never()).revoke(any());
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    @DisplayName("logout — ไม่มี refresh token cookie → ไม่แตะ DB เลย")
+    void logout_withoutRefreshToken_doesNothing() {
+        authService.logout(null);
+
+        verifyNoInteractions(refreshTokenService, activityLogService);
+    }
 }

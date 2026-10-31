@@ -46,6 +46,14 @@ public class Product {
     @Column(nullable = true)
     private LocalDate expiryDate;
 
+    /** สินค้าแนะนำบนหน้าร้าน — null = ไม่แนะนำ, เลขน้อยแสดงก่อน (admin ตั้งที่หน้าจัดการหน้าร้าน) */
+    @Column(name = "featured_rank")
+    private Integer featuredRank;
+
+    /** false = ปิดการขาย — ลูกค้าไม่เห็นและสั่งไม่ได้ แต่ข้อมูลยังอยู่ (order เก่าอ้างถึงได้ / เปิดขายใหม่ได้) */
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
     @CreationTimestamp                  // ✅ เพิ่มใหม่
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -97,5 +105,11 @@ public class Product {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
+
+    public Integer getFeaturedRank() { return featuredRank; }
+    public void setFeaturedRank(Integer featuredRank) { this.featuredRank = featuredRank; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

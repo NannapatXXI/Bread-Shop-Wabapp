@@ -26,6 +26,7 @@ import com.breadShop.XXI.service.UserActivityLogService;
  * เฉพาะ log ทางธุรกิจ (activity / audit / order)
  * log ของระบบและสถิติ request/error ดูใน Grafana (Loki + Prometheus)
  * ดู docker-compose.monitoring.yml
+ * 
  */
 @RestController
 @RequestMapping("/api/v1/admin/logs")

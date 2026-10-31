@@ -1,5 +1,6 @@
 package com.breadShop.XXI.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,10 @@ import jakarta.persistence.LockModeType;
 public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByCategory(ProductCategory category);
     long countByStockGreaterThan(int stock);
+
+    List<Product> findByFeaturedRankIsNotNullOrderByFeaturedRankAsc();
+
+    List<Product> findByActiveTrue();
 
     // Pessimistic write lock — ป้องกัน race condition ตอนหักสต็อก
     @Lock(LockModeType.PESSIMISTIC_WRITE)

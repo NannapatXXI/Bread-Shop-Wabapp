@@ -15,7 +15,8 @@ public class ProductMapper {
                 product.getDescription(),
                 product.getImageUrl(),
                 product.getCategory(),
-                product.getExpiryDate()
+                product.getExpiryDate(),
+                product.isActive()
         );
     }
 }

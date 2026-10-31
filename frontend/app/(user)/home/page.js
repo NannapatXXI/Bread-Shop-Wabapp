@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../CartContext';
-import { getProducts, getMyOrders } from '@/services/auth.service';
+import { getProducts, getMyOrders, getStorefront } from '@/services/auth.service';
 import Icon from '../../components/Icon';
 import ProductCard, { CATEGORY_LABEL } from '../../components/ProductCard';
 import StatusBadge from '../../components/StatusBadge';
@@ -36,15 +36,24 @@ export default function HomePage() {
   const { addToCart, items } = useCart();
   const getCartQty = (productId) => items.find(i => i.product.id === productId)?.quantity ?? 0;
   const [products, setProducts] = useState([]);
+  const [storefront, setStorefront] = useState({ heroImageUrl: null, featured: [] });
+  const [loadingStorefront, setLoadingStorefront] = useState(true);
   const [orders, setOrders] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
   useEffect(() => {
+    // ใช้นับหมวดหมู่ + รูปปกสำรอง
     getProducts()
       .then(res => setProducts(res.data))
+      .catch(() => {});
+  }, []);
+
+  // รูปปก + สินค้าแนะนำ ที่ admin ตั้งไว้ (หน้า /admin/storefront)
+  useEffect(() => {
+    getStorefront()
+      .then(res => setStorefront({ heroImageUrl: res.data?.heroImageUrl ?? null, featured: res.data?.featured ?? [] }))
       .catch(() => {})
-      .finally(() => setLoadingProducts(false));
+      .finally(() => setLoadingStorefront(false));
   }, []);
 
   // โหลด orders เมื่อ user พร้อม
@@ -58,7 +67,8 @@ export default function HomePage() {
 
   const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'PROCESSING' || o.status === 'CONFIRMED');
 
-  const heroImage = products.find(p => p.imageUrl)?.imageUrl;
+  // admin ยังไม่ได้ตั้งรูปปก → ใช้รูปสินค้าตัวแรกที่มีรูปแทน
+  const heroImage = storefront.heroImageUrl ?? products.find(p => p.imageUrl)?.imageUrl;
   const categories = Object.entries(
     products.reduce((acc, p) => {
       if (!p.category) return acc;
@@ -123,11 +133,11 @@ export default function HomePage() {
           <Link className="link" href="/product" style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 14 }}>ดูทั้งหมด <Icon name="right" size="sm" /></Link>
         </div>
         <div className="pgrid" style={{ marginTop: 20 }}>
-          {loadingProducts
+          {loadingStorefront
             ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i}><div className="sk" style={{ aspectRatio: '1/1', borderRadius: 'var(--r-md)' }} /><div className="sk" style={{ height: 14, width: '60%', marginTop: 12 }} /></div>
             ))
-            : products.slice(0, 4).map(product => (
+            : storefront.featured.map(product => (
               <ProductCard key={product.id} product={product} imageSrc={`${API_URL}/${product.imageUrl}`}
                 inCart={getCartQty(product.id)} onAdd={addToCart} />
             ))}

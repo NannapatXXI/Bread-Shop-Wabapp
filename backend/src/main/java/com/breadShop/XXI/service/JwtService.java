@@ -1,9 +1,10 @@
 package com.breadShop.XXI.service;
 
-import java.security.Key;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+
+import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
@@ -23,8 +23,8 @@ import io.jsonwebtoken.security.Keys;
 @Service
 public class JwtService {
 
-    private final Key  signingKey;
-    private final long expirationMs;
+    private final SecretKey signingKey;
+    private final long      expirationMs;
 
     /** @param base64Secret secret แบบ Base64 ยาวอย่างน้อย 32 bytes (HS256) */
     public JwtService(@Value("${app.jwtSecret}") String base64Secret,
@@ -36,11 +36,11 @@ public class JwtService {
     public String generateToken(UserDetails user) {
         Date now = new Date();
         return Jwts.builder()
-                .setClaims(Map.of("roles", user.getAuthorities()))
-                .setSubject(user.getUsername())
-                .setIssuedAt(now)
-                .setExpiration(new Date(now.getTime() + expirationMs))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .claims(Map.of("roles", user.getAuthorities()))
+                .subject(user.getUsername())
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + expirationMs))
+                .signWith(signingKey, Jwts.SIG.HS256)   // ระบุตรง ๆ — ไม่ปล่อยให้เลือกตามความยาว key
                 .compact();
     }
 
@@ -62,10 +62,10 @@ public class JwtService {
 
     /** ตรวจลายเซ็น + วันหมดอายุ แล้วคืน claims */
     private Claims parse(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(signingKey)
+        return Jwts.parser()
+                .verifyWith(signingKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

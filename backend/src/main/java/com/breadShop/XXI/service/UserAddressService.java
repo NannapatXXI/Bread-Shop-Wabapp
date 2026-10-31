@@ -33,7 +33,12 @@ public class UserAddressService {
         return userAddressRepository.findByUserId(userId).stream().map(this::toResponse).toList();
     }
 
-    /** ที่อยู่แรกของ user เป็น default เสมอ */
+    /**
+     * สร้างที่อยู่ใหม่ — ถ้าเป็น default จะ unset default เดิมให้อัตโนมัติ
+     * @param userId เจ้าของที่อยู่
+     * @param request ข้อมูลที่อยู่ใหม่
+     * @return UserAddressResponse ของที่อยู่ใหม่
+     */
     @Transactional
     public UserAddressResponse createAddress(Integer userId, UserAddressRequest request) {
         User user = userRepository.findById(userId)
@@ -52,6 +57,13 @@ public class UserAddressService {
         return toResponse(userAddressRepository.save(address));
     }
 
+    /**
+     * อัพเดทที่อยู่ — ถ้าเป็น default จะ unset default เดิมให้อัตโนมัติ
+     * @param userId เจ้าของที่อยู่
+     * @param addressId id ของที่อยู่ที่จะอัพเดท
+     * @param request ข้อมูลที่อยู่ใหม่
+     * @return UserAddressResponse ของที่อยู่ที่อัพเดทแล้ว
+     */
     @Transactional
     public UserAddressResponse updateAddress(Integer userId, Integer addressId, UserAddressRequest request) {
         UserAddress address = findOwnedAddress(userId, addressId);

@@ -89,7 +89,12 @@ public class OrderService {
         return toResponse(findOrder(id));
     }
 
-    /** เฉพาะ order ของ user คนนี้ — ของคนอื่นตอบ 404 เหมือนไม่มีอยู่ */
+    /**
+     * order ของ user — ถ้า order ไม่ใช่ของ user นี้ตอบ 404 เหมือนไม่มีอยู่
+     * @param id  id ของ order
+     * @param userId id ของ user ที่ขอดู order
+     * @return  OrderResponse ของ order ที่ user เป็นเจ้าของ
+     */
     @Transactional(readOnly = true)
     public OrderResponse getByIdForUser(Integer id, Integer userId) {
         Order order = orderRepository.findById(id)
@@ -101,8 +106,9 @@ public class OrderService {
     // ─── สร้าง order ───────────────────────────────────────────────────
 
     /**
-     * total = ราคาสินค้า (จาก DB) − ส่วนลดโค้ดโปรโมชั่น + ค่าส่ง (ไม่ติดลบ)
-     * ตัดสต็อกพร้อมกันในขั้นนี้ — ถ้าขั้นไหนพัง transaction rollback ทั้งหมด
+     * สร้าง order ใหม่ — คำนวณราคาที่ server ทั้งหมด ไม่เชื่อตัวเลขจาก client
+     * @param request รับว่า userId, addressId, promotionCode, note, และรายการสินค้า (productId + quantity)
+     * @return OrderResponse พร้อม orderNo, ราคาสินค้า, ส่วนลด, ค่าส่ง, ยอดรวม, สถานะ PENDING
      */
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
@@ -135,12 +141,20 @@ public class OrderService {
         return toResponse(saved);
     }
 
-    /** เพิ่มสินค้า 1 รายการ + ตัดสต็อก @return ยอดของรายการนี้ */
+    /**
+     * เพิ่มแถวสินค้าใน order — ล็อกแถวสินค้าเพื่อป้องกันขายเกินสต็อก
+     * @param order คำสั่งซื้อที่กำลังสร้าง
+     * @param item รายการสินค้า (productId + quantity)
+     * @return ราคาสินค้าในแถวนี้ (product.price * quantity)
+     */
     private BigDecimal addLine(Order order, OrderLineRequest item) {
         // ล็อกแถวสินค้า — 2 คำสั่งซื้อพร้อมกันจะไม่ขายเกินสต็อก
         Product product = productRepository.findByIdWithLock(item.getProductId().longValue())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + item.getProductId()));
 
+        if (!product.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "สินค้า " + product.getName() + " ปิดการขายอยู่");
+        }
         if (product.getStock() < item.getQuantity()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient stock for: " + product.getName());
         }
@@ -156,7 +170,13 @@ public class OrderService {
         return lineTotal;
     }
 
-    /** @return ส่วนลดจากโค้ด (0 ถ้าไม่ได้ใส่โค้ด) — โค้ดผิด/หมดอายุ → 400 */
+   /**
+    * คำนวณส่วนลดจาก promotion code — ถ้าไม่ถูกต้องหรือหมดอายุ  400
+    * @param order คำสั่งซื้อที่กำลังสร้าง
+    * @param code รหัสโปรโมชั่นจากลูกค้า
+    * @param subtotal ราคาสินค้ารวมก่อนส่วนลด
+    * @return จำนวนเงินส่วนลดที่ใช้ได้ (0 ถ้าไม่มี code)
+    */
     private BigDecimal applyPromotion(Order order, String code, BigDecimal subtotal) {
         if (code == null || code.isBlank()) {
             return BigDecimal.ZERO;
@@ -170,7 +190,10 @@ public class OrderService {
         return promotionService.calculateDiscount(promotion, subtotal);
     }
 
-    /** ORD-<เวลา>-<สุ่ม 6 ตัว> — สุ่มต่อท้ายให้หลายคนสั่งในวินาทีเดียวกันได้ไม่ชน UNIQUE */
+   /**
+    * สร้าง orderNo ใหม่ — รูปแบบ ORD-yyyyMMddHHmmss-XXXXXX (X เป็นตัวเลข/ตัวอักษรสุ่ม)
+    * @return orderNo ใหม่
+    */
     private String newOrderNo() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase(Locale.ROOT);
         return "ORD-" + LocalDateTime.now().format(ORDER_NO_TIME) + "-" + suffix;

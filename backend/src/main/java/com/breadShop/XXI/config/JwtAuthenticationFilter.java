@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,10 +39,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",     // ต้องผ่านแม้ access token หมดอายุ (ไม่งั้นได้ 401 JWT_EXPIRED)
         "/api/v1/auth/otp",
         "/api/v1/auth/otp/verification",
         "/api/v1/auth/password",
-        "/api/v1/products"
+        "/api/v1/products",
+        "/api/v1/storefront"
     );
 
     private final JwtService jwtService;

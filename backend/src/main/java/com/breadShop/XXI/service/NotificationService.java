@@ -23,10 +23,14 @@ public class NotificationService {
         this.sseService             = sseService;
     }
 
+    /**
+     * สร้าง notification ใน DB และส่งผ่าน SSE
+     * @param order ออเดอร์ที่เปลี่ยนสถานะ (ต้องมี user และ orderNo)
+     * @param newStatus สถานะใหม่ของ order
+     */
     @Transactional
     public void createAndPush(Order order, OrderStatus newStatus) {
-        Notification notification = new Notification(order.getUser(), order,
-                message(order.getOrderNo(), newStatus), newStatus.name());
+        Notification notification = new Notification(order.getUser(), order, message(order.getOrderNo(), newStatus), newStatus.name());
         notificationRepository.save(notification);
         sseService.send(order.getUser().getId(), toResponse(notification));
     }
@@ -37,7 +41,7 @@ public class NotificationService {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream().map(this::toResponse).toList();
     }
 
-    /** แจ้งเตือนของคนอื่น → ไม่ทำอะไร (ไม่บอกด้วยว่ามี id นี้อยู่) */
+    /** แจ้งเตือนของคนอื่น > ไม่ทำอะไร (ไม่บอกด้วยว่ามี id นี้อยู่) */
     @Transactional
     public void markAsRead(Integer notificationId, Integer userId) {
         notificationRepository.findById(notificationId)

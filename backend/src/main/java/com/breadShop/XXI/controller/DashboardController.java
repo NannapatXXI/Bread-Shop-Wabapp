@@ -24,6 +24,7 @@ import com.breadShop.XXI.service.DashboardService;
  *   GET /sales          — กราฟยอดขายแยกตาม period (week/month/year)
  *   GET /category-sales — pie chart แยกตาม category
  *   GET /top-products   — สินค้าขายดี top 5
+ * 
  */
 @RestController
 @RequestMapping("/api/v1/admin/dashboard")

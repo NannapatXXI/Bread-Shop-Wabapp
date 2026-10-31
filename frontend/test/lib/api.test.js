@@ -48,6 +48,12 @@ describe('lib/api interceptors', () => {
     await expect(api.get('/api/v1/promotions/discount')).rejects.toThrow('โค้ดหมดอายุ');
   });
 
+  it('an HTTP error (4xx) carries the backend reason as err.message, not axios\'s "Request failed…"', async () => {
+    fakeServer(() => ({ status: 409, body: { success: false, message: 'สินค้านี้มีในออเดอร์แล้ว ลบไม่ได้', data: null } }));
+
+    await expect(api.delete('/api/v1/admin/products/1')).rejects.toThrow('สินค้านี้มีในออเดอร์แล้ว ลบไม่ได้');
+  });
+
   it('on 401 refreshes the session once and retries the original request', async () => {
     let ordersCalls = 0;
     const calls = fakeServer((config) => {

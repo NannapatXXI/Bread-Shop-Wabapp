@@ -16,12 +16,12 @@ import PasswordField from '@/app/components/PasswordField';
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { ssr: false });
 
 export default function ProfilePage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateUser } = useAuth();
 
   // ─── ข้อมูลส่วนตัว ────────────────────────────────────────────
   const [editingProfile, setEditingProfile] = useState(false);
   const [username, setUsername]             = useState('');
-  const [profileMsg, setProfileMsg]         = useState('');
+  const [profileMsg, setProfileMsg]         = useState({ text: '', ok: true });
 
   // ─── เปลี่ยนรหัสผ่าน ─────────────────────────────────────────
   // step: 'idle' | 'otp' | 'newpass'
@@ -138,13 +138,16 @@ export default function ProfilePage() {
   // ─── แก้ไขข้อมูลส่วนตัว ──────────────────────────────────────
   const handleSaveProfile = async () => {
     try {
-      await api.patch('/api/v1/users/me', { username });
-      setProfileMsg('บันทึกสำเร็จ');
+      const res = await api.patch('/api/v1/users/me', { username });
+      const saved = res.data?.username ?? username.trim();
+      updateUser({ username: saved });   // header + "ยกเลิก" ครั้งต่อไปใช้ชื่อใหม่
+      setUsername(saved);
+      setProfileMsg({ text: 'บันทึกสำเร็จ', ok: true });
       setEditingProfile(false);
-    } catch {
-      setProfileMsg('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    } catch (err) {
+      setProfileMsg({ text: err?.message ?? 'บันทึกไม่สำเร็จ กรุณาลองใหม่', ok: false });
     }
-    setTimeout(() => setProfileMsg(''), 3000);
+    setTimeout(() => setProfileMsg({ text: '', ok: true }), 3000);
   };
 
   // ─── จัดการฟอร์มที่อยู่ ──────────────────────────────────────
@@ -279,7 +282,7 @@ export default function ProfilePage() {
                 <button className="btn btn-outline sm" onClick={() => { setEditingProfile(false); setUsername(user?.username || ''); }}>ยกเลิก</button>
               </div>
             )}
-            {profileMsg && <p className={profileMsg.includes('ไม่สำเร็จ') ? 'alert-error' : 'alert-ok'} style={{ margin: 0 }}>{profileMsg}</p>}
+            {profileMsg.text && <p className={profileMsg.ok ? 'alert-ok' : 'alert-error'} style={{ margin: 0 }}>{profileMsg.text}</p>}
           </div>
         </section>
 

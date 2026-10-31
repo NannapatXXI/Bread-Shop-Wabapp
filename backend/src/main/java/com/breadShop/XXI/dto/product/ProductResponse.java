@@ -19,11 +19,12 @@ public class ProductResponse {
     private final String imageUrl;
     private final ProductCategory category;   // หรือ type จริงของคุณ
     private final LocalDate expiryDate;
+    private final boolean isActive;           // false = ปิดการขาย (admin เห็น / ลูกค้าไม่เห็นตัวนี้เลย)
     
     public ProductResponse(Long id, String name, BigDecimal price,
                            Integer stock, String description,
                            String imageUrl, ProductCategory category,
-                           LocalDate expiryDate) {
+                           LocalDate expiryDate, boolean isActive) {
         this.id = id;
         this.name = name;
         this.price = price;
@@ -32,6 +33,7 @@ public class ProductResponse {
         this.imageUrl = imageUrl;
         this.category = category;
         this.expiryDate = expiryDate;
+        this.isActive = isActive;
     }
 
     // ===== Getter =====
@@ -44,5 +46,6 @@ public class ProductResponse {
     public String getImageUrl() { return imageUrl; }
     public ProductCategory getCategory() { return category; }
     public LocalDate getExpiryDate() { return expiryDate; }
+    public boolean getIsActive() { return isActive; }
     
 }

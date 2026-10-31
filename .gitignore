@@ -41,3 +41,5 @@ uploads/
 # --- เครื่องมือ (ผลลัพธ์ที่สร้างใหม่ได้ ไม่ต้องขึ้น git) ---
 .scannerwork/
 .archify/
+# รายงาน OWASP dependency-check (สร้างใหม่ได้ด้วย dependency-check ... --out dependency-report)
+dependency-report/

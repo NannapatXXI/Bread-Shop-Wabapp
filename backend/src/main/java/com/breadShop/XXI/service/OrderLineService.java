@@ -22,6 +22,13 @@ public class OrderLineService {
         this.orderLineRepository = orderLineRepository;
     }
 
+
+    /**
+     * รายการสินค้าใน order — เฉพาะ order ของ user คนนั้น ของคนอื่นตอบ 404 เหมือนไม่มีอยู่
+     * @param orderId order ที่ต้องการดูรายการสินค้า
+     * @param userId user ที่เป็นเจ้าของ order
+     * @return รายการสินค้าใน order
+     */
     @Transactional(readOnly = true)
     public List<OrderLineResponse> getByOrderId(Integer orderId, Integer userId) {
         List<OrderLine> lines = orderLineRepository.findByOrderId(orderId);
@@ -31,7 +38,13 @@ public class OrderLineService {
         return lines.stream().map(OrderLineMapper::toResponse).toList();
     }
 
-    /** line ต้องอยู่ใน order ตาม URL และ order นั้นต้องเป็นของ user */
+    /**
+     * รายการสินค้าใน order — เฉพาะ order ของ user คนนั้น ของคนอื่นตอบ 404 เหมือนไม่มีอยู่
+     * @param orderId order ที่ต้องการดูรายการสินค้า
+     * @param lineId รายการสินค้าที่ต้องการดู
+     * @param userId user ที่เป็นเจ้าของ order
+     * @return รายการสินค้าใน order
+     */
     @Transactional(readOnly = true)
     public OrderLineResponse getById(Integer orderId, Integer lineId, Integer userId) {
         return orderLineRepository.findById(lineId)

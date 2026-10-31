@@ -8,8 +8,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,6 +36,10 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    // ตัวจริง — เทสรูปสินค้าตรวจไฟล์ที่ถูกบันทึกผ่าน MultipartFile mock
+    @Spy
+    private ImageStorage imageStorage = new ImageStorage();
 
     @InjectMocks
     private ProductService productService;
@@ -123,6 +131,70 @@ class ProductServiceTest {
                 .isInstanceOf(ResponseStatusException.class);
 
         verify(productRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteProduct — สินค้าเคยถูกสั่งแล้ว (FK order_lines) → 409 ให้ปิดการขายแทน และรูปต้องยังอยู่")
+    void deleteProduct_whenAlreadyOrdered_returns409_andKeepsImage() {
+        sampleProduct.setImageUrl("uploads/keep-me.png");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        doThrow(new DataIntegrityViolationException("fk_order_lines_product")).when(productRepository).delete(sampleProduct);
+
+        assertThatThrownBy(() -> productService.deleteProduct(1L))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getReason()).contains("ปิดการขาย");
+                });
+
+        verify(imageStorage, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteProduct — ลบแถวใน DB ก่อน แล้วค่อยลบรูป")
+    void deleteProduct_deletesRowBeforeImage() {
+        sampleProduct.setImageUrl("uploads/old.png");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        doNothing().when(imageStorage).delete(any());
+
+        productService.deleteProduct(1L);
+
+        InOrder order = inOrder(productRepository, imageStorage);
+        order.verify(productRepository).delete(sampleProduct);
+        order.verify(imageStorage).delete("uploads/old.png");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  เปิด/ปิดการขาย
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("getActiveProducts — ลูกค้าเห็นแค่สินค้าที่เปิดขาย")
+    void getActiveProducts_usesActiveOnlyQuery() {
+        when(productRepository.findByActiveTrue()).thenReturn(List.of(sampleProduct));
+
+        assertThat(productService.getActiveProducts()).containsExactly(sampleProduct);
+        verify(productRepository, never()).findAll();
+    }
+
+    @Test
+    @DisplayName("setActive — ปิดแล้วเปิดกลับได้ ข้อมูลเดิมไม่หาย")
+    void setActive_closesAndReopens_keepingData() {
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.save(sampleProduct)).thenReturn(sampleProduct);
+
+        assertThat(productService.setActive(1L, false).isActive()).isFalse();
+        assertThat(productService.setActive(1L, true).isActive()).isTrue();
+        assertThat(sampleProduct.getName()).isEqualTo("Croissant");
+        assertThat(sampleProduct.getStock()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("setActive — ไม่พบสินค้า → 404")
+    void setActive_unknownProduct_returns404() {
+        when(productRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.setActive(999L, false)).isInstanceOf(ResponseStatusException.class);
+        verify(productRepository, never()).save(any());
     }
 
     // ─────────────────────────────────────────────────────────────────────────

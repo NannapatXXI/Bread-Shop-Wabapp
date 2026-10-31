@@ -9,15 +9,17 @@ import { SkeletonRows } from '@/app/components/Skeleton';
 import Icon from '@/app/components/Icon';
 import StatusBadge from '@/app/components/StatusBadge';
 
-// ── Config สถานะ ────────────────────────────────────────────
-const STATUS_CONFIG = {
-  PENDING:    { label: 'รอดำเนินการ', dot: 'bg-orange-400', badge: 'text-orange-600 bg-orange-50',  card: 'border-orange-400',  text: 'text-orange-500' },
-  PROCESSING: { label: 'กำลังเตรียม', dot: 'bg-blue-400',   badge: 'text-blue-600   bg-blue-50',    card: 'border-blue-400',    text: 'text-blue-500'   },
-  SHIPPED:    { label: 'จัดส่งแล้ว',  dot: 'bg-purple-400', badge: 'text-purple-600 bg-purple-50',  card: 'border-purple-400',  text: 'text-purple-500' },
-  DELIVERED:  { label: 'ได้รับแล้ว',  dot: 'bg-green-400',  badge: 'text-green-600  bg-green-50',   card: 'border-green-400',   text: 'text-green-500'  },
-  CANCELLED:  { label: 'ยกเลิก',      dot: 'bg-red-400',    badge: 'text-red-600    bg-red-50',     card: 'border-red-400',     text: 'text-red-500'    },
+// ── สถานะ — ต้องครบทุกค่าของ Order.OrderStatus ฝั่ง backend (ไม่งั้นแสดงผิด/ตั้งค่านั้นไม่ได้) ──
+const STATUS_LABEL = {
+  PENDING:    'รอดำเนินการ',
+  CONFIRMED:  'ยืนยันแล้ว',
+  PROCESSING: 'กำลังเตรียม',
+  SHIPPED:    'จัดส่งแล้ว',
+  DELIVERED:  'ได้รับแล้ว',
+  CANCELLED:  'ยกเลิก',
+  REFUNDED:   'คืนเงิน',
 };
-const ALL_STATUSES = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+const ALL_STATUSES = Object.keys(STATUS_LABEL);
 const PAGE_SIZE = 7;
 
 export default function AdminOrdersPage() {
@@ -92,7 +94,7 @@ export default function AdminOrdersPage() {
 
   const tabs = [
     { key: 'ALL', label: 'ทั้งหมด', count: orders.length },
-    ...ALL_STATUSES.map(s => ({ key: s, label: STATUS_CONFIG[s].label, count: orders.filter(o => o.status === s).length })),
+    ...ALL_STATUSES.map(s => ({ key: s, label: STATUS_LABEL[s], count: orders.filter(o => o.status === s).length })),
   ];
 
   const pageItems = Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -152,7 +154,6 @@ export default function AdminOrdersPage() {
               </thead>
               <tbody>
                 {paginated.map(order => {
-                  const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING;
                   const { date, time } = fmtDate(order.createdAt);
                   return (
                     <tr key={order.id}>
@@ -160,7 +161,7 @@ export default function AdminOrdersPage() {
                       <td className="hide-m"><b style={{ fontWeight: 600 }}>{order.shippingName}</b><span className="sub">{order.shippingPhone}</span></td>
                       <td className="num hide-m">{date}<span className="sub">{time}</span></td>
                       <td className="num right"><b style={{ fontWeight: 600 }}>฿{Number(order.totalAmount).toLocaleString()}</b></td>
-                      <td><StatusBadge status={order.status} label={cfg.label} /></td>
+                      <td><StatusBadge status={order.status} label={STATUS_LABEL[order.status] ?? order.status} /></td>
                       <td>
                         <div className="row-actions">
                           <button className="btn btn-outline sm" onClick={() => openModal(order)}>จัดการ</button>
@@ -231,7 +232,7 @@ export default function AdminOrdersPage() {
                 <label htmlFor="ord-status">สถานะ</label>
                 <div className="control">
                   <select id="ord-status" value={newStatus} onChange={e => setNewStatus(e.target.value)}>
-                    {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
+                    {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                   </select>
                 </div>
               </div>

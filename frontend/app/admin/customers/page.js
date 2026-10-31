@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { adminGetCustomers, adminUpdateUserRole, adminSetCustomerActive, adminUpdateUsername, getMyOrders } from '@/services/auth.service';
+import { adminGetCustomers, adminUpdateUserRole, adminSetCustomerActive, adminUpdateUsername, adminGetCustomerOrders } from '@/services/auth.service';
 import { exportCSV } from '@/lib/exportCSV';
 import Spinner from '@/app/components/Spinner';
 import { SkeletonRows } from '@/app/components/Skeleton';
@@ -48,7 +48,7 @@ export default function AdminCustomersPage() {
   const loadOrders = async (userId) => {
     setOrdersLoading(true);
     try {
-      const res = await getMyOrders(userId);
+      const res = await adminGetCustomerOrders(userId);
       setUserOrders(res.data ?? []);
     } catch { setUserOrders([]); }
     finally { setOrdersLoading(false); }
@@ -75,8 +75,8 @@ export default function AdminCustomersPage() {
       ));
       toast.success('อัปเดตสำเร็จ');
       setSelectedUser(null);
-    } catch {
-      toast.error('อัปเดตไม่สำเร็จ');
+    } catch (err) {
+      toast.error(err?.message ?? 'อัปเดตไม่สำเร็จ');
     } finally { setSaving(false); }
   };
 
@@ -144,7 +144,7 @@ export default function AdminCustomersPage() {
       return acc;
     }, []);
 
-  const ORDER_STATUS_LABEL = { PENDING: 'รอดำเนินการ', PROCESSING: 'กำลังเตรียม', SHIPPED: 'จัดส่งแล้ว', DELIVERED: 'ได้รับแล้ว', CANCELLED: 'ยกเลิก' };
+  const ORDER_STATUS_LABEL = { PENDING: 'รอดำเนินการ', CONFIRMED: 'ยืนยันแล้ว', PROCESSING: 'กำลังเตรียม', SHIPPED: 'จัดส่งแล้ว', DELIVERED: 'ได้รับแล้ว', CANCELLED: 'ยกเลิก', REFUNDED: 'คืนเงิน' };
 
   return (
     <>

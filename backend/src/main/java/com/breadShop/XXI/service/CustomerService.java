@@ -12,11 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.breadShop.XXI.dto.customer.CustomerResponse;
+import com.breadShop.XXI.dto.customer.UserOrderCount;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.OrderRepository;
 import com.breadShop.XXI.repository.UserRepository;
 
-/** หน้าจัดการลูกค้าของ admin — ดูรายชื่อ, เปลี่ยน role, แบน, แก้ username */
+/** ข้อมูล user: หา user ที่ login อยู่ + หน้าจัดการลูกค้าของ admin (ดูรายชื่อ, เปลี่ยน role, แบน, แก้ username) */
 @Service
 public class CustomerService {
 
@@ -30,11 +31,15 @@ public class CustomerService {
         this.orderRepository = orderRepository;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * ดึงรายชื่อ user ทั้งหมด + นับ order ของแต่ละคน 
+     * @return CustomerResponse ของ user ทั้งหมด
+     */
+    @Transactional(readOnly = true) 
     public List<CustomerResponse> getAll() {
-        // นับ order ของทุกคนใน query เดียว (ไม่ยิง query แยกต่อคน)
+        // นับ order ของทุกคนใน 2 query (นับ order 1 ครั้ง + ดึง user 1 ครั้ง (ไม่ยิง query แยกต่อคน)
         Map<Integer, Long> orderCount = orderRepository.countOrdersGroupByUser().stream()
-                .collect(Collectors.toMap(row -> (Integer) row[0], row -> (Long) row[1]));
+                .collect(Collectors.toMap(UserOrderCount::userId, UserOrderCount::orderCount));
 
         return userRepository.findAll().stream()
                 .map(user -> new CustomerResponse(
@@ -46,7 +51,12 @@ public class CustomerService {
                 .toList();
     }
 
-    /** @return role เดิม (ไว้ลง audit log) */
+   /**
+    * เปลี่ยน role ของ user — ถ้า role ไม่ใช่ USER หรือ ADMIN จะ throw 400
+    * @param id id ของ user ที่ต้องการเปลี่ยน role
+    * @param role  role ใหม่ (USER หรือ ADMIN)
+    * @return role เดิม (ไว้ลง audit log)
+    */
     @Transactional
     public String updateRole(Integer id, String role) {
         String newRole = role.toUpperCase(Locale.ROOT);
@@ -60,7 +70,12 @@ public class CustomerService {
         return oldRole;
     }
 
-    /** แบน (false) / ปลดแบน (true) @return สถานะเดิม (ไว้ลง audit log) */
+   /**
+    * เปิด/ปิดการใช้งาน user — ถ้า user ถูกลบไปแล้วจะ throw 404
+    * @param id id ของ user ที่ต้องการเปิด/ปิดการใช้งาน
+    * @param active true = เปิดใช้งาน, false = ปิดใช้งาน
+    * @return สถานะ active เดิม (ไว้ลง audit log)
+    */
     @Transactional
     public boolean setActive(Integer id, boolean active) {
         User user = findUser(id);
@@ -78,6 +93,16 @@ public class CustomerService {
         User user = findUser(id);
         user.setUsername(username.trim());
         userRepository.save(user);
+    }
+
+    /**
+     * คนที่ login อยู่ — แปลง email ใน token (@AuthenticationPrincipal) เป็น User ใช้ร่วมกันทุก controller
+     * token ยังไม่หมดอายุแต่ user ถูกลบไปแล้ว → 401 ให้ frontend พาไป login ใหม่
+     */
+    @Transactional(readOnly = true)
+    public User getByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
     }
 
     private User findUser(Integer id) {

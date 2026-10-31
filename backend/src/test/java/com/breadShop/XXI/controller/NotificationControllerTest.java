@@ -1,5 +1,6 @@
 package com.breadShop.XXI.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -14,8 +15,12 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.breadShop.XXI.dto.notification.NotificationResponse;
@@ -23,6 +28,7 @@ import com.breadShop.XXI.service.NotificationService;
 import com.breadShop.XXI.service.SseService;
 
 @WebMvcTest(NotificationController.class)
+@ExtendWith(OutputCaptureExtension.class)
 class NotificationControllerTest extends ControllerTestSupport {
 
     private static final String ALICE = "alice@example.com";
@@ -99,7 +105,7 @@ class NotificationControllerTest extends ControllerTestSupport {
     @Test
     void stream_subscribesTokenUser_andStartsAsyncResponse() throws Exception {
         stubUser(7, ALICE, "USER");
-        when(sseService.subscribe(7)).thenReturn(new SseEmitter(0L));
+        when(sseService.subscribe(7)).thenReturn(Optional.of(new SseEmitter(0L)));
 
         mockMvc.perform(get("/api/v1/notifications/stream").cookie(userToken(ALICE)))
                 .andExpect(status().isOk())
@@ -114,5 +120,19 @@ class NotificationControllerTest extends ControllerTestSupport {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(sseService);
+    }
+
+    @Test
+    void stream_overTheTabLimit_returns429_soTheBrowserStopsAndBacksOff(CapturedOutput output) throws Exception {
+        stubUser(7, ALICE, "USER");
+        when(sseService.subscribe(7)).thenReturn(Optional.empty());
+
+        // EventSource ส่ง Accept: text/event-stream — ต้องได้ 429 ตรง ๆ (ไม่ใช่ 406/500)
+        mockMvc.perform(get("/api/v1/notifications/stream").accept(MediaType.TEXT_EVENT_STREAM)
+                        .cookie(userToken(ALICE)))
+                .andExpect(status().isTooManyRequests());
+
+        // แท็บที่เกินจะลองใหม่เรื่อย ๆ — ต้องไม่ทิ้ง WARN + stack trace ไว้ใน log ทุกครั้ง
+        assertThat(output).doesNotContain("Failure in @ExceptionHandler").doesNotContain("HttpMediaTypeNotAcceptableException");
     }
 }

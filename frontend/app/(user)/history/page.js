@@ -26,6 +26,14 @@ const statusConfig = {
   REFUNDED:   { label: 'คืนเงิน',     bg: 'bg-pink-100',   text: 'text-pink-800'   },
 };
 
+// ยกเลิกเองได้เฉพาะ PENDING (กติกาเดียวกับ OrderService.cancelOrder) — สถานะเหล่านี้บอกเหตุผลแทนปุ่ม
+const NOT_CANCELLABLE_REASON = {
+  CONFIRMED:  'ยืนยันแล้ว',
+  PROCESSING: 'กำลังเตรียมสินค้า',
+  SHIPPED:    'จัดส่งแล้ว',
+  DELIVERED:  'ได้รับแล้ว',
+};
+
 const getStatus = (status) =>
   statusConfig[status] || { label: status, bg: 'bg-gray-100', text: 'text-gray-600' };
 
@@ -40,6 +48,7 @@ export default function HistoryPage() {
   const { user, loading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [confirmCancelId, setConfirmCancelId] = useState(null);
@@ -56,8 +65,10 @@ export default function HistoryPage() {
       // เรียงล่าสุดก่อน
       const sorted = res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(sorted);
+      setLoadError(false);
     } catch {
-      // ไม่แสดง error ที่ซับซ้อน แค่ทำให้ list ว่าง
+      // แยกจาก "ยังไม่มีคำสั่งซื้อ" — ไม่ให้ลูกค้าคิดว่าออเดอร์หายไป
+      setLoadError(true);
     } finally {
       setFetchLoading(false);
     }
@@ -121,7 +132,16 @@ export default function HistoryPage() {
         />
       )}
 
-      {orders.length === 0 && (
+      {loadError && (
+        <div className="empty" role="alert">
+          <div className="ic" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}><Icon name="alert" /></div>
+          <h3>โหลดประวัติการสั่งซื้อไม่สำเร็จ</h3>
+          <p>ออเดอร์ของคุณยังอยู่ ลองโหลดใหม่อีกครั้ง</p>
+          <button className="btn btn-primary" onClick={() => { setFetchLoading(true); fetchOrders(); }}>ลองอีกครั้ง</button>
+        </div>
+      )}
+
+      {!loadError && orders.length === 0 && (
         <div className="empty">
           <div className="ic"><Icon name="receipt" /></div>
           <h3>ยังไม่มีคำสั่งซื้อ</h3>
@@ -212,12 +232,10 @@ export default function HistoryPage() {
                       </div>
                     )}
 
-                    {['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(order.status) && (
+                    {NOT_CANCELLABLE_REASON[order.status] && (
                       <span className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <Icon name="alert" size="sm" />
-                        ไม่สามารถยกเลิกได้ — ร้านเปลี่ยนสถานะเป็น &ldquo;
-                        {order.status === 'PROCESSING' ? 'กำลังเตรียมสินค้า' :
-                         order.status === 'SHIPPED'    ? 'จัดส่งแล้ว' : 'ได้รับแล้ว'}&rdquo; แล้ว
+                        ไม่สามารถยกเลิกได้ — ร้านเปลี่ยนสถานะเป็น &ldquo;{NOT_CANCELLABLE_REASON[order.status]}&rdquo; แล้ว
                       </span>
                     )}
                   </div>

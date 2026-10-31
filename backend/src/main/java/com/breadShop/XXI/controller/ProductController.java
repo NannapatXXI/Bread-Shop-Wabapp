@@ -1,7 +1,7 @@
 package com.breadShop.XXI.controller;
 
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,14 +29,17 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts() {
         return ResponseEntity.ok(ApiResponse.ok(
-                productService.getAllProducts().stream().map(ProductMapper::toResponse).toList()));
+                productService.getActiveProducts().stream().map(ProductMapper::toResponse).toList()));
     }
 
-    /** ?category=BREAD หรือ ?stockAbove=10 (จำนวนสินค้าที่สต็อกมากกว่าค่านี้) — ใส่ได้ทีละตัว */
+   /**
+    * เอาไว้นับจำนวนสินค้าตาม category หรือ stockAbove (stock > x) อย่างใดอย่างหนึ่ง
+    * @param category หมวดหมู่สินค้า (เช่น BREAD, PASTRY, CAKE) หรือ null
+    * @param stockAbove จำนวน stock ที่มากกว่า (เช่น 10) หรือ null
+    * @return ResponseEntity<ApiResponse<Long>> จำนวนสินค้าที่ตรงตามเงื่อนไข
+    */
     @GetMapping("/count")
-    public ResponseEntity<ApiResponse<Long>> count(
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) Integer stockAbove) {
+    public ResponseEntity<ApiResponse<Long>> count( @RequestParam(required = false) String category, @RequestParam(required = false) Integer stockAbove) {
         if ((category == null) == (stockAbove == null)) {
             return ResponseEntity.badRequest().body(ApiResponse.error("ระบุ category หรือ stockAbove อย่างใดอย่างหนึ่ง"));
         }

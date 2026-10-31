@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.16</version>
+		<version>4.1.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.breadShop</groupId>
@@ -48,9 +48,11 @@
 			<artifactId>micrometer-registry-prometheus</artifactId>
 		</dependency>
 		<dependency>
+			<!-- อ่าน backend/.env เป็น property — 5.x แยกส่วนต่อ Spring Boot ออกเป็น springboot4-dotenv
+			     (spring-dotenv เฉย ๆ คือแค่ตัว core ไม่โหลด .env ให้ Spring) -->
 			<groupId>me.paulschwarz</groupId>
-			<artifactId>spring-dotenv</artifactId>
-			<version>4.0.0</version>
+			<artifactId>springboot4-dotenv</artifactId>
+			<version>5.1.0</version>
 		</dependency>
 
 		<dependency>
@@ -69,6 +71,17 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Boot 4 แยก auto-config เป็น module — @WebMvcTest/@AutoConfigureMockMvc และ @AutoConfigureMetrics อยู่ในนี้ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-micrometer-metrics-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- integration test ใช้ MySQL ใน container แยก ไม่แตะ DB ที่ใช้พัฒนา (ต้องเปิด Docker) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -77,7 +90,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
-			<artifactId>mysql</artifactId>
+			<artifactId>testcontainers-mysql</artifactId>
 			<scope>test</scope>
 		</dependency>
 
@@ -87,29 +100,30 @@
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
 
+    <!-- spring-security-test + auto-config ของ security สำหรับ @WebMvcTest (Boot 4) -->
     <dependency>
-      <groupId>org.springframework.security</groupId>
-      <artifactId>spring-security-test</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-test</artifactId>
       <scope>test</scope>
     </dependency>
 
 	<dependency>
 		<groupId>io.jsonwebtoken</groupId>
 		<artifactId>jjwt-api</artifactId>
-		<version>0.11.5</version>
+		<version>0.13.0</version>
 	</dependency>
 
 	<dependency>
 		<groupId>io.jsonwebtoken</groupId>
 		<artifactId>jjwt-impl</artifactId>
-		<version>0.11.5</version>
+		<version>0.13.0</version>
 		<scope>runtime</scope>
 	</dependency>
 
 	<dependency>
 		<groupId>io.jsonwebtoken</groupId>
 		<artifactId>jjwt-jackson</artifactId> <!-- for JSON parsing -->
-		<version>0.11.5</version>
+		<version>0.13.0</version>
 		<scope>runtime</scope>
 	</dependency>
 
@@ -126,10 +140,11 @@
 	<!-- [Claude] Flyway — version control สำหรับ database schema
 	     แทน ddl-auto=update ที่ Spring จัดการให้อัตโนมัติ (ไม่มี history)
 	     Flyway จะรัน SQL ใน resources/db/migration/V*.sql ตามลำดับ
-	     flyway-mysql ต้องใช้คู่กับ flyway-core สำหรับ MySQL driver -->
+	     Boot 4: ต้องใช้ starter (มี auto-config) — ใส่แค่ flyway-core จะไม่มีใครรัน migration แล้วแอปเปิดไม่ขึ้น
+	     flyway-mysql = ส่วนรองรับ MySQL -->
 	<dependency>
-		<groupId>org.flywaydb</groupId>
-		<artifactId>flyway-core</artifactId>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-flyway</artifactId>
 	</dependency>
 	<dependency>
 		<groupId>org.flywaydb</groupId>

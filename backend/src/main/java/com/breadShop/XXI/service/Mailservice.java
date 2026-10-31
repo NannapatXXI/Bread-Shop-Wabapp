@@ -1,59 +1,86 @@
 package com.breadShop.XXI.service;
 
-import org.springframework.scheduling.annotation.Async;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-//สำหรับการส่งอีเมล เช่น OTP และอีเมลต้อนรับ  reviewd by peak
+/**
+ * ส่งอีเมลของร้าน (OTP, ต้อนรับ) ผ่าน SMTP ตามค่า spring.mail.*
+ *
+ * เนื้อหามีชื่อร้าน บอกเหตุผลที่ได้รับ และบอกว่าถ้าไม่ได้ขอให้ทำอย่างไร —
+ * เมลสั้น ๆ ที่มีแต่รหัสหน้าตาเหมือน phishing จึงถูก Gmail ย้ายไป Spam
+ *
+ * ส่งไม่สำเร็จ → บันทึก log แล้วจบ ไม่ throw (ไม่ให้การสมัครสมาชิกพังเพราะเมลต้อนรับ)
+ * log ไม่มีรหัส OTP (ข้อความ error จาก SMTP อาจมีอีเมลผู้รับ — log อยู่ฝั่ง server เท่านั้น)
+ */
 @Service
 public class Mailservice {
 
-    private final JavaMailSender mailSender; //เป็น Interface ของ Spring  ทำหน้าที่ส่ง Email ผ่าน SMTP()SMTP (Simple Mail Transfer Protocol)
-   
+    private static final Logger log = LoggerFactory.getLogger(Mailservice.class);
 
-    // Constructor Injection (ปลอดภัย + Production)
-    public Mailservice(JavaMailSender mailSender) {
+    static final String SHOP_NAME = "PeakPung by Mom Hmee";
+
+    private final JavaMailSender mailSender;
+    private final String from;
+
+    public Mailservice(JavaMailSender mailSender, @Value("${spring.mail.username:}") String fromAddress) {
         this.mailSender = mailSender;
+        // "ชื่อร้าน <อีเมล>" — ผู้รับเห็นชื่อร้านแทนอีเมลเปล่า ๆ
+        this.from = SHOP_NAME + " <" + fromAddress + ">";
     }
-    
-    /**
-     * ส่งอีเมล OTP สำหรับรีเซ็ตรหัสผ่าน โดยรับพารามิเตอร์ที่อยู่ผู้รับและรหัส OTP ที่จะส่งไปในเนื้อหาอีเมล
-     * @param to ที่อยู่อีเมลของผู้รับ OTP
-     * @param otp รหัส OTP ที่จะส่งไปในเนื้อหาอีเมล โดยจะแสดงข้อความว่า "รหัส OTP ของคุณคือ: {otp} รหัสนี้มีอายุ 5 นาที" เพื่อแจ้งผู้ใช้ถึงรหัส OTP และระยะเวลาที่สามารถใช้งานได้
-     */
+
+    /** ส่งเบื้องหลัง — request ตอบเร็วเท่ากันไม่ว่าอีเมลจะมีบัญชีหรือไม่ (ดู AsyncConfig) */
     @Async
     public void sendOtpEmail(String to, String otp) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject("OTP สำหรับรีเซ็ตรหัสผ่าน");
-        message.setText(
-                "รหัส OTP ของคุณคือ: " + otp +
-                "\nรหัสนี้มีอายุ 5 นาที"
-        );
+        send("OTP", to, "[PeakPung] รหัสยืนยันสำหรับตั้งรหัสผ่านใหม่", """
+                สวัสดีค่ะ
 
-        mailSender.send(message);
+                เราได้รับคำขอตั้งรหัสผ่านใหม่สำหรับบัญชี {shop} ของคุณ
+                รหัสยืนยันของคุณคือ
+
+                    {otp}
+
+                รหัสนี้ใช้ได้ 5 นาที และใช้ได้ครั้งเดียว
+                ห้ามบอกรหัสนี้กับผู้อื่น ทางร้านจะไม่ขอรหัสนี้จากคุณไม่ว่าทางใด
+
+                หากคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร รหัสผ่านเดิมของคุณยังใช้ได้ตามปกติ
+
+                ขอบคุณค่ะ
+                {shop}
+                """.replace("{shop}", SHOP_NAME).replace("{otp}", otp));
     }
 
-    /**
-     * ส่งอีเมลต้อนรับหลังจากที่ผู้ใช้สมัครสมาชิกสำเร็จ โดยรับพารามิเตอร์ที่อยู่ผู้รับและชื่อผู้ใช้ที่จะนำไปใช้ในเนื้อหาอีเมล
-     * @param to ที่อยู่อีเมลของผู้รับอีเมลต้อนรับ
-     * @param username ชื่อผู้ใช้ที่จะนำไปใช้ในเนื้อหาอีเมล โดยจะแสดงข้อความต้อนรับที่มีชื่อผู้ใช้ เช่น "สวัสดี {username}! ขอบคุณที่สมัครสมาชิกกับเรา เราหวังว่าคุณจะมีประสบการณ์ที่ดีกับการช็อปปิ้งขนมปังและเบเกอรี่ของเรา! ขอให้มีวันที่ดี! ทีมงาน BreadShop XXI" เพื่อสร้างความประทับใจและความรู้สึกเป็นส่วนหนึ่งของชุมชนของร้าน BreadShop XXI
-     */
     public void sendWelcomeEmail(String to, String username) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject("ยินดีต้อนรับสู่ PeakPung By MomHmee ");
-        message.setText(
-                "สวัสดี " + username + "!\n\n" +
-                "ขอบคุณที่สมัครสมาชิกกับเรา เราหวังว่าคุณจะมีประสบการณ์ที่ดีกับการช็อปปิ้งขนมปังและเบเกอรี่ของเรา!\n\n" +
-                "ขอให้มีวันที่ดี!\n" +
-                "ทีมงาน PeakPung By MomHmee"
-        );
+        send("WELCOME", to, "[PeakPung] ยินดีต้อนรับสู่ " + SHOP_NAME, """
+                สวัสดีคุณ {username}
 
-        mailSender.send(message);
+                ขอบคุณที่สมัครสมาชิกกับ {shop}
+                ขนมอบใหม่ทุกวันจากครัวของแม่หมี สั่งล่วงหน้าออนไลน์ได้เลย
+
+                หากคุณไม่ได้สมัครสมาชิกเอง ตอบกลับอีเมลนี้เพื่อแจ้งทางร้านได้
+
+                ขอบคุณค่ะ
+                {shop}
+                """.replace("{shop}", SHOP_NAME).replace("{username}", username));
     }
-    
 
-
+    private void send(String kind, String to, String subject, String text) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(text);
+        try {
+            mailSender.send(message);
+            log.info("Mail sent: kind={}", kind);
+        } catch (MailException e) {
+            // เช่น AuthenticationFailedException = App Password ผิด / MailSendException = ผู้รับหรือ SMTP ปฏิเสธ
+            log.error("Mail failed: kind={}, reason={}: {}", kind, e.getClass().getSimpleName(), e.getMessage());
+        }
+    }
 }

@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -42,7 +42,7 @@ class ProductControllerTest extends ControllerTestSupport {
 
     @Test
     void getAllProducts_isPublic_andMapsEveryField() throws Exception {
-        when(productService.getAllProducts()).thenReturn(List.of(
+        when(productService.getActiveProducts()).thenReturn(List.of(
                 product(1, "Donut", "20.00", 5, ProductCategory.BREAD),
                 product(2, "Chiffon", "80.00", 0, ProductCategory.CAKE)));
 
@@ -62,7 +62,7 @@ class ProductControllerTest extends ControllerTestSupport {
 
     @Test
     void getAllProducts_stillPublic_whenBrowserSendsGarbageToken() throws Exception {
-        when(productService.getAllProducts()).thenReturn(List.of());
+        when(productService.getActiveProducts()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/products").cookie(new Cookie("access_token", "not-a-jwt")))
                 .andExpect(status().isOk())

@@ -10,7 +10,7 @@ import java.net.http.HttpResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
+import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalManagementPort;
@@ -23,8 +23,8 @@ import com.breadShop.XXI.service.Mailservice;
  * Actuator สำหรับ Prometheus/Grafana — เปิดแอปจริงบน port จริง (ไม่ใช่ MockMvc)
  * ต้องอยู่บน management port เท่านั้น ห้ามโผล่บน port ที่ลูกค้าเรียก
  */
-// @AutoConfigureObservability: @SpringBootTest ปิด metrics export ไว้โดยปริยาย — เปิดให้เหมือนตอนรันจริง
-@AutoConfigureObservability
+// @AutoConfigureMetrics: @SpringBootTest ปิด metrics export ไว้โดยปริยาย — เปิดให้เหมือนตอนรันจริง
+@AutoConfigureMetrics
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "management.server.port=0")
@@ -49,7 +49,9 @@ class MonitoringEndpointsIT {
         HttpResponse<String> res = get(managementPort, "/actuator/health");
 
         assertThat(res.statusCode()).isEqualTo(200);
-        assertThat(res.body()).isEqualTo("{\"status\":\"UP\"}"); // ไม่บอกรายละเอียด DB/ดิสก์ให้คนนอก
+        // Boot 4 เปิด probe liveness/readiness ให้เอง → body มี "groups" (แค่ชื่อกลุ่ม ไม่ใช่ข้อมูลระบบ)
+        assertThat(res.body()).contains("\"status\":\"UP\"")
+                .doesNotContain("components", "details", "MySQL"); // ไม่บอกรายละเอียด DB/ดิสก์ให้คนนอก
     }
 
     @Test

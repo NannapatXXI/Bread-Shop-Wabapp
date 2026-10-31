@@ -76,7 +76,7 @@ public class DatabaseBackupScheduler {
         return pb;
     }
 
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "0 0 2 * * *", zone = "Asia/Bangkok")
     public void backup() {
         try {
             Path backupDir = Paths.get(System.getProperty("user.home"), "breadshop-backups");

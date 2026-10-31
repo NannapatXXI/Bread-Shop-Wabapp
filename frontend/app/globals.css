@@ -110,6 +110,7 @@ textarea.control{height:auto;min-height:96px;padding:10px 12px;resize:vertical;c
 
 /* ---------- Stats ---------- */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stats.five{grid-template-columns:repeat(5,1fr)}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px}
 .stat .k{font-size:13px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .stat .v{font-family:var(--font-head);font-size:28px;line-height:1.2;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums}
@@ -285,7 +286,7 @@ main.shop{padding-bottom:64px}
 /* ---------- Responsive ---------- */
 @media (max-width:1024px){
   .pgrid{grid-template-columns:repeat(3,1fr)}
-  .stats{grid-template-columns:repeat(2,1fr)}
+  .stats,.stats.five{grid-template-columns:repeat(2,1fr)}
   .top .search{display:none}
   .admin{grid-template-columns:72px 1fr}
   .side .brand span,.side .grp,.side a.nav span{display:none}

@@ -21,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.breadShop.XXI.dto.customer.CustomerResponse;
+import com.breadShop.XXI.dto.customer.UserOrderCount;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.repository.OrderRepository;
 import com.breadShop.XXI.repository.UserRepository;
@@ -61,7 +62,7 @@ class CustomerServiceTest {
         when(userRepository.findAll()).thenReturn(List.of(
                 customer(7, "alice", "USER", true, null),
                 customer(8, "bob", "USER", false, "google")));
-        when(orderRepository.countOrdersGroupByUser()).thenReturn(List.<Object[]>of(new Object[] { 7, 3L }));
+        when(orderRepository.countOrdersGroupByUser()).thenReturn(List.of(new UserOrderCount(7, 3L)));
 
         List<CustomerResponse> result = customerService.getAll();
 
@@ -137,5 +138,21 @@ class CustomerServiceTest {
                 .hasMessageContaining("username ห้ามว่าง");
 
         verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void getByEmail_returnsTheLoggedInUser() {
+        User bob = customer(8, "bob", "USER", true, null);
+        when(userRepository.findByEmail("bob@example.com")).thenReturn(Optional.of(bob));
+
+        assertThat(customerService.getByEmail("bob@example.com")).isSameAs(bob);
+    }
+
+    @Test
+    void getByEmail_userDeletedButTokenStillValid_throws401() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> customerService.getByEmail("ghost@example.com"))
+                .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.UNAUTHORIZED));
     }
 }

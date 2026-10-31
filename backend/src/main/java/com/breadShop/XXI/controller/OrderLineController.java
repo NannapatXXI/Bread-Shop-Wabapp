@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.breadShop.XXI.dto.ApiResponse;
 import com.breadShop.XXI.dto.orderline.OrderLineResponse;
+import com.breadShop.XXI.service.CustomerService;
 import com.breadShop.XXI.service.OrderLineService;
 
 /** /api/v1/orders/{orderId}/lines — รายการสินค้าใน order ของตัวเอง */
@@ -19,23 +20,23 @@ import com.breadShop.XXI.service.OrderLineService;
 public class OrderLineController {
 
     private final OrderLineService orderLineService;
-    private final CurrentUser      currentUser;
+    private final CustomerService  customerService;
 
-    public OrderLineController(OrderLineService orderLineService, CurrentUser currentUser) {
+    public OrderLineController(OrderLineService orderLineService, CustomerService customerService) {
         this.orderLineService = orderLineService;
-        this.currentUser      = currentUser;
+        this.customerService  = customerService;
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<OrderLineResponse>>> getAll(
             @PathVariable Integer orderId, @AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(ApiResponse.ok(orderLineService.getByOrderId(orderId, currentUser.get(email).getId())));
+        return ResponseEntity.ok(ApiResponse.ok(orderLineService.getByOrderId(orderId, customerService.getByEmail(email).getId())));
     }
 
     @GetMapping("/{lineId}")
     public ResponseEntity<ApiResponse<OrderLineResponse>> getOne(
             @PathVariable Integer orderId, @PathVariable Integer lineId, @AuthenticationPrincipal String email) {
         return ResponseEntity.ok(ApiResponse.ok(
-                orderLineService.getById(orderId, lineId, currentUser.get(email).getId())));
+                orderLineService.getById(orderId, lineId, customerService.getByEmail(email).getId())));
     }
 }

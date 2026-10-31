@@ -95,7 +95,11 @@ export const adminSetPromotionActive = (id, active) => api.patch(`/api/v1/promot
 export const adminDeletePromotion    = (id)         => api.delete(`/api/v1/promotions/${id}`);
 
 export const adminDeleteProduct     = (id)           => api.delete(`/api/v1/admin/products/${id}`);
+/** ปิดการขาย (false) / เปิดขาย (true) — ปิดแทนการลบ เมนูที่จะกลับมาขายอีก */
+export const adminSetProductActive  = (id, active)   => api.patch(`/api/v1/admin/products/${id}/active`, { active });
 
+/** ออเดอร์ของลูกค้าคนนั้น (ไม่ใช่ของ admin ที่ login อยู่) */
+export const adminGetCustomerOrders = (id)           => api.get(`/api/v1/admin/customers/${id}/orders`);
 export const adminUpdateUserRole    = (id, role)     => api.patch(`/api/v1/admin/customers/${id}/role`, { role });
 export const adminSetCustomerActive = (id, active)   => api.patch(`/api/v1/admin/customers/${id}/active`, { active });
 export const adminUpdateUsername    = (id, username) => api.patch(`/api/v1/admin/customers/${id}/username`, { username });
@@ -104,3 +108,19 @@ export const adminUpdateUsername    = (id, username) => api.patch(`/api/v1/admin
 export const getMyProfile    = ()         => api.get('/api/v1/users/me');
 export const updateMyProfile = (username) => api.patch('/api/v1/users/me', { username });
 
+
+// ── หน้าร้าน (รูปปก + สินค้าแนะนำ) ────────────────────────────
+/** สาธารณะ — { heroImageUrl (null = ยังไม่ตั้ง), featured: [สินค้าที่มีของ สูงสุด 4] } */
+export const getStorefront = () => api.get('/api/v1/storefront');
+
+/** admin — { heroImageUrl, featuredProductIds } ตามที่ตั้งไว้จริง (รวมตัวที่หมด) */
+export const adminGetStorefront    = ()    => api.get('/api/v1/admin/storefront');
+export const adminSetFeatured      = (ids) => api.put('/api/v1/admin/storefront/featured', { productIds: ids });
+export const adminRemoveHeroImage  = ()    => api.delete('/api/v1/admin/storefront/hero-image');
+export const adminUploadHeroImage  = (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+  return api.put('/api/v1/admin/storefront/hero-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};

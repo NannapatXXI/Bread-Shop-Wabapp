@@ -37,7 +37,7 @@ public class LogRetentionJob {
     }
 
     // ตี 4 ทุกวัน — หลัง backup (ตี 2) ข้อมูลที่ลบจึงยังอยู่ใน backup ของคืนนั้น
-    @Scheduled(cron = "0 0 4 * * *")
+    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Bangkok")
     public void purgeOldLogs() {
         LocalDateTime now = LocalDateTime.now();
         int activity = activityRepository.deleteOlderThan(now.minusDays(activityDays));

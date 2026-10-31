@@ -161,6 +161,34 @@ class OrderServiceTest {
     }
 
     @Test
+    @DisplayName("createOrder — สินค้าปิดการขาย (เช่นค้างอยู่ในตะกร้า) → throw 400 และไม่ตัดสต็อก")
+    void createOrder_whenProductClosedForSale_shouldThrow400_andKeepStock() {
+        sampleProduct.setStock(20);
+        sampleProduct.setActive(false);
+
+        OrderLineRequest item = mock(OrderLineRequest.class);
+        when(item.getProductId()).thenReturn(10);
+        when(item.getQuantity()).thenReturn(1);
+
+        OrderRequest request = mock(OrderRequest.class);
+        when(request.getUserId()).thenReturn(1);
+        when(request.getAddressId()).thenReturn(1);
+        when(request.getNote()).thenReturn(null);
+        when(request.getItems()).thenReturn(List.of(item));
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleUser));
+        when(userAddressRepository.findById(1)).thenReturn(Optional.of(sampleAddress));
+        when(productRepository.findByIdWithLock(10L)).thenReturn(Optional.of(sampleProduct));
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("ปิดการขาย");
+
+        assertThat(sampleProduct.getStock()).isEqualTo(20);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("createOrder — ไม่พบสินค้าใน item → throw 404")
     void createOrder_whenProductNotFound_shouldThrow404() {
         OrderLineRequest item = mock(OrderLineRequest.class);

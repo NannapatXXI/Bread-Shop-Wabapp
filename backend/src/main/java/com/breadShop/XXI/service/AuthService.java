@@ -133,6 +133,27 @@ public class AuthService {
                 user.getUsername(), user.getEmail());
     }
 
+    /**
+     * ปิด session นี้ (revoke refresh token) และบันทึกว่าใคร logout
+     * รู้ตัวคนจาก refresh token ไม่ใช่ access token — access token อายุแค่ 15 นาที อาจหมดไปแล้วตอนกด logout
+     * ไม่มี token / token ใช้ไม่ได้แล้ว = session จบไปแล้ว ไม่ต้องทำอะไร
+     */
+    @Transactional
+    public void logout(String refreshToken) {
+        if (refreshToken == null) {
+            return;
+        }
+        RefreshToken token;
+        try {
+            token = refreshTokenService.validate(refreshToken);
+        } catch (RuntimeException e) {
+            return;
+        }
+        refreshTokenService.revoke(token);
+        activityLogService.logSuccess(token.getUser(), "LOGOUT",
+                RequestInfo.currentClientIp(), RequestInfo.currentUserAgent(), "ออกจากระบบ");
+    }
+
     // ─── ลืมรหัสผ่าน: sendResetPasswordOtp → verifyOtp → resetPassword ───
 
     /** @return token ที่ใช้คู่กับ OTP — อีเมลที่ไม่มีบัญชีก็ได้ token (ปลอม) เหมือนกัน */

@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -38,12 +38,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import com.breadShop.XXI.dto.AuthenticationResponse;
 import com.breadShop.XXI.dto.LoginRequest;
 import com.breadShop.XXI.dto.RegisterRequest;
-import com.breadShop.XXI.entity.RefreshToken;
 import com.breadShop.XXI.entity.User;
 import com.breadShop.XXI.service.AuthService;
 import com.breadShop.XXI.service.GoogleAuthService;
-import com.breadShop.XXI.service.RefreshTokenService;
-import com.breadShop.XXI.service.UserActivityLogService;
 
 import jakarta.servlet.http.Cookie;
 
@@ -56,8 +53,6 @@ class AuthControllerTest extends ControllerTestSupport {
 
     @MockitoBean private AuthService authService;
     @MockitoBean private GoogleAuthService googleAuthService;
-    @MockitoBean private RefreshTokenService refreshTokenService;
-    @MockitoBean private UserActivityLogService activityLogService;
 
     private static String freshIp() {
         return "10.0.0." + IP_SEQ.getAndIncrement();
@@ -184,10 +179,8 @@ class AuthControllerTest extends ControllerTestSupport {
     // ───────────── logout ─────────────
 
     @Test
-    void logout_revokesRefreshToken_logsActivity_andExpiresBothCookies() throws Exception {
-        User alice = stubUser(7, ALICE, "USER");
-        RefreshToken stored = new RefreshToken();
-        when(refreshTokenService.validate("REFRESH-456")).thenReturn(stored);
+    void logout_passesRefreshTokenToService_andExpiresBothCookies() throws Exception {
+        stubUser(7, ALICE, "USER");
 
         MvcResult result = mockMvc.perform(post("/api/v1/auth/logout")
                         .cookie(userToken(ALICE), new Cookie("refresh_token", "REFRESH-456")))
@@ -195,24 +188,31 @@ class AuthControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.message").value("ออกจากระบบสำเร็จ"))
                 .andReturn();
 
-        verify(refreshTokenService).revoke(stored);
-        verify(activityLogService).logSuccess(eq(alice), eq("LOGOUT"), anyString(), anyString(), eq("ออกจากระบบ"));
+        verify(authService).logout("REFRESH-456");
         List<String> cookies = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
         assertThat(cookies).anySatisfy(c -> assertThat(c).startsWith("access_token=;").contains("Max-Age=0"));
-        assertThat(cookies).anySatisfy(c -> assertThat(c).startsWith("refresh_token=;").contains("Max-Age=0"));
+        assertThat(cookies).anySatisfy(c -> assertThat(c).startsWith("refresh_token=;").contains("Max-Age=0")
+                .contains("Path=/api/v1/auth"));
     }
 
     @Test
-    void logout_withInvalidRefreshToken_stillClearsCookies() throws Exception {
-        when(refreshTokenService.validate("stale")).thenThrow(new RuntimeException("INVALID_REFRESH_TOKEN"));
-
-        mockMvc.perform(post("/api/v1/auth/logout").cookie(new Cookie("refresh_token", "stale")))
+    void logout_withExpiredAccessToken_stillSucceeds_andClearsCookies() throws Exception {
+        // access token อายุ 15 นาที — กด logout หลังจากนั้นต้องไม่โดน 401 JWT_EXPIRED จาก filter
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(expiredToken(ALICE), new Cookie("refresh_token", "REFRESH-456")))
                 .andExpect(status().isOk())
                 .andExpect(header().stringValues(HttpHeaders.SET_COOKIE,
                         hasItem(allOf(containsString("access_token=;"), containsString("Max-Age=0")))));
 
-        verify(refreshTokenService, never()).revoke(any());
-        verifyNoInteractions(activityLogService);
+        verify(authService).logout("REFRESH-456");
+    }
+
+    @Test
+    void logout_withNoCookiesAtAll_stillSucceeds() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isOk());
+
+        verify(authService).logout(null);
     }
 
     // ───────────── refresh ─────────────

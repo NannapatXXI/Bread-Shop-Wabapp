@@ -5,7 +5,7 @@ import Brand from './components/Brand';
 import Icon from './components/Icon';
 import LandingStory from './components/LandingStory';
 import { useEffect, useState } from 'react';
-import { getProducts } from "@/services/auth.service";
+import { getStorefront } from "@/services/auth.service";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -14,8 +14,9 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getProducts()
-      .then(res => setProducts(Array.isArray(res.data) ? res.data : []))
+    // สินค้าแนะนำที่ admin เลือก (เฉพาะที่มีของ) — ไม่ได้เลือกก็เป็นของขายดีจริง
+    getStorefront()
+      .then(res => setProducts(Array.isArray(res.data?.featured) ? res.data.featured : []))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, []);
@@ -76,13 +77,12 @@ export default function LandingPage() {
                 ? Array.from({ length: 4 }).map((_, i) => (
                   <div key={i}><div className="sk" style={{ aspectRatio: '1/1', borderRadius: 'var(--r-md)' }} /><div className="sk" style={{ height: 14, width: '60%', marginTop: 12 }} /></div>
                 ))
-                : products.slice(0, 4).map(product => (
-                  <Link key={product.id} href="/login" className={`pcard${product.stock === 0 ? ' out' : ''}`}>
+                : products.map(product => (
+                  <Link key={product.id} href="/login" className="pcard">
                     <div className="ph">
                       {product.imageUrl
                         ? <img src={`${API_URL}/${product.imageUrl}`} alt={product.name} />
                         : <span className="ph-empty">ไม่มีรูปสินค้า</span>}
-                      {product.stock === 0 && <span className="tag">หมดแล้ว</span>}
                     </div>
                     <div className="pmeta">
                       <div style={{ minWidth: 0 }}>

@@ -32,7 +32,7 @@ public class RefreshTokenCleanupJob {
     }
 
     @Transactional
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Bangkok")
     public void cleanupExpiredTokens() {
         LocalDateTime now = LocalDateTime.now();
 
